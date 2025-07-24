@@ -1,20 +1,29 @@
+import 'dart:async';
+import 'dart:convert'; // For jsonEncode and json.decode
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // For TextInputFormatter
+import 'package:flutter/services.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart'; // For DateFormat
-import 'package:new_sara/components/BidConfirmationDialog.dart'; // Adjust path as needed
+import 'package:http/http.dart' as http; // For making HTTP requests
+import 'package:intl/intl.dart';
+import 'package:new_sara/components/BidConfirmationDialog.dart';
+
+import '../../components/AnimatedMessageBar.dart';
+import '../../ulits/Constents.dart'; // Ensure this path is correct for Constant.apiEndpoint
 
 class JodiBulkScreen extends StatefulWidget {
   final String screenTitle;
-  final String gameType; // Passed from the previous screen
-  final int gameId; // Passed from the previous screen
+  final String gameType;
+  final int gameId;
+  final String gameName;
 
   const JodiBulkScreen({
     Key? key,
     required this.screenTitle,
-    required this.gameType, // Now required in constructor
-    required this.gameId, // Now required in constructor
+    required this.gameType,
+    required this.gameId,
+    required this.gameName,
   }) : super(key: key);
 
   @override
@@ -25,28 +34,40 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
   final TextEditingController _pointsController = TextEditingController();
   final TextEditingController _singleDigitController = TextEditingController();
 
-  List<Map<String, String>> _bids = []; // List to store the added bids
+  List<Map<String, String>> _bids = [];
 
-  final GetStorage storage = GetStorage(); // Directly initialize GetStorage
+  final GetStorage storage = GetStorage();
 
   String mobile = '';
   String name = '';
   bool accountActiveStatus = false;
-  String walletBalance = '0'; // Renamed to avoid confusion with walletBallence
+  String walletBalance = '0';
+
+  String? _messageToShow;
+  bool _isErrorForMessage = false;
+  Key _messageBarKey = UniqueKey();
+  Timer? _messageDismissTimer;
 
   @override
   void initState() {
     super.initState();
+    _loadUserData();
+    _setupStorageListeners();
+  }
 
-    _loadUserData(); // Load initial data
-    _setupStorageListeners(); // Setup listeners for dynamic updates
+  @override
+  void dispose() {
+    _pointsController.dispose();
+    _singleDigitController.dispose();
+    _messageDismissTimer?.cancel();
+    super.dispose();
   }
 
   void _loadUserData() {
     mobile = storage.read('mobileNoEnc') ?? '';
     name = storage.read('fullName') ?? '';
     accountActiveStatus = storage.read('accountStatus') ?? false;
-    walletBalance = storage.read('walletBalance') ?? '0';
+    walletBalance = storage.read('walletBalance')?.toString() ?? '0';
   }
 
   void _setupStorageListeners() {
@@ -70,79 +91,106 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
 
     storage.listenKey('walletBalance', (value) {
       setState(() {
-        walletBalance = value ?? '0';
+        walletBalance = value?.toString() ?? '0';
       });
     });
   }
 
-  @override
-  void dispose() {
-    _pointsController.dispose();
-    _singleDigitController.dispose();
-    super.dispose();
+  void _showMessage(String message, {bool isError = false}) {
+    _messageDismissTimer?.cancel();
+
+    setState(() {
+      _messageToShow = message;
+      _isErrorForMessage = isError;
+      _messageBarKey = UniqueKey();
+    });
+
+    _messageDismissTimer = Timer(const Duration(seconds: 3), () {
+      _clearMessage();
+    });
   }
 
-  // Function to add a new bid automatically
-  void _addBidAutomatically() {
-    final digit = _singleDigitController.text.trim();
-    final points = _pointsController.text.trim();
-
-    // Check if both fields have valid input and digit is 2 characters long for Jodi
-    if (digit.length == 2 &&
-        int.tryParse(digit) != null &&
-        points.isNotEmpty &&
-        int.tryParse(points) != null) {
-      final int parsedPoints = int.parse(points);
-
-      // Basic validation for points (example: between 10 and 1000)
-      if (parsedPoints < 10 || parsedPoints > 1000) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Points must be between 10 and 1000.')),
-        );
-        return;
-      }
-
+  void _clearMessage() {
+    if (mounted) {
       setState(() {
-        // Check if this Jodi digit already exists for the current game type
-        // This prevents adding the same Jodi multiple times.
-        bool alreadyExists = _bids.any(
-          (entry) =>
-              entry['digit'] == digit && entry['gameType'] == widget.gameType,
-        );
-
-        if (!alreadyExists) {
-          _bids.add({
-            "digit": digit,
-            "points": points,
-            "gameType": widget.gameType, // Use the gameType from widget
-            "type": "Jodi", // Explicitly set type for Jodi bids
-          });
-          _singleDigitController.clear(); // Clear digit after successful add
-          _pointsController.clear(); // Clear points after successful add
-        } else {
-          // Optionally provide feedback if the digit already exists
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Jodi $digit already added for this game type.'),
-            ),
-          );
-        }
+        _messageToShow = null;
       });
     }
   }
 
-  // Function to remove a bid from the list
+  void _addBidAutomatically() {
+    _clearMessage();
+    final digit = _singleDigitController.text.trim();
+    final points = _pointsController.text.trim();
+
+    if (digit.length != 2 || int.tryParse(digit) == null) {
+      _showMessage(
+        'Jodi digit must be exactly 2 numbers (00-99).',
+        isError: true,
+      );
+      return;
+    }
+
+    if (points.isEmpty || int.tryParse(points) == null) {
+      _showMessage('Please enter valid points.', isError: true);
+      return;
+    }
+
+    final int parsedPoints = int.parse(points);
+
+    if (parsedPoints < 10 || parsedPoints > 1000) {
+      _showMessage('Points must be between 10 and 1000.', isError: true);
+      return;
+    }
+
+    final int currentWalletBalance = int.tryParse(walletBalance) ?? 0;
+    if (parsedPoints > currentWalletBalance) {
+      _showMessage(
+        'Insufficient wallet balance to add this bid.',
+        isError: true,
+      );
+      return;
+    }
+
+    bool alreadyExists = _bids.any(
+      (entry) =>
+          entry['digit'] == digit && entry['gameType'] == widget.gameType,
+    );
+
+    if (!alreadyExists) {
+      setState(() {
+        _bids.add({
+          "digit": digit,
+          "points": points,
+          "gameType": widget.gameType,
+          "type": "Jodi",
+        });
+        _singleDigitController.clear();
+        _pointsController.clear();
+        _showMessage('Jodi $digit with $points points added.', isError: false);
+      });
+    } else {
+      _showMessage(
+        'Jodi $digit already added for this game type.',
+        isError: true,
+      );
+    }
+  }
+
   void _removeBid(int index) {
     setState(() {
-      _bids.removeAt(index);
+      final Map<String, String> removedBid = _bids.removeAt(index);
+      _showMessage('Jodi ${removedBid['digit']} removed.', isError: false);
     });
   }
 
-  // Function to show the confirmation dialog
   void _showConfirmationDialog() {
+    _clearMessage();
+
     if (_bids.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least one bid.')),
+      _showMessage(
+        'Please add at least one bid before submitting.',
+        isError: true,
       );
       return;
     }
@@ -151,11 +199,9 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
     final int currentWalletBalance = int.tryParse(walletBalance) ?? 0;
 
     if (currentWalletBalance < totalPoints) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Insufficient wallet balance to place this bid.'),
-          backgroundColor: Colors.red,
-        ),
+      _showMessage(
+        'Insufficient wallet balance to place these bids.',
+        isError: true,
       );
       return;
     }
@@ -166,7 +212,7 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
 
     showDialog(
       context: context,
-      barrierDismissible: false, // User must tap a button to dismiss
+      barrierDismissible: false,
       builder: (BuildContext dialogContext) {
         return BidConfirmationDialog(
           gameTitle: widget.screenTitle,
@@ -176,9 +222,8 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
                 (bid) => {
                   "digit": bid['digit']!,
                   "points": bid['points']!,
-                  "type": bid['type']!, // Using 'type' key from the bid map
-                  "gameType":
-                      bid['gameType']!, // Using 'gameType' key from the bid map
+                  "type": bid['type']!,
+                  "gameType": bid['gameType']!,
                 },
               )
               .toList(),
@@ -189,16 +234,110 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
               .toString(),
           gameId: widget.gameId.toString(),
           gameType: widget.gameType,
+          onConfirm: () async {
+            bool success = await _placeFinalBids();
+            if (success) {
+              setState(() {
+                _bids.clear();
+              });
+              _showMessage("All bids submitted successfully!", isError: false);
+            } else {
+              _showMessage(
+                "Bid submission failed. Please try again.",
+                isError: true,
+              );
+            }
+          },
         );
       },
-    ).then((_) {
-      // Optional: Handle actions after dialog is dismissed (e.g., clear bids on successful submission)
-      // For now, we'll just print
-      print("Bid confirmation dialog dismissed.");
-    });
+    );
   }
 
-  // Calculate total points
+  Future<bool> _placeFinalBids() async {
+    String url;
+    if (widget.gameName.toLowerCase().contains('jackpot')) {
+      url = '${Constant.apiEndpoint}place-jackpot-bid';
+    } else if (widget.gameName.toLowerCase().contains('starline')) {
+      url = '${Constant.apiEndpoint}place-starline-bid';
+    } else {
+      url = '${Constant.apiEndpoint}place-bid';
+    }
+
+    if (mobile.isEmpty ||
+        name.isEmpty ||
+        storage.read('accessToken') == null ||
+        storage.read('registerId') == null) {
+      _showMessage("Authentication error. Please log in again.", isError: true);
+      return false;
+    }
+
+    final headers = {
+      'deviceId': 'qwert',
+      'deviceName': 'sm2233',
+      'accessStatus': '1',
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ${storage.read('accessToken')}',
+    };
+
+    final List<Map<String, dynamic>> bidPayload = _bids.map((bid) {
+      String sessionType = bid["type"] ?? "";
+      String digit = bid["digit"] ?? "";
+      int bidAmount = int.tryParse(bid["points"] ?? '0') ?? 0;
+
+      if (bid["type"] != null && bid["type"]!.contains('(')) {
+        final String fullType = bid["type"]!;
+        final int startIndex = fullType.indexOf('(') + 1;
+        final int endIndex = fullType.indexOf(')');
+        if (startIndex > 0 && endIndex > startIndex) {
+          sessionType = fullType.substring(startIndex, endIndex).toUpperCase();
+        }
+      }
+
+      return {
+        "sessionType": sessionType,
+        "digit": digit,
+        "pana": digit,
+        "bidAmount": bidAmount,
+      };
+    }).toList();
+
+    final body = {
+      "registerId": storage.read('registerId'),
+      "gameId": widget.gameId,
+      "bidAmount": _getTotalPoints(),
+      "gameType": widget.gameType,
+      "bid": bidPayload,
+    };
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: headers,
+        body: jsonEncode(body),
+      );
+
+      final Map<String, dynamic> responseBody = json.decode(response.body);
+
+      if (response.statusCode == 200 && responseBody['status'] == true) {
+        int currentWallet = int.tryParse(walletBalance) ?? 0;
+        int deductedAmount = _getTotalPoints();
+        int newWalletBalance = currentWallet - deductedAmount;
+        storage.write('walletBalance', newWalletBalance.toString());
+        setState(() {
+          walletBalance = newWalletBalance.toString();
+        });
+        return true;
+      } else {
+        String errorMessage = responseBody['msg'] ?? "Unknown error occurred.";
+        _showMessage('Bid submission failed: $errorMessage', isError: true);
+        return false;
+      }
+    } catch (e) {
+      _showMessage('Network error during bid submission: $e', isError: true);
+      return false;
+    }
+  }
+
   int _getTotalPoints() {
     return _bids.fold(
       0,
@@ -209,7 +348,7 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5), // Light gray background
+      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
@@ -233,7 +372,7 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
           const SizedBox(width: 6),
           Center(
             child: Text(
-              walletBalance, // Display dynamic wallet balance
+              walletBalance,
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -244,232 +383,252 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
           const SizedBox(width: 12),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16.0,
-              vertical: 12.0,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Enter Points:',
-                      style: GoogleFonts.poppins(fontSize: 16),
-                    ),
-                    SizedBox(
-                      width: 150,
-                      height: 40,
-                      child: TextField(
-                        cursorColor: Colors.amber,
-                        controller: _pointsController,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        // onChanged is now only on _singleDigitController
-                        decoration: InputDecoration(
-                          hintText: 'Enter Amount',
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            borderSide: const BorderSide(color: Colors.black),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            borderSide: const BorderSide(color: Colors.black),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            borderSide: const BorderSide(
-                              color: Colors.amber,
-                              width: 2,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+          Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 12.0,
                 ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Enter Jodi Digit:', // Changed label to Jodi
-                      style: GoogleFonts.poppins(fontSize: 16),
-                    ),
-                    SizedBox(
-                      width: 150,
-                      height: 40,
-                      child: TextField(
-                        cursorColor: Colors.amber,
-                        controller: _singleDigitController,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          LengthLimitingTextInputFormatter(
-                            2,
-                          ), // Limit to 2 digits for Jodi
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        onChanged: (value) {
-                          // Trigger add only if a 2-digit Jodi and points are entered
-                          if (value.length == 2 &&
-                              _pointsController.text.isNotEmpty) {
-                            _addBidAutomatically();
-                          }
-                        },
-                        decoration: InputDecoration(
-                          hintText: 'Bid Digits',
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            borderSide: const BorderSide(color: Colors.black),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            borderSide: const BorderSide(color: Colors.black),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            borderSide: const BorderSide(
-                              color: Colors.amber,
-                              width: 2,
-                            ),
-                          ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Enter Points:',
+                          style: GoogleFonts.poppins(fontSize: 16),
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 15),
-              ],
-            ),
-          ),
-          const Divider(thickness: 1), // Divider after input section
-          // Table Headers (conditionally rendered)
-          if (_bids.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 8.0,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Digit',
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      'Amount',
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      'Game Type',
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const SizedBox(width: 48), // Space for delete icon
-                ],
-              ),
-            ),
-          if (_bids.isNotEmpty) const Divider(thickness: 1),
-
-          // Dynamic List of Bids
-          Expanded(
-            child: _bids.isEmpty
-                ? Center(
-                    child: Text(
-                      'No Bids Placed',
-                      style: GoogleFonts.poppins(color: Colors.grey),
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: _bids.length,
-                    itemBuilder: (context, index) {
-                      final bid = _bids[index];
-                      return Container(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.2),
-                              spreadRadius: 1,
-                              blurRadius: 3,
-                              offset: const Offset(0, 1),
-                            ),
-                          ],
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16.0,
-                            vertical: 8.0,
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  // Null-aware access for safety
-                                  bid['digit'] ?? '',
-                                  style: GoogleFonts.poppins(),
-                                ),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  // Null-aware access for safety
-                                  bid['points'] ?? '',
-                                  style: GoogleFonts.poppins(),
-                                ),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  // Null-aware access for safety, using 'type' or 'gameType' as defined in _addBidAutomatically
-                                  bid['type'] ?? bid['gameType'] ?? '',
-                                  style: GoogleFonts.poppins(
-                                    color: Colors.green[700],
-                                  ),
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.delete,
-                                  color: Colors.red,
-                                ),
-                                onPressed: () => _removeBid(index),
-                              ),
+                        SizedBox(
+                          width: 150,
+                          height: 40,
+                          child: TextField(
+                            cursorColor: Colors.amber,
+                            controller: _pointsController,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
                             ],
+                            onTap: _clearMessage,
+                            decoration: InputDecoration(
+                              hintText: 'Enter Amount',
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                borderSide: const BorderSide(
+                                  color: Colors.black,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                borderSide: const BorderSide(
+                                  color: Colors.black,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                borderSide: const BorderSide(
+                                  color: Colors.amber,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                      );
-                    },
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Enter Jodi Digit:',
+                          style: GoogleFonts.poppins(fontSize: 16),
+                        ),
+                        SizedBox(
+                          width: 150,
+                          height: 40,
+                          child: TextField(
+                            cursorColor: Colors.amber,
+                            controller: _singleDigitController,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              LengthLimitingTextInputFormatter(2),
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            onTap: _clearMessage,
+                            onChanged: (value) {
+                              if (value.length == 2 &&
+                                  _pointsController.text.isNotEmpty) {
+                                _addBidAutomatically();
+                              }
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'Bid Digits',
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                borderSide: const BorderSide(
+                                  color: Colors.black,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                borderSide: const BorderSide(
+                                  color: Colors.black,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                borderSide: const BorderSide(
+                                  color: Colors.amber,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 15),
+                  ],
+                ),
+              ),
+              const Divider(thickness: 1),
+              if (_bids.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 8.0,
                   ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Digit',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          'Amount',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          'Game Type',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 48),
+                    ],
+                  ),
+                ),
+              if (_bids.isNotEmpty) const Divider(thickness: 1),
+              Expanded(
+                child: _bids.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No Bids Placed',
+                          style: GoogleFonts.poppins(color: Colors.grey),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: _bids.length,
+                        itemBuilder: (context, index) {
+                          final bid = _bids[index];
+                          return Container(
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.2),
+                                  spreadRadius: 1,
+                                  blurRadius: 3,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16.0,
+                                vertical: 8.0,
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      bid['digit'] ?? '',
+                                      style: GoogleFonts.poppins(),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      bid['points'] ?? '',
+                                      style: GoogleFonts.poppins(),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      bid['type'] ?? bid['gameType'] ?? '',
+                                      style: GoogleFonts.poppins(
+                                        color: Colors.green[700],
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete,
+                                      color: Colors.red,
+                                    ),
+                                    onPressed: () => _removeBid(index),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+              if (_bids.isNotEmpty) _buildBottomBar(),
+            ],
           ),
-          // Bottom Bar (conditionally rendered)
-          if (_bids.isNotEmpty) _buildBottomBar(),
+          if (_messageToShow != null)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: AnimatedMessageBar(
+                key: _messageBarKey,
+                message: _messageToShow!,
+                isError: _isErrorForMessage,
+                onDismissed: _clearMessage,
+              ),
+            ),
         ],
       ),
     );
   }
 
-  // Helper for bottom bar
   Widget _buildBottomBar() {
     int totalBids = _bids.length;
     int totalPoints = _getTotalPoints();
@@ -529,11 +688,7 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
             ],
           ),
           ElevatedButton(
-            onPressed: _showConfirmationDialog, // Call the confirmation dialog
-            child: Text(
-              'SUBMIT',
-              style: GoogleFonts.poppins(color: Colors.white, fontSize: 16),
-            ),
+            onPressed: _showConfirmationDialog,
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange[700],
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -541,6 +696,10 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               elevation: 3,
+            ),
+            child: Text(
+              'SUBMIT',
+              style: GoogleFonts.poppins(color: Colors.white, fontSize: 16),
             ),
           ),
         ],

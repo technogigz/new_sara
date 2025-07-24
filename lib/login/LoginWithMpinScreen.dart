@@ -6,10 +6,12 @@ import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:local_auth/local_auth.dart';
 
-import '../HomeScreen/HomeScreen.dart';
-import '../SetMPIN/SetNewPinScreen.dart';
-import '../components/AppNameBold.dart';
-import '../ulits/Constents.dart';
+import '../Helper/Toast.dart'; // Assuming this path is correct
+import '../HomeScreen/HomeScreen.dart'; // Assuming this path is correct
+import '../SetMPIN/SetNewPinScreen.dart'; // Assuming this path is correct
+import '../components/AppNameBold.dart'; // Assuming this path is correct
+import '../ulits/ColorsR.dart'; // Assuming this path is correct
+import '../ulits/Constents.dart'; // Assuming this path is correct
 
 class LoginWithMpinScreen extends StatefulWidget {
   const LoginWithMpinScreen({super.key});
@@ -47,7 +49,7 @@ class _LoginWithMpinScreenState extends State<LoginWithMpinScreen> {
       }
 
       final authenticated = await auth.authenticate(
-        localizedReason: 'Scan your fingerprint to login',
+        localizedReason: 'Scan your fingerprint to verify',
         options: const AuthenticationOptions(
           biometricOnly: true,
           stickyAuth: true,
@@ -66,9 +68,61 @@ class _LoginWithMpinScreenState extends State<LoginWithMpinScreen> {
     }
   }
 
+  void _onSetPinPressed() async {
+    final mobileNo = storage.read('mobile');
+    if (mobileNo == null || mobileNo.toString().isEmpty) {
+      // Use mobileNo directly
+      popToast("Mobile number not found", 4, Colors.white, ColorsR.appColorRed);
+      return;
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('${Constant.apiEndpoint}send-otp'),
+        headers: {
+          'deviceId': 'qwert',
+          'deviceName': 'sm2233',
+          'accessStatus': '1',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({"mobileNo": int.tryParse(mobileNo)}), // Use mobileNo
+      );
+
+      final json = jsonDecode(response.body);
+
+      print("Raw response body: ${response.body}");
+
+      if (response.statusCode == 200 && json['status'] == true) {
+        popToast("OTP sent successfully", 2, Colors.white, Colors.green);
+
+        Future.delayed(const Duration(milliseconds: 500), () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SetNewPinScreen(mobile: mobileNo),
+            ),
+          );
+        });
+      } else {
+        popToast(
+          json['message'] ?? "Failed to send OTP",
+          4,
+          Colors.white,
+          ColorsR.appColorRed,
+        );
+      }
+    } catch (e) {
+      popToast(
+        "Something went wrong: $e",
+        4,
+        Colors.white,
+        ColorsR.appColorRed,
+      );
+    }
+  }
+
   /// Login using entered mPIN
   Future<void> _loginWithMpin() async {
-    final savedMpin = storage.read('user_mpin');
     final enteredMpin = mpinController.text.trim();
 
     if (enteredMpin.isEmpty) {
@@ -76,35 +130,86 @@ class _LoginWithMpinScreenState extends State<LoginWithMpinScreen> {
       return;
     }
 
-    if (savedMpin == null) {
-      _showSnackBar('No mPIN found. Please set a new mPIN.');
+    // Retrieve registerId and accessToken from GetStorage
+    final String? registerId = storage.read('registerId');
+    final String? accessToken = storage.read('accessToken');
+
+    log("Register Id: $registerId");
+    log("Access Token: $accessToken");
+
+    if (registerId == null || registerId.isEmpty) {
+      _showSnackBar('Registration ID not found. Please re-register.');
       return;
     }
 
-    if (savedMpin != enteredMpin) {
-      _showSnackBar('Incorrect mPIN. Please try again.');
-    } else {
-      _navigateToHome();
+    if (accessToken == null || accessToken.isEmpty) {
+      _showSnackBar('Access token not found. Please re-login.');
+      return;
+    }
+
+    try {
+      final url = Uri.parse('${Constant.apiEndpoint}verify-mpin');
+      final response = await http.post(
+        url,
+        headers: {
+          'deviceId':
+              'qwert', // Replace with actual device ID logic if available
+          'deviceName':
+              'sm2233', // Replace with actual device name logic if available
+          'accessStatus': '1',
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: jsonEncode({
+          "registerId": registerId,
+          "pinNo": int.tryParse(enteredMpin), // MPIN is expected as an integer
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+
+        log("MPIN Verification Response: $responseData");
+        // Assuming the API returns a success status or similar
+        if (responseData['status'] == true) {
+          // Adjust based on actual API response structure
+          _showSnackBar('Login successful!');
+          await fetchAndSaveUserDetails(
+            registerId,
+          ); // Fetch user details after successful MPIN verification
+          _navigateToHome();
+        } else {
+          _showSnackBar(
+            responseData['message'] ?? 'Incorrect mPIN. Please try again.',
+          );
+        }
+      } else {
+        log(
+          "❌ MPIN Verification Failed: ${response.statusCode} => ${response.body}",
+        );
+        _showSnackBar('Failed to verify mPIN. Please try again later.');
+      }
+    } catch (e) {
+      log("❌ Exception during MPIN verification: $e");
+      _showSnackBar('An error occurred during mPIN verification: $e');
     }
   }
 
   /// Validate saved mPIN (used after biometric success)
   Future<void> _validateSavedMpinAndNavigate() async {
-    final savedMpin = storage.read('user_mpin');
-
-    if (savedMpin == null || savedMpin.isEmpty) {
-      _showSnackBar('No mPIN set. Please create one.');
+    final String? registerId = storage.read('registerId');
+    if (registerId == null || registerId.isEmpty) {
+      _showSnackBar('Registration ID not found. Please re-register.');
       return;
     }
-    String registerId = storage.read('registerId') ?? '';
-    fetchAndSaveUserDetails(registerId);
+    await fetchAndSaveUserDetails(registerId);
     _navigateToHome(); // Biometric passed and mPIN exists
   }
 
   Future<void> fetchAndSaveUserDetails(String registerId) async {
     final storage = GetStorage();
     final url = Uri.parse('${Constant.apiEndpoint}user-details-by-register-id');
-    String accessToken = storage.read('accessToken');
+    String accessToken = storage.read('accessToken') ?? '';
 
     log("Register Id: $registerId");
     log("Access Token: $accessToken");
@@ -127,13 +232,14 @@ class _LoginWithMpinScreenState extends State<LoginWithMpinScreen> {
         final info = responseData['info'];
         log("User details: $info");
 
-        // Save individual fields to GetStorage
+        // Save individual fields to GetStorage, ensuring walletBalance is stored as String
         storage.write('userId', info['userId']);
         storage.write('fullName', info['fullName']);
         storage.write('emailId', info['emailId']);
         storage.write('mobileNo', info['mobileNo']);
         storage.write('mobileNoEnc', info['mobileNoEnc']);
-        storage.write('walletBalance', info['walletBalance']);
+        // FIX: Convert walletBalance to String before saving
+        storage.write('walletBalance', info['walletBalance']?.toString());
         storage.write('profilePicture', info['profilePicture']);
         storage.write('accountStatus', info['accountStatus']);
         storage.write('betStatus', info['betStatus']);
@@ -141,10 +247,12 @@ class _LoginWithMpinScreenState extends State<LoginWithMpinScreen> {
         log("✅ User details saved to GetStorage:");
         info.forEach((key, value) => log('$key: $value'));
       } else {
-        print("❌ Failed: ${response.statusCode} => ${response.body}");
+        print(
+          "❌ Failed to fetch user details: ${response.statusCode} => ${response.body}",
+        );
       }
     } catch (e) {
-      print("❌ Exception: $e");
+      print("❌ Exception fetching user details: $e");
     }
   }
 
@@ -226,7 +334,8 @@ class _LoginWithMpinScreenState extends State<LoginWithMpinScreen> {
                     child: const Text(
                       "LOGIN",
                       style: TextStyle(
-                        color: Colors.black,
+                        color: Colors.white,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -237,23 +346,27 @@ class _LoginWithMpinScreenState extends State<LoginWithMpinScreen> {
                 // Forgot mPIN
                 GestureDetector(
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => SetNewPinScreen(mobile: mobile),
-                      ),
-                    );
+                    _onSetPinPressed();
+                    // The navigation to SetNewPinScreen is already inside _onSetPinPressed
+                    // So, remove the duplicate navigation here.
+                    // Navigator.push(
+                    //   context,
+                    //   MaterialPageRoute(
+                    //     builder: (_) => SetNewPinScreen(mobile: mobile),
+                    //   ),
+                    // );
                   },
                   child: const Text(
                     "Forgot M-Pin?",
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.black87,
-                      decoration: TextDecoration.underline,
+                      decoration: TextDecoration.none,
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+
+                const SizedBox(height: 30),
 
                 // Fingerprint Icon
                 GestureDetector(
@@ -267,7 +380,7 @@ class _LoginWithMpinScreenState extends State<LoginWithMpinScreen> {
                 const SizedBox(height: 8),
                 const Text(
                   "Use fingerprint to login",
-                  style: TextStyle(color: Colors.grey),
+                  style: TextStyle(color: Colors.blueGrey, fontSize: 16),
                 ),
               ],
             ),

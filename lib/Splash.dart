@@ -4,8 +4,8 @@ import 'dart:developer';
 import 'package:flutter/widgets.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:new_sara/Permissions/Permissions.dart';
 
-import '../login/LoginScreen.dart';
 import '../Login/LoginWithMpinScreen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -27,14 +27,17 @@ class _SplashScreenState extends State<SplashScreen> {
 
       Future.delayed(const Duration(seconds: 3), () {
         final isLoggedIn = storage.read('is_logged_in') ?? false;
-        final target = isLoggedIn ? const LoginWithMpinScreen() : const EnterMobileScreen();
+        final target = isLoggedIn
+            ? const LoginWithMpinScreen()
+            : const PermissionScreen();
 
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) => target,
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
             transitionDuration: const Duration(milliseconds: 500),
           ),
         );
@@ -87,7 +90,6 @@ class _SplashScreenState extends State<SplashScreen> {
     }
   }
 }
-
 
 // import 'dart:convert';
 // import 'dart:developer';

@@ -225,7 +225,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<HomeData> fetchDashboardData() async {
     final response = await http.post(
-      Uri.parse("https://sara777.win/api/v1/game-list"),
+      Uri.parse("${Constant.apiEndpoint}game-list"),
       headers: {
         "Content-Type": "application/json",
         "deviceId": "qwert",
@@ -328,6 +328,8 @@ class _HomePageState extends State<HomePage> {
                               );
                             },
                           ),
+
+                          const SizedBox(width: 5),
                           _customCategoryButton(
                             uiStrings["King Jackpot"] ?? "King Jackpot",
                             onTap: () {
@@ -350,7 +352,7 @@ class _HomePageState extends State<HomePage> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             _contactItem("+919649115777", isVisible: true),
-                            const SizedBox(width: 20),
+                            Spacer(),
                             _contactItem("+918875115777", isVisible: true),
                           ],
                         ),
@@ -389,6 +391,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // Category Buttons
   Widget _customCategoryButton(String title, {required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
@@ -409,7 +412,7 @@ class _HomePageState extends State<HomePage> {
               ),
               child: Icon(
                 Icons.play_arrow,
-                color: Colors.grey.shade800,
+                color: Colors.grey.shade600,
                 size: 20,
               ),
             ),
@@ -418,7 +421,7 @@ class _HomePageState extends State<HomePage> {
               title.toUpperCase(),
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 18,
+                fontSize: 18.3,
                 color: Colors.black,
               ),
             ),
@@ -428,6 +431,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // Contact Items
   Widget _contactItem(String number, {bool isVisible = true}) {
     return Visibility(
       visible: isVisible,
@@ -467,6 +471,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // Game Cards
   Widget _buildCustomGameCard({
     required String title,
     required String result,
@@ -577,7 +582,7 @@ class _HomePageState extends State<HomePage> {
                     child: Icon(
                       Icons.play_arrow,
                       size: 30,
-                      color: Colors.grey.shade800,
+                      color: Colors.grey.shade600,
                     ),
                   ),
                 ),

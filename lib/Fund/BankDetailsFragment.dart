@@ -48,9 +48,19 @@ class _BankDetailsFragmentState extends State<BankDetailsFragment> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         print("Success: $data");
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Bank details submitted successfully")),
         );
+
+        // Clear fields on success
+        nameController.clear();
+        accNumberController.clear();
+        ifscController.clear();
+        bankNameController.clear();
+        branchController.clear();
+
+        Navigator.pop(context);
       } else {
         print("Error: ${response.statusCode} ${response.body}");
         ScaffoldMessenger.of(context).showSnackBar(

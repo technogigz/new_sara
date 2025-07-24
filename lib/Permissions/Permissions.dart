@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:new_sara/Login/LoginWithMpinScreen.dart';
-import 'package:new_sara/login/LoginScreen.dart';
+import 'package:new_sara/login/LoginScreen.dart'; // Assuming EnterMobileScreen is here
 import 'package:permission_handler/permission_handler.dart';
 
-import '../components/AppNameBold.dart';
+import '../components/AppNameBold.dart'; // Ensure this path is correct based on your project structure
 
 class PermissionScreen extends StatefulWidget {
   const PermissionScreen({super.key});
@@ -31,9 +31,12 @@ class _PermissionScreenState extends State<PermissionScreen> {
     await Future.delayed(const Duration(milliseconds: 300));
 
     // Request all 3 permissions initially
-    await _requestPermission(Permission.microphone);
-    await _requestPermission(Permission.phone);
-    await _requestPermission(Permission.notification);
+    await _requestPermission(
+      Permission.microphone,
+      showSnackbar: false,
+    ); // Don't show snackbar for initial batch
+    await _requestPermission(Permission.phone, showSnackbar: false);
+    await _requestPermission(Permission.notification, showSnackbar: false);
 
     await _updatePermissionsStatus();
 
@@ -44,16 +47,48 @@ class _PermissionScreenState extends State<PermissionScreen> {
     setState(() => isLoading = false);
   }
 
-  Future<void> _requestPermission(Permission permission) async {
-    final status = await permission.status;
+  Future<void> _requestPermission(
+    Permission permission, {
+    bool showSnackbar = true,
+  }) async {
+    final statusBefore = await permission.status;
+    bool changedToGranted = false;
 
-    if (status.isDenied || status.isRestricted) {
-      await permission.request();
-    } else if (status.isPermanentlyDenied) {
+    if (statusBefore.isDenied || statusBefore.isRestricted) {
+      final statusAfterRequest = await permission.request();
+      if (statusAfterRequest.isGranted) {
+        changedToGranted = true;
+      }
+    } else if (statusBefore.isPermanentlyDenied) {
       await openAppSettings();
+      // After returning from settings, we'll check status again below
     }
 
-    await _updatePermissionsStatus(); // ✅ Always update after request
+    // Always update status after any interaction
+    await _updatePermissionsStatus();
+
+    // Check if permission became granted after this interaction
+    final statusNow = await permission.status;
+    if (showSnackbar && statusNow.isGranted && !statusBefore.isGranted) {
+      String permissionName = '';
+      if (permission == Permission.microphone)
+        permissionName = 'Record Audio';
+      else if (permission == Permission.phone)
+        permissionName = 'Make and Manage Calls';
+      else if (permission == Permission.notification)
+        permissionName = 'Notifications';
+
+      if (mounted) {
+        // Ensure widget is still in tree
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$permissionName permission granted!'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _updatePermissionsStatus() async {
@@ -65,23 +100,30 @@ class _PermissionScreenState extends State<PermissionScreen> {
     debugPrint('callGranted: $callGranted');
     debugPrint('notificationGranted: $notificationGranted');
 
-    setState(() {});
+    // Only call setState if the widget is still mounted
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void _goToNextScreen() {
     final isLoggedIn = storage.read('isLoggedIn') ?? false;
 
+    // Use a post-frame callback to ensure navigation happens after the build phase
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (isLoggedIn) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const LoginWithMpinScreen()),
-        );
-      } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const EnterMobileScreen()),
-        );
+      if (context.mounted) {
+        // Check if context is still valid before navigating
+        if (isLoggedIn) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const LoginWithMpinScreen()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const EnterMobileScreen()),
+          );
+        }
       }
     });
   }
@@ -136,27 +178,31 @@ class _PermissionScreenState extends State<PermissionScreen> {
           child: Column(
             children: [
               const SizedBox(height: 20),
+              // Ensure AppNameBold is correctly imported and exists
               const AppNameBold(),
               const SizedBox(height: 20),
 
               _buildPermissionTile(
                 icon: Icons.mic,
-                title: "Microphone",
-                description: "Required to send voice to Sara777 support.",
+                title: "Record Audio",
+                description:
+                    "Required to record and send voice to Sara777 support.",
                 granted: micGranted,
                 onTap: () => _requestPermission(Permission.microphone),
               ),
               _buildPermissionTile(
                 icon: Icons.call,
-                title: "Call",
-                description: "Required to call Sara777 support.",
+                title: "Make and Manage Calls",
+                description:
+                    "Required to directly call Sara777 support from the app.",
                 granted: callGranted,
                 onTap: () => _requestPermission(Permission.phone),
               ),
               _buildPermissionTile(
                 icon: Icons.notifications,
-                title: "Notification",
-                description: "Required to receive important alerts.",
+                title: "Notifications",
+                description:
+                    "Required to receive important alerts and updates.",
                 granted: notificationGranted,
                 onTap: () => _requestPermission(Permission.notification),
               ),

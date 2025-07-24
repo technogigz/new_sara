@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:new_sara/HomeScreen/HomeScreen.dart';
 import 'package:new_sara/Login/LoginWithMpinScreen.dart';
 
 import '../../../ulits/ColorsR.dart';
@@ -155,7 +156,7 @@ class _VerifyMobileScreenState extends State<VerifyMobileScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('https://sara777.win/api/v1/user-register'),
+        Uri.parse('${Constant.apiEndpoint}user-register'),
         headers: {
           'deviceId': 'qwert',
           'deviceName': 'sm2233',
@@ -177,6 +178,12 @@ class _VerifyMobileScreenState extends State<VerifyMobileScreen> {
         print("✅ Registration successful. Message: $msg");
 
         // Navigate to next screen
+        Future.delayed(const Duration(seconds: 1), () {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+          );
+        });
       } else {
         popToast("❌ $msg", 4, Colors.white, ColorsR.appColorRed);
         print("❌ Registration failed. Message: $msg");

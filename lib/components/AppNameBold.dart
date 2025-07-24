@@ -41,7 +41,7 @@ class AppNameBold extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 48,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black,
+                        color: Colors.amber,
                       ),
                     ),
                   ],

@@ -1,10 +1,111 @@
+import 'dart:async'; // For Timer
+import 'dart:convert'; // For jsonEncode, json.decode
+import 'dart:developer'; // For log
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For TextInputFormatter
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart'; // For GoogleFonts
+import 'package:http/http.dart' as http; // For API calls
 import 'package:intl/intl.dart'; // For date formatting
 
 import '../../components/BidConfirmationDialog.dart'; // Import your BidConfirmationDialog
+import '../../ulits/Constents.dart'; // Import the Constants file for API endpoint
+
+// AnimatedMessageBar component (Ensure this is a common component or defined here)
+// If this component is already defined in a separate file (e.g., components/animated_message_bar.dart)
+// then you should import it and remove this duplicate definition.
+class AnimatedMessageBar extends StatefulWidget {
+  final String message;
+  final bool isError;
+  final VoidCallback? onDismissed;
+
+  const AnimatedMessageBar({
+    Key? key,
+    required this.message,
+    this.isError = false,
+    this.onDismissed,
+  }) : super(key: key);
+
+  @override
+  _AnimatedMessageBarState createState() => _AnimatedMessageBarState();
+}
+
+class _AnimatedMessageBarState extends State<AnimatedMessageBar> {
+  double _height = 0.0;
+  Timer? _visibilityTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showBar();
+    });
+  }
+
+  void _showBar() {
+    if (!mounted) return;
+    setState(() {
+      _height = 48.0;
+    });
+
+    _visibilityTimer = Timer(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      setState(() {
+        _height = 0.0;
+      });
+      Timer(const Duration(milliseconds: 300), () {
+        if (mounted && widget.onDismissed != null) {
+          widget.onDismissed!();
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _visibilityTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      height: _height,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      color: widget.isError ? Colors.red : Colors.green,
+      alignment: Alignment.center,
+      child: _height > 0.0
+          ? Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                children: [
+                  Icon(
+                    widget.isError
+                        ? Icons.error_outline
+                        : Icons.check_circle_outline,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.message,
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: 13,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : const SizedBox.shrink(),
+    );
+  }
+}
 
 class HalfSangamBBoardScreen extends StatefulWidget {
   final String screenTitle;
@@ -14,8 +115,8 @@ class HalfSangamBBoardScreen extends StatefulWidget {
   const HalfSangamBBoardScreen({
     Key? key,
     required this.screenTitle,
-    required this.gameType, // Make sure to pass this from the calling screen
-    required this.gameId, // Make sure to pass this from the calling screen
+    required this.gameType,
+    required this.gameId,
   }) : super(key: key);
 
   @override
@@ -27,7 +128,7 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
   final TextEditingController _closeDigitController = TextEditingController();
   final TextEditingController _pointsController = TextEditingController();
 
-  List<Map<String, String>> _bids = []; // List to store the added bids
+  List<Map<String, String>> _bids = [];
   late GetStorage storage = GetStorage();
   late String accessToken;
   late String registerId;
@@ -35,25 +136,41 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
   bool accountStatus = false;
   late int walletBalance;
 
+  // Placeholder for device info. In a real app, these would be dynamic.
+  final String _deviceId = 'test_device_id_flutter';
+  final String _deviceName = 'test_device_name_flutter';
+
+  // State management for AnimatedMessageBar
+  String? _messageToShow;
+  bool _isErrorForMessage = false;
+  Key _messageBarKey = UniqueKey(); // Key to force rebuild/re-animation
+
   @override
   void initState() {
     super.initState();
+    _loadInitialData();
+    _setupStorageListeners();
+  }
+
+  // Load initial data from GetStorage
+  Future<void> _loadInitialData() async {
     accessToken = storage.read('accessToken') ?? '';
     registerId = storage.read('registerId') ?? '';
     accountStatus = storage.read('accountStatus') ?? false;
     preferredLanguage = storage.read('selectedLanguage') ?? 'en';
 
-    // FIX HERE: Safely parse the walletBalance to an int
     final dynamic storedWalletBalance = storage.read('walletBalance');
     if (storedWalletBalance is String) {
       walletBalance = int.tryParse(storedWalletBalance) ?? 0;
     } else if (storedWalletBalance is int) {
       walletBalance = storedWalletBalance;
     } else {
-      walletBalance = 0; // Default if neither string nor int, or null
+      walletBalance = 0;
     }
+  }
 
-    // Auto-update on key change
+  // Set up listeners for GetStorage keys
+  void _setupStorageListeners() {
     storage.listenKey('accessToken', (value) {
       setState(() {
         accessToken = value ?? '';
@@ -74,7 +191,6 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
 
     storage.listenKey('walletBalance', (value) {
       setState(() {
-        // Handle potential String or int from GetStorage
         if (value is String) {
           walletBalance = int.tryParse(value) ?? 0;
         } else if (value is int) {
@@ -106,7 +222,26 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
     super.dispose();
   }
 
+  // Helper method to show messages using AnimatedMessageBar
+  void _showMessage(String message, {bool isError = false}) {
+    setState(() {
+      _messageToShow = message;
+      _isErrorForMessage = isError;
+      _messageBarKey = UniqueKey(); // Update key to trigger animation
+    });
+  }
+
+  // Helper method to clear the message bar
+  void _clearMessage() {
+    if (mounted) {
+      setState(() {
+        _messageToShow = null;
+      });
+    }
+  }
+
   void _addBid() {
+    _clearMessage(); // Clear any previous messages
     final openPanna = _openPannaController.text.trim();
     final closeDigit = _closeDigitController.text.trim();
     final points = _pointsController.text.trim();
@@ -115,10 +250,9 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
     if (openPanna.isEmpty ||
         openPanna.length != 3 ||
         int.tryParse(openPanna) == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a 3-digit number for Open Panna.'),
-        ),
+      _showMessage(
+        'Please enter a 3-digit number for Open Panna.',
+        isError: true,
       );
       return;
     }
@@ -126,11 +260,7 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
     if (parsedOpenPanna == null ||
         parsedOpenPanna < 100 ||
         parsedOpenPanna > 999) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Open Panna must be between 100 and 999.'),
-        ),
-      );
+      _showMessage('Open Panna must be between 100 and 999.', isError: true);
       return;
     }
 
@@ -138,10 +268,9 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
     if (closeDigit.isEmpty ||
         closeDigit.length != 1 ||
         int.tryParse(closeDigit) == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a single digit for Close Digit (0-9).'),
-        ),
+      _showMessage(
+        'Please enter a single digit for Close Digit (0-9).',
+        isError: true,
       );
       return;
     }
@@ -149,10 +278,9 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
     if (parsedCloseDigit == null ||
         parsedCloseDigit < 0 ||
         parsedCloseDigit > 9) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Close Digit must be a single digit between 0 and 9.'),
-        ),
+      _showMessage(
+        'Close Digit must be a single digit between 0 and 9.',
+        isError: true,
       );
       return;
     }
@@ -160,9 +288,7 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
     // 3. Validate Points (10 to 1000)
     int? parsedPoints = int.tryParse(points);
     if (parsedPoints == null || parsedPoints < 10 || parsedPoints > 1000) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Points must be between 10 and 1000.')),
-      );
+      _showMessage('Points must be between 10 and 1000.', isError: true);
       return;
     }
 
@@ -178,9 +304,7 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
         _bids[existingIndex]['points'] =
             (int.parse(_bids[existingIndex]['points']!) + parsedPoints)
                 .toString();
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Updated points for $sangam.')));
+        _showMessage('Updated points for $sangam.');
       } else {
         // Otherwise, add a new bid
         _bids.add({
@@ -190,9 +314,7 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
           "closeDigit": closeDigit,
           "type": "HalfSangamB",
         }); // Added openPanna, closeDigit, and type for API
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Added bid: $sangam with $points points.')),
-        );
+        _showMessage('Added bid: $sangam with $points points.');
       }
 
       // Clear controllers after adding/updating
@@ -203,8 +325,11 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
   }
 
   void _removeBid(int index) {
+    _clearMessage();
     setState(() {
+      final removedSangam = _bids[index]['sangam'];
       _bids.removeAt(index);
+      _showMessage('Bid for $removedSangam removed from list.');
     });
   }
 
@@ -216,21 +341,18 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
   }
 
   void _showConfirmationDialog() {
+    _clearMessage();
     if (_bids.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least one bid.')),
-      );
+      _showMessage('Please add at least one bid.', isError: true);
       return;
     }
 
     final int totalPoints = _getTotalPoints();
 
     if (walletBalance < totalPoints) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Insufficient wallet balance to place this bid.'),
-          backgroundColor: Colors.red,
-        ),
+      _showMessage(
+        'Insufficient wallet balance to place this bid.',
+        isError: true,
       );
       return;
     }
@@ -254,7 +376,8 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
 
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      barrierDismissible: false, // User must interact with the dialog
+      builder: (BuildContext dialogContext) {
         return BidConfirmationDialog(
           gameTitle: widget.screenTitle, // Use screenTitle for gameTitle
           gameDate: formattedDate,
@@ -266,9 +389,101 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
           gameId: widget.gameId.toString(), // Ensure gameId is String
           gameType: widget
               .gameType, // Pass the correct gameType (e.g., "halfSangamB")
+          onConfirm: () async {
+            Navigator.pop(dialogContext); // Dismiss the confirmation dialog
+            bool success = await _placeFinalBids();
+            if (success) {
+              setState(() {
+                _bids.clear(); // Clear bids on successful submission
+              });
+              _showMessage('Bids placed successfully!');
+            }
+          },
         );
       },
     );
+  }
+
+  // Place final bids via API
+  Future<bool> _placeFinalBids() async {
+    String url;
+    // For Sangam, typically it's 'place-bid' but with specific gameType/sessionType
+    if (widget.screenTitle.toLowerCase().contains('jackpot')) {
+      url = '${Constant.apiEndpoint}place-jackpot-bid';
+    } else if (widget.screenTitle.toLowerCase().contains('starline')) {
+      url = '${Constant.apiEndpoint}place-starline-bid';
+    } else {
+      url = '${Constant.apiEndpoint}place-bid'; // General bid placement
+    }
+
+    if (accessToken.isEmpty || registerId.isEmpty) {
+      _showMessage('Authentication error. Please log in again.', isError: true);
+      return false;
+    }
+
+    final headers = {
+      'deviceId': _deviceId,
+      'deviceName': _deviceName,
+      'accessStatus': accountStatus ? '1' : '0', // Convert bool to '1' or '0'
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $accessToken',
+    };
+
+    final List<Map<String, dynamic>> bidPayload = _bids.map((bid) {
+      return {
+        "sessionType": bid['type']!.toUpperCase(), // "HALFSANGAMB"
+        "digit": bid['closeDigit']!, // Close Digit for Half Sangam B
+        "pana": bid['openPanna']!, // Open Panna for Half Sangam B
+        "bidAmount": int.tryParse(bid['points'] ?? '0') ?? 0,
+      };
+    }).toList();
+
+    final body = jsonEncode({
+      "registerId": registerId,
+      "gameId": widget.gameId,
+      "bidAmount": _getTotalPoints(),
+      "gameType":
+          widget.gameType, // Use the gameType from the widget's properties
+      "bid": bidPayload,
+    });
+
+    log('Placing final bids to URL: $url');
+    log('Request Body: $body');
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: headers,
+        body: body,
+      );
+
+      final Map<String, dynamic> responseBody = json.decode(response.body);
+
+      log('API Response for Final Bid Submission: ${responseBody}');
+
+      if (response.statusCode == 200 && responseBody['status'] == true) {
+        // Update wallet balance in GetStorage and local state on successful bid
+        int currentWallet = walletBalance;
+        int deductedAmount = _getTotalPoints();
+        int newWalletBalance = currentWallet - deductedAmount;
+        storage.write(
+          'walletBalance',
+          newWalletBalance.toString(),
+        ); // Update storage
+        setState(() {
+          walletBalance = newWalletBalance; // Update local state
+        });
+        return true; // Indicate success
+      } else {
+        String errorMessage = responseBody['msg'] ?? "Unknown error occurred.";
+        _showMessage('Bid submission failed: $errorMessage', isError: true);
+        return false; // Indicate failure
+      }
+    } catch (e) {
+      log('Network error during bid submission: $e');
+      _showMessage('Network error during bid submission: $e', isError: true);
+      return false; // Indicate failure
+    }
   }
 
   @override
@@ -309,156 +524,177 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
           const SizedBox(width: 12),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16.0,
-              vertical: 12.0,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildPannaInputRow(
-                  'Enter Open Panna :',
-                  _openPannaController,
-                  hintText: 'e.g., 123',
-                  maxLength: 3,
+          Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 12.0,
                 ),
-                const SizedBox(height: 16),
-                _buildInputRow(
-                  'Enter Close Digit :',
-                  _closeDigitController,
-                  hintText: 'e.g., 5',
-                  maxLength: 1,
-                ),
-                const SizedBox(height: 16),
-                _buildInputRow(
-                  'Enter Points :',
-                  _pointsController,
-                  hintText: 'e.g., 100',
-                  maxLength: 4,
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 45,
-                  child: ElevatedButton(
-                    onPressed: _addBid,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
-                      ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildPannaInputRow(
+                      'Enter Open Panna :',
+                      _openPannaController,
+                      hintText: 'e.g., 123',
+                      maxLength: 3,
                     ),
-                    child: Text(
-                      "ADD",
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.5,
-                        fontSize: 16,
-                      ),
+                    const SizedBox(height: 16),
+                    _buildInputRow(
+                      'Enter Close Digit :',
+                      _closeDigitController,
+                      hintText: 'e.g., 5',
+                      maxLength: 1,
                     ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(thickness: 1),
-
-          // Table Headers
-          if (_bids.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 8.0,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Sangam',
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+                    const SizedBox(height: 16),
+                    _buildInputRow(
+                      'Enter Points :',
+                      _pointsController,
+                      hintText: 'e.g., 100',
+                      maxLength: 4,
                     ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      'Points',
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const SizedBox(width: 48), // Space for delete icon
-                ],
-              ),
-            ),
-          if (_bids.isNotEmpty) const Divider(thickness: 1),
-
-          // Dynamic List of Bids
-          Expanded(
-            child: _bids.isEmpty
-                ? Center(
-                    child: Text(
-                      'No Bids Placed',
-                      style: GoogleFonts.poppins(color: Colors.grey),
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: _bids.length,
-                    itemBuilder: (context, index) {
-                      final bid = _bids[index];
-                      return Container(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 45,
+                      child: ElevatedButton(
+                        onPressed: _addBid,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.amber,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
                         ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.2),
-                              spreadRadius: 1,
-                              blurRadius: 3,
-                              offset: const Offset(0, 1),
+                        child: Text(
+                          "ADD",
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(thickness: 1),
+
+              // Table Headers
+              if (_bids.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 8.0,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Sangam',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          'Points',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 48), // Space for delete icon
+                    ],
+                  ),
+                ),
+              if (_bids.isNotEmpty) const Divider(thickness: 1),
+
+              // Dynamic List of Bids
+              Expanded(
+                child: _bids.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No Bids Placed',
+                          style: GoogleFonts.poppins(color: Colors.grey),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: _bids.length,
+                        itemBuilder: (context, index) {
+                          final bid = _bids[index];
+                          return Container(
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
                             ),
-                          ],
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16.0,
-                            vertical: 8.0,
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  bid['sangam']!,
-                                  style: GoogleFonts.poppins(),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.2),
+                                  spreadRadius: 1,
+                                  blurRadius: 3,
+                                  offset: const Offset(0, 1),
                                 ),
+                              ],
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16.0,
+                                vertical: 8.0,
                               ),
-                              Expanded(
-                                child: Text(
-                                  bid['points']!,
-                                  style: GoogleFonts.poppins(),
-                                ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      bid['sangam']!,
+                                      style: GoogleFonts.poppins(),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      bid['points']!,
+                                      style: GoogleFonts.poppins(),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete,
+                                      color: Colors.red,
+                                    ),
+                                    onPressed: () => _removeBid(index),
+                                  ),
+                                ],
                               ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.delete,
-                                  color: Colors.red,
-                                ),
-                                onPressed: () => _removeBid(index),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+              // Bottom Bar (conditionally rendered)
+              if (_bids.isNotEmpty) _buildBottomBar(),
+            ],
           ),
-          // Bottom Bar (conditionally rendered)
-          if (_bids.isNotEmpty) _buildBottomBar(),
+          // AnimatedMessageBar positioned at the top
+          if (_messageToShow != null)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: AnimatedMessageBar(
+                key: _messageBarKey,
+                message: _messageToShow!,
+                isError: _isErrorForMessage,
+                onDismissed: _clearMessage,
+              ),
+            ),
         ],
       ),
     );
@@ -487,6 +723,7 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
               if (maxLength != null)
                 LengthLimitingTextInputFormatter(maxLength),
             ],
+            onTap: _clearMessage, // Clear message on tap
             decoration: InputDecoration(
               hintText: hintText,
               contentPadding: const EdgeInsets.symmetric(horizontal: 12),
@@ -538,8 +775,7 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
                 ) {
                   // Keep our controller in sync with Autocomplete's internal controller
                   controller.text = textEditingController.text;
-                  controller.selection = textEditingController
-                      .selection; // Maintain cursor position
+                  controller.selection = textEditingController.selection;
 
                   return TextField(
                     controller: textEditingController,
@@ -550,6 +786,7 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
                       if (maxLength != null)
                         LengthLimitingTextInputFormatter(maxLength),
                     ],
+                    onTap: _clearMessage, // Clear message on tap
                     decoration: InputDecoration(
                       hintText: hintText,
                       contentPadding: const EdgeInsets.symmetric(
@@ -586,7 +823,6 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
               });
             },
             onSelected: (String selection) {
-              // When a suggestion is selected, update the controller
               controller.text = selection;
             },
             optionsViewBuilder:
@@ -602,9 +838,8 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
                       child: SizedBox(
                         height: options.length > 5
                             ? 200.0
-                            : options.length *
-                                  48.0, // Dynamic height up to 5 items, then fixed
-                        width: 150, // Match the width of the input field
+                            : options.length * 48.0,
+                        width: 150,
                         child: ListView.builder(
                           padding: EdgeInsets.zero,
                           itemCount: options.length,

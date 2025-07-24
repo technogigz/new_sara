@@ -12,6 +12,13 @@
 	<key>NSFaceIDUsageDescription</key>
     <string>We use Face ID to protect your data.</string>
 
+    <key>NSAppTransportSecurity</key>
+    <dict>
+    <key>NSAllowsArbitraryLoads</key>
+    <true/>
+    </dict>
+
+
     <key>LSApplicationQueriesSchemes</key>
         <array>
             <string>upi</string>

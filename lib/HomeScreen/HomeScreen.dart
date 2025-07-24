@@ -22,7 +22,6 @@ import '../Support/SupportPage.dart'; // This is _screens[4]
 import '../Video/LanguageSelectionScreen.dart';
 import '../components/AppName.dart';
 import '../game/gameRates/GameRateScreen.dart'; // This is _screens[7]
-import '../submitIdea/SubmitIdeaScreen.dart';
 import '../ulits/ColorsR.dart';
 import '../ulits/Constents.dart';
 import 'HomePage.dart'; // This is _screens[2]
@@ -175,9 +174,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
-    bool accountActiveStatus = storage.read('accountStatus') ?? false;
-    String walletBalance = storage.read('walletBalance') ?? '';
-
     return AppBar(
       automaticallyImplyLeading: false,
       toolbarHeight: 40,
@@ -226,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        "₹${walletBalance}",
+                        "₹${walletBallence}",
                         style: TextStyle(
                           color: Colors.black,
                           fontSize: 12,
@@ -348,7 +344,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     _onItemTapped(0);
                   }, accountStatus),
 
-                  _buildDrawerItem("assets/images/mpin_nav.png", "MPIN", () {
+                  _buildDrawerItem("assets/images/mpin_nav.png", "M-PIN", () {
                     Navigator.pop(context);
                     _handleMpin();
                   }, accountStatus),
@@ -362,38 +358,35 @@ class _HomeScreenState extends State<HomeScreen> {
                     accountStatus,
                   ),
 
-                  _buildDrawerItem("assets/images/chat_icon.png", "Chats", () {
-                    _navigateToDrawerScreenAndPush(ChatScreen());
-                  }, accountStatus),
-
+                  // _buildDrawerItem("assets/images/chat_icon.png", "Chats", () {
+                  //   _navigateToDrawerScreenAndPush(ChatScreen());
+                  // }, accountStatus),
                   _buildDrawerItem("assets/images/funds_nav.png", "Funds", () {
                     Navigator.pop(context);
                     _onItemTapped(3);
                   }, accountStatus),
 
-                  _buildDrawerItem(
-                    "assets/images/ic_notification.png",
-                    "Notification",
-                    () {
-                      _navigateToDrawerScreenAndPush(NoticeHistoryScreen());
-                    },
-                    accountStatus,
-                  ),
-
+                  // _buildDrawerItem(
+                  //   "assets/images/ic_notification.png",
+                  //   "Notification",
+                  //   () {
+                  //     _navigateToDrawerScreenAndPush(NoticeHistoryScreen());
+                  //   },
+                  //   accountStatus,
+                  // ),
                   _buildDrawerItem("assets/images/videos.png", "Videos", () {
                     _navigateToDrawerScreenAndPush(LanguageSelectionScreen());
                   }, accountStatus),
 
-                  _buildDrawerItem(
-                    "assets/images/notice.png",
-                    "Notice Board/Rules",
-                    () {
-                      Navigator.pop(context);
-                      _onItemTapped(5);
-                    },
-                    accountStatus,
-                  ),
-
+                  // _buildDrawerItem(
+                  //   "assets/images/notice.png",
+                  //   "Notice Board/Rules",
+                  //   () {
+                  //     Navigator.pop(context);
+                  //     _onItemTapped(5);
+                  //   },
+                  //   accountStatus,
+                  // ),
                   _buildDrawerItem(
                     "assets/images/rate_stars.png",
                     "Game Rates",
@@ -408,15 +401,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     _navigateToDrawerScreenAndPush(ChartScreen());
                   }, accountStatus),
 
-                  _buildDrawerItem(
-                    "assets/images/idea_nav.png",
-                    "Submit Idea",
-                    () {
-                      _navigateToDrawerScreenAndPush(SubmitIdeaScreen());
-                    },
-                    accountStatus,
-                  ),
-
+                  // _buildDrawerItem(
+                  //   "assets/images/idea_nav.png",
+                  //   "Submit Idea",
+                  //   () {
+                  //     _navigateToDrawerScreenAndPush(SubmitIdeaScreen());
+                  //   },
+                  //   accountStatus,
+                  // ),
                   _buildDrawerItem(
                     "assets/images/setting_nav.png",
                     "Settings",

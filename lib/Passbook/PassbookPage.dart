@@ -17,7 +17,7 @@ class PassbookPage extends StatefulWidget {
 
 class _PassbookPageState extends State<PassbookPage> {
   int pageIndex = 1;
-  final int recordLimit = 10; // Updated recordLimit to match API request
+  final int recordLimit = 20; // Updated recordLimit to match API request
   List<PassbookEntry> entries = [];
   bool isLandscape = false;
   bool loading = false;

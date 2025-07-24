@@ -1,10 +1,113 @@
+import 'dart:async'; // For Timer
+import 'dart:convert'; // For jsonEncode, json.decode
+import 'dart:developer'; // For log
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http; // For API calls
 import 'package:intl/intl.dart'; // Import for date formatting
 
 import '../../components/BidConfirmationDialog.dart';
+import '../../components/BidFailureDialog.dart';
+import '../../components/BidSuccessDialog.dart';
+import '../../ulits/Constents.dart'; // Import the Constants file for API endpoint
+
+// AnimatedMessageBar component (Ensure this is a common component or defined here)
+// If this component is already defined in a separate file (e.g., components/animated_message_bar.dart)
+// then you should import it and remove this duplicate definition.
+class AnimatedMessageBar extends StatefulWidget {
+  final String message;
+  final bool isError;
+  final VoidCallback? onDismissed;
+
+  const AnimatedMessageBar({
+    Key? key,
+    required this.message,
+    this.isError = false,
+    this.onDismissed,
+  }) : super(key: key);
+
+  @override
+  _AnimatedMessageBarState createState() => _AnimatedMessageBarState();
+}
+
+class _AnimatedMessageBarState extends State<AnimatedMessageBar> {
+  double _height = 0.0;
+  Timer? _visibilityTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showBar();
+    });
+  }
+
+  void _showBar() {
+    if (!mounted) return;
+    setState(() {
+      _height = 48.0;
+    });
+
+    _visibilityTimer = Timer(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      setState(() {
+        _height = 0.0;
+      });
+      Timer(const Duration(milliseconds: 300), () {
+        if (mounted && widget.onDismissed != null) {
+          widget.onDismissed!();
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _visibilityTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      height: _height,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      color: widget.isError ? Colors.red : Colors.green,
+      alignment: Alignment.center,
+      child: _height > 0.0
+          ? Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                children: [
+                  Icon(
+                    widget.isError
+                        ? Icons.error_outline
+                        : Icons.check_circle_outline,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.message,
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: 13,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : const SizedBox.shrink(),
+    );
+  }
+}
 
 class SingleDigitBetScreen extends StatefulWidget {
   final String title;
@@ -42,16 +145,29 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
   bool accountStatus = false;
   late int walletBalance;
 
+  // Placeholder for device info. In a real app, these would be dynamic.
+  final String _deviceId = 'test_device_id_flutter';
+  final String _deviceName = 'test_device_name_flutter';
+
+  // State management for AnimatedMessageBar
+  String? _messageToShow;
+  bool _isErrorForMessage = false;
+  Key _messageBarKey = UniqueKey(); // Key to force rebuild/re-animation
+
   @override
   void initState() {
     super.initState();
-    // Initial read for GetStorage values
+    _loadInitialData();
+    _setupStorageListeners();
+  }
+
+  // Load initial data from GetStorage
+  Future<void> _loadInitialData() async {
     accessToken = storage.read('accessToken') ?? '';
     registerId = storage.read('registerId') ?? '';
     accountStatus = storage.read('accountStatus') ?? false;
     preferredLanguage = storage.read('selectedLanguage') ?? 'en';
 
-    // Safely parse walletBalance to int
     final dynamic storedWalletBalance = storage.read('walletBalance');
     if (storedWalletBalance is int) {
       walletBalance = storedWalletBalance;
@@ -61,12 +177,11 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
       walletBalance = 0; // Default to 0 if it's not an int or a valid string
     }
 
-    // --- FIX APPLIED HERE ---
-    // Initialize selectedGameBetType to a valid option from gameTypesOptions.
-    // This resolves the DropdownButton assertion error.
     selectedGameBetType = gameTypesOptions[0]; // Set default to "Open"
+  }
 
-    // Auto-update on key change
+  // Set up listeners for GetStorage keys
+  void _setupStorageListeners() {
     storage.listenKey('accessToken', (value) {
       setState(() {
         accessToken = value ?? '';
@@ -91,7 +206,6 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
       });
     });
 
-    // Also listen for wallet balance changes
     storage.listenKey('walletBalance', (value) {
       setState(() {
         if (value is int) {
@@ -112,39 +226,89 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
     super.dispose();
   }
 
-  void _addEntry() {
-    final digit = digitController.text.trim();
-    final points = pointsController.text.trim();
+  // Helper method to show messages using AnimatedMessageBar
+  void _showMessage(String message, {bool isError = false}) {
+    setState(() {
+      _messageToShow = message;
+      _isErrorForMessage = isError;
+      _messageBarKey = UniqueKey(); // Update key to trigger animation
+    });
+  }
 
-    if (digit.isNotEmpty && points.isNotEmpty) {
-      if (digit.length == 1 && int.tryParse(digit) != null) {
-        setState(() {
-          addedEntries.add({
-            "digit": digit,
-            "points": points,
-            "type":
-                selectedGameBetType, // Use the state's selected game type (Open/Close)
-          });
-          digitController.clear();
-          pointsController.clear();
-        });
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please enter a single digit for Bid Digits.'),
-          ),
-        );
-      }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter both Digit and Amount.')),
-      );
+  // Helper method to clear the message bar
+  void _clearMessage() {
+    if (mounted) {
+      setState(() {
+        _messageToShow = null;
+      });
     }
   }
 
-  void _removeEntry(int index) {
+  void _addEntry() {
+    _clearMessage(); // Clear any previous messages
+    final digit = digitController.text.trim();
+    final points = pointsController.text.trim();
+
+    if (digit.isEmpty || points.isEmpty) {
+      _showMessage('Please enter both Digit and Amount.', isError: true);
+      return;
+    }
+
+    // Validate digit: must be a single digit (0-9)
+    if (digit.length != 1 || int.tryParse(digit) == null) {
+      _showMessage(
+        'Please enter a single digit (0-9) for Bid Digits.',
+        isError: true,
+      );
+      return;
+    }
+
+    // Validate points: must be a number between 10 and 1000
+    int? parsedPoints = int.tryParse(points);
+    if (parsedPoints == null || parsedPoints < 10 || parsedPoints > 1000) {
+      _showMessage('Points must be between 10 and 1000.', isError: true);
+      return;
+    }
+
+    // Check for existing bid with same digit and type
+    final existingIndex = addedEntries.indexWhere(
+      (entry) =>
+          entry['digit'] == digit && entry['type'] == selectedGameBetType,
+    );
+
     setState(() {
+      if (existingIndex != -1) {
+        // Update existing entry
+        final currentPoints = int.parse(addedEntries[existingIndex]['points']!);
+        addedEntries[existingIndex]['points'] = (currentPoints + parsedPoints)
+            .toString();
+        _showMessage(
+          'Updated points for Digit: $digit, Type: $selectedGameBetType.',
+        );
+      } else {
+        // Add new entry
+        addedEntries.add({
+          "digit": digit,
+          "points": points,
+          "type": selectedGameBetType,
+        });
+        _showMessage(
+          'Added bid: Digit $digit, Points $points, Type $selectedGameBetType.',
+        );
+      }
+      digitController.clear();
+      pointsController.clear();
+    });
+  }
+
+  void _removeEntry(int index) {
+    _clearMessage();
+    setState(() {
+      final removedEntry = addedEntries[index];
       addedEntries.removeAt(index);
+      _showMessage(
+        'Removed bid: Digit ${removedEntry['digit']}, Type ${removedEntry['type']}.',
+      );
     });
   }
 
@@ -158,15 +322,18 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
   }
 
   void _showConfirmationDialog() {
+    _clearMessage(); // Clear any previous messages
+    if (addedEntries.isEmpty) {
+      _showMessage('Please add at least one bid.', isError: true);
+      return;
+    }
+
     final int totalPoints = _getTotalPoints();
 
-    // Check if wallet balance is sufficient
     if (walletBalance < totalPoints) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Insufficient wallet balance to place this bid.'),
-          backgroundColor: Colors.red,
-        ),
+      _showMessage(
+        'Insufficient wallet balance to place this bid.',
+        isError: true,
       );
       return;
     }
@@ -177,23 +344,286 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
 
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      barrierDismissible: false, // User must interact with the dialog
+      builder: (BuildContext dialogContext) {
         return BidConfirmationDialog(
           gameTitle: widget.gameName,
-          gameDate: formattedDate, // Use a formatted current date
-          bids: addedEntries,
+          gameDate: formattedDate,
+          bids: addedEntries.map((bid) {
+            return {
+              "digit": bid['digit']!,
+              "points": bid['points']!,
+              "type": bid['type']!, // This will be "Open" or "Close"
+            };
+          }).toList(),
           totalBids: addedEntries.length,
           totalBidsAmount: totalPoints,
           walletBalanceBeforeDeduction: walletBalance,
           walletBalanceAfterDeduction: (walletBalance - totalPoints).toString(),
-          gameId: widget.gameId
-              .toString(), // Convert to String if gameId is int
-          gameType: widget
-              .gameCategoryType, // Pass the general game type (e.g., "singleDigits")
+          gameId: widget.gameId.toString(),
+          gameType: widget.gameCategoryType, // e.g., "singleDigits"
+          onConfirm: () async {
+            Navigator.pop(dialogContext); // Dismiss the confirmation dialog
+            bool success = await _placeFinalBids();
+            if (success) {
+              setState(() {
+                addedEntries.clear(); // Clear bids on successful submission
+              });
+              _showMessage('Bids placed successfully!');
+            }
+          },
         );
       },
     );
   }
+
+  Future<bool> _placeFinalBids() async {
+    String url;
+    // Determine the correct API endpoint based on game category
+    if (widget.gameCategoryType.toLowerCase().contains('jackpot')) {
+      url = '${Constant.apiEndpoint}place-jackpot-bid';
+    } else if (widget.gameCategoryType.toLowerCase().contains('starline')) {
+      url = '${Constant.apiEndpoint}place-starline-bid';
+    } else {
+      url = '${Constant.apiEndpoint}place-bid'; // General bid placement
+    }
+
+    if (accessToken.isEmpty || registerId.isEmpty) {
+      // Check mounted before showing dialog
+      if (!mounted) return false; // Important: Exit if widget is not mounted
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return const BidFailureDialog(
+            errorMessage: 'Authentication error. Please log in again.',
+          );
+        },
+      );
+      return false;
+    }
+
+    final headers = {
+      'deviceId': _deviceId,
+      'deviceName': _deviceName,
+      'accessStatus': accountStatus ? '1' : '0', // Convert bool to '1' or '0'
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $accessToken',
+    };
+
+    final List<Map<String, dynamic>> bidPayload = addedEntries.map((entry) {
+      return {
+        "sessionType": entry['type']!.toUpperCase(), // "OPEN" or "CLOSE"
+        "digit": entry['digit']!,
+        "bidAmount": int.tryParse(entry['points'] ?? '0') ?? 0,
+      };
+    }).toList();
+
+    final body = jsonEncode({
+      "registerId": registerId,
+      "gameId": widget.gameId,
+      "bidAmount": _getTotalPoints(),
+      "gameType": widget.gameCategoryType, // e.g., "singleDigits"
+      "bid": bidPayload,
+    });
+
+    // Log the cURL and headers here
+    String curlCommand = 'curl -X POST \\';
+    curlCommand += '\n  ${Uri.parse(url)} \\';
+    headers.forEach((key, value) {
+      curlCommand += '\n  -H "$key: $value" \\';
+    });
+    curlCommand += '\n  -d \'$body\'';
+
+    log('CURL Command for Final Bid Submission:\n$curlCommand');
+    log('Request Headers for Final Bid Submission: $headers');
+    log('Request Body for Final Bid Submission: $body');
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: headers,
+        body: body,
+      );
+
+      final Map<String, dynamic> responseBody = json.decode(response.body);
+
+      log('API Response for Final Bid Submission: ${responseBody}');
+
+      if (response.statusCode == 200 && responseBody['status'] == true) {
+        // Update wallet balance in GetStorage and local state on successful bid
+        log('Bid submission successful. ${responseBody['msg']}');
+        int currentWallet = walletBalance;
+        int deductedAmount = _getTotalPoints();
+        int newWalletBalance = currentWallet - deductedAmount;
+        storage.write(
+          'walletBalance',
+          newWalletBalance.toString(),
+        ); // Update storage
+
+        // Check mounted before calling setState
+        if (mounted) {
+          setState(() {
+            walletBalance = newWalletBalance; // Update local state
+          });
+        }
+
+        // Check mounted before showing dialog
+        if (!mounted) return true; // Important: Exit if widget is not mounted
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return const BidSuccessDialog();
+          },
+        );
+        return true; // Indicate success
+      } else {
+        String errorMessage = responseBody['msg'] ?? "Unknown error occurred.";
+        // Check mounted before showing dialog
+        if (!mounted) return false; // Important: Exit if widget is not mounted
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return BidFailureDialog(errorMessage: errorMessage);
+          },
+        );
+        return false; // Indicate failure
+      }
+    } catch (e) {
+      log('Network error during bid submission: $e');
+      // Check mounted before showing dialog
+      if (!mounted) return false; // Important: Exit if widget is not mounted
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return BidFailureDialog(
+            errorMessage:
+                'Network error during bid submission: ${e.toString()}',
+          );
+        },
+      );
+      return false; // Indicate failure
+    }
+  }
+
+  // Future<bool> _placeFinalBids() async {
+  //   String url;
+  //   // Determine the correct API endpoint based on game category
+  //   if (widget.gameCategoryType.toLowerCase().contains('jackpot')) {
+  //     url = '${Constant.apiEndpoint}place-jackpot-bid';
+  //   } else if (widget.gameCategoryType.toLowerCase().contains('starline')) {
+  //     url = '${Constant.apiEndpoint}place-starline-bid';
+  //   } else {
+  //     url = '${Constant.apiEndpoint}place-bid'; // General bid placement
+  //   }
+  //
+  //   if (accessToken.isEmpty || registerId.isEmpty) {
+  //     // Using the failure dialog here
+  //     showDialog(
+  //       context: context,
+  //       builder: (BuildContext context) {
+  //         return const BidFailureDialog(
+  //           errorMessage: 'Authentication error. Please log in again.',
+  //         );
+  //       },
+  //     );
+  //     return false;
+  //   }
+  //
+  //   final headers = {
+  //     'deviceId': _deviceId,
+  //     'deviceName': _deviceName,
+  //     'accessStatus': accountStatus ? '1' : '0', // Convert bool to '1' or '0'
+  //     'Content-Type': 'application/json',
+  //     'Authorization': 'Bearer $accessToken',
+  //   };
+  //
+  //   final List<Map<String, dynamic>> bidPayload = addedEntries.map((entry) {
+  //     return {
+  //       "sessionType": entry['type']!.toUpperCase(), // "OPEN" or "CLOSE"
+  //       "digit": entry['digit']!,
+  //       "bidAmount": int.tryParse(entry['points'] ?? '0') ?? 0,
+  //     };
+  //   }).toList();
+  //
+  //   final body = jsonEncode({
+  //     "registerId": registerId,
+  //     "gameId": widget.gameId,
+  //     "bidAmount": _getTotalPoints(),
+  //     "gameType": widget.gameCategoryType, // e.g., "singleDigits"
+  //     "bid": bidPayload,
+  //   });
+  //
+  //   // Log the cURL and headers here
+  //   String curlCommand = 'curl -X POST \\';
+  //   curlCommand += '\n  ${Uri.parse(url)} \\';
+  //   headers.forEach((key, value) {
+  //     curlCommand += '\n  -H "$key: $value" \\';
+  //   });
+  //   curlCommand += '\n  -d \'$body\'';
+  //
+  //   log('CURL Command for Final Bid Submission:\n$curlCommand');
+  //   log('Request Headers for Final Bid Submission: $headers');
+  //   log('Request Body for Final Bid Submission: $body');
+  //
+  //   try {
+  //     final response = await http.post(
+  //       Uri.parse(url),
+  //       headers: headers,
+  //       body: body,
+  //     );
+  //
+  //     final Map<String, dynamic> responseBody = json.decode(response.body);
+  //
+  //     log('API Response for Final Bid Submission: ${responseBody}');
+  //
+  //     if (response.statusCode == 200 && responseBody['status'] == true) {
+  //       // Update wallet balance in GetStorage and local state on successful bid
+  //       log('Bid submission successful. ${responseBody['msg']}');
+  //       int currentWallet = walletBalance;
+  //       int deductedAmount = _getTotalPoints();
+  //       int newWalletBalance = currentWallet - deductedAmount;
+  //       storage.write(
+  //         'walletBalance',
+  //         newWalletBalance.toString(),
+  //       ); // Update storage
+  //       setState(() {
+  //         walletBalance = newWalletBalance; // Update local state
+  //       });
+  //
+  //       // Show success dialog
+  //       showDialog(
+  //         context: context,
+  //         builder: (BuildContext context) {
+  //           return const BidSuccessDialog();
+  //         },
+  //       );
+  //       return true; // Indicate success
+  //     } else {
+  //       String errorMessage = responseBody['msg'] ?? "Unknown error occurred.";
+  //       // Show failure dialog with specific error message
+  //       showDialog(
+  //         context: context,
+  //         builder: (BuildContext context) {
+  //           return BidFailureDialog(errorMessage: errorMessage);
+  //         },
+  //       );
+  //       return false; // Indicate failure
+  //     }
+  //   } catch (e) {
+  //     log('Network error during bid submission: $e');
+  //     // Show failure dialog for network errors
+  //     showDialog(
+  //       context: context,
+  //       builder: (BuildContext context) {
+  //         return BidFailureDialog(
+  //           errorMessage:
+  //               'Network error during bid submission: ${e.toString()}',
+  //         );
+  //       },
+  //     );
+  //     return false; // Indicate failure
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -232,132 +662,166 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
           const SizedBox(width: 12),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Column(
-              children: [
-                _inputRow("Select Game Type:", _buildDropdown()),
-                const SizedBox(height: 12),
-                _inputRow(
-                  "Enter Single Digit:",
-                  _buildTextField(
-                    digitController,
-                    "Bid Digits",
-                    inputFormatters: [
-                      LengthLimitingTextInputFormatter(1),
-                      FilteringTextInputFormatter.digitsOnly,
+          Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: Column(
+                  children: [
+                    _inputRow("Select Game Type:", _buildDropdown()),
+                    const SizedBox(height: 12),
+                    _inputRow(
+                      "Enter Single Digit:",
+                      _buildTextField(
+                        digitController,
+                        "Bid Digits",
+                        inputFormatters: [
+                          LengthLimitingTextInputFormatter(1),
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _inputRow(
+                      "Enter Points:",
+                      _buildTextField(
+                        pointsController,
+                        "Enter Amount",
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 45,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.amber,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        onPressed: _addEntry,
+                        child: const Text(
+                          "ADD BID",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                  ],
+                ),
+              ),
+              const Divider(thickness: 1),
+              if (addedEntries.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          "Digit",
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          "Amount",
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          "Game Type",
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 48),
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                _inputRow(
-                  "Enter Points:",
-                  _buildTextField(
-                    pointsController,
-                    "Enter Amount",
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 45,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
+              if (addedEntries.isNotEmpty) const Divider(thickness: 1),
+              Expanded(
+                child: addedEntries.isEmpty
+                    ? const Center(child: Text("No data added yet"))
+                    : ListView.builder(
+                        itemCount: addedEntries.length,
+                        itemBuilder: (_, index) {
+                          final entry = addedEntries[index];
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 6,
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    entry['digit']!,
+                                    style: GoogleFonts.poppins(),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    entry['points']!,
+                                    style: GoogleFonts.poppins(),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    entry['type']!,
+                                    style: GoogleFonts.poppins(),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete,
+                                    color: Colors.red,
+                                  ),
+                                  onPressed: () => _removeEntry(index),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
-                    ),
-                    onPressed: _addEntry,
-                    child: const Text(
-                      "ADD BID",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-              ],
-            ),
+              ),
+              if (addedEntries.isNotEmpty) _buildBottomBar(),
+            ],
           ),
-          const Divider(thickness: 1),
-          if (addedEntries.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      "Digit",
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      "Amount",
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      "Game Type",
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const SizedBox(width: 48),
-                ],
+          // AnimatedMessageBar positioned at the top
+          if (_messageToShow != null)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: AnimatedMessageBar(
+                key: _messageBarKey,
+                message: _messageToShow!,
+                isError: _isErrorForMessage,
+                onDismissed: _clearMessage,
               ),
             ),
-          if (addedEntries.isNotEmpty) const Divider(thickness: 1),
-          Expanded(
-            child: addedEntries.isEmpty
-                ? const Center(child: Text("No data added yet"))
-                : ListView.builder(
-                    itemCount: addedEntries.length,
-                    itemBuilder: (_, index) {
-                      final entry = addedEntries[index];
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 6,
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                entry['digit']!,
-                                style: GoogleFonts.poppins(),
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                entry['points']!,
-                                style: GoogleFonts.poppins(),
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                entry['type']!,
-                                style: GoogleFonts.poppins(),
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _removeEntry(index),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-          ),
-          if (addedEntries.isNotEmpty) _buildBottomBar(),
         ],
       ),
     );
@@ -399,12 +863,12 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
         child: DropdownButtonHideUnderline(
           child: DropdownButton<String>(
             isExpanded: true,
-            value:
-                selectedGameBetType, // Use the state variable for the dropdown's value
+            value: selectedGameBetType,
             icon: const Icon(Icons.keyboard_arrow_down),
             onChanged: (String? newValue) {
               setState(() {
                 selectedGameBetType = newValue!;
+                _clearMessage(); // Clear message on dropdown change
               });
             },
             items: gameTypesOptions.map<DropdownMenuItem<String>>((
@@ -435,6 +899,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
         keyboardType: TextInputType.number,
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: inputFormatters,
+        onTap: _clearMessage, // Clear message on tap
         decoration: InputDecoration(
           hintText: hint,
           contentPadding: const EdgeInsets.symmetric(

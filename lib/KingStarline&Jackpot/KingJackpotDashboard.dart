@@ -7,7 +7,8 @@ import 'package:http/http.dart' as http; // Import http package
 import 'package:new_sara/KingStarline&Jackpot/JackpotJodiOptionsScreen.dart'; // Assuming this exists
 import 'package:new_sara/components/KingJackpotBiddingClosedDialog.dart'; // Assuming this exists
 
-import '../Helper/TranslationHelper.dart'; // Assuming this exists
+import '../Helper/TranslationHelper.dart';
+import '../ulits/Constents.dart'; // Assuming this exists
 
 class KingJackpotDashboard extends StatefulWidget {
   @override
@@ -63,7 +64,7 @@ class _KingJackpotDashboardState extends State<KingJackpotDashboard> {
 
     try {
       final response = await http.post(
-        Uri.parse("https://sara777.win/api/v1/jackpot-game-list"),
+        Uri.parse("${Constant.apiEndpoint}jackpot-game-list"),
         headers: {
           "Content-Type": "application/json",
           "deviceId": "qwert",
@@ -150,6 +151,7 @@ class _KingJackpotDashboardState extends State<KingJackpotDashboard> {
                         itemBuilder: (context, index) {
                           final game = gameData[index];
                           return _buildGameCard(
+                            game.gameId,
                             game.gameName,
                             game.result,
                             game.statusText,
@@ -272,6 +274,7 @@ class _KingJackpotDashboardState extends State<KingJackpotDashboard> {
   }
 
   Widget _buildGameCard(
+    int gameid,
     String time,
     String result,
     String status,
@@ -346,7 +349,11 @@ class _KingJackpotDashboardState extends State<KingJackpotDashboard> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => JackpotJodiOptionsScreen(gameTime: time),
+                    builder: (_) => JackpotJodiOptionsScreen(
+                      title: "King Jackpot, $time",
+                      gameTime: time,
+                      gameId: gameid,
+                    ),
                   ),
                 );
               }

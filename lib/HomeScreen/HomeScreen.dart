@@ -6,6 +6,7 @@ import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:new_sara/ChartScreen/ChartScreen.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../Bids/MyBidsPage.dart';
 import '../Helper/Toast.dart';
@@ -36,6 +37,12 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 2; // Default to HomePage (main tab)
   late GetStorage storage = GetStorage();
+
+  launchWhatsAppChat() {
+    // Replace with your WhatsApp number
+    const phoneNumber = '8875115777';
+    launchUrl(Uri.parse('https://wa.me/91$phoneNumber'));
+  }
 
   // Define your screens. Ensure ChatScreen is const if it has no internal state
   // or that a new instance is acceptable each time.

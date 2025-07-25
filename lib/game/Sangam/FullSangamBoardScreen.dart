@@ -9,108 +9,17 @@ import 'package:google_fonts/google_fonts.dart'; // For GoogleFonts
 import 'package:http/http.dart' as http; // For API calls
 import 'package:intl/intl.dart'; // Import for date formatting
 
+import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart'; // Import the BidConfirmationDialog
+// Assuming these are also in your components folder
+import '../../components/BidFailureDialog.dart'; // Make sure you have this file
+import '../../components/BidSuccessDialog.dart'; // Make sure you have this file
 import '../../ulits/Constents.dart'; // Import the Constants file for API endpoint
-
-// AnimatedMessageBar component (Make sure this is in a separate file if it's shared)
-// If this component is already defined in a separate file (e.g., components/animated_message_bar.dart)
-// then you should import it and remove this duplicate definition.
-class AnimatedMessageBar extends StatefulWidget {
-  final String message;
-  final bool isError;
-  final VoidCallback? onDismissed;
-
-  const AnimatedMessageBar({
-    Key? key,
-    required this.message,
-    this.isError = false,
-    this.onDismissed,
-  }) : super(key: key);
-
-  @override
-  _AnimatedMessageBarState createState() => _AnimatedMessageBarState();
-}
-
-class _AnimatedMessageBarState extends State<AnimatedMessageBar> {
-  double _height = 0.0;
-  Timer? _visibilityTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showBar();
-    });
-  }
-
-  void _showBar() {
-    if (!mounted) return;
-    setState(() {
-      _height = 48.0;
-    });
-
-    _visibilityTimer = Timer(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      setState(() {
-        _height = 0.0;
-      });
-      Timer(const Duration(milliseconds: 300), () {
-        if (mounted && widget.onDismissed != null) {
-          widget.onDismissed!();
-        }
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _visibilityTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      height: _height,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      color: widget.isError ? Colors.red : Colors.green,
-      alignment: Alignment.center,
-      child: _height > 0.0
-          ? Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Row(
-                children: [
-                  Icon(
-                    widget.isError
-                        ? Icons.error_outline
-                        : Icons.check_circle_outline,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      widget.message,
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 13,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : const SizedBox.shrink(),
-    );
-  }
-}
 
 class FullSangamBoardScreen extends StatefulWidget {
   final String screenTitle;
   final int gameId;
-  final String gameType;
+  final String gameType; // e.g., "FullSangam"
 
   const FullSangamBoardScreen({
     Key? key,
@@ -135,6 +44,9 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
   late String preferredLanguage;
   bool accountStatus = false;
   late int walletBalance;
+
+  // State to manage API call in progress
+  bool _isApiCalling = false;
 
   // Placeholder for device info. In a real app, these would be dynamic.
   final String _deviceId = 'test_device_id_flutter';
@@ -172,43 +84,37 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
   // Set up listeners for GetStorage keys
   void _setupStorageListeners() {
     storage.listenKey('accessToken', (value) {
-      setState(() {
-        accessToken = value ?? '';
-      });
+      if (mounted) setState(() => accessToken = value ?? '');
     });
 
     storage.listenKey('registerId', (value) {
-      setState(() {
-        registerId = value ?? '';
-      });
+      if (mounted) setState(() => registerId = value ?? '');
     });
 
     storage.listenKey('accountStatus', (value) {
-      setState(() {
-        accountStatus = value ?? false;
-      });
+      if (mounted) setState(() => accountStatus = value ?? false);
     });
 
     storage.listenKey('selectedLanguage', (value) {
-      setState(() {
-        preferredLanguage = value ?? 'en';
-      });
+      if (mounted) setState(() => preferredLanguage = value ?? 'en');
     });
 
     storage.listenKey('walletBalance', (value) {
-      setState(() {
-        if (value is String) {
-          walletBalance = int.tryParse(value) ?? 0;
-        } else if (value is int) {
-          walletBalance = value;
-        } else {
-          walletBalance = 0;
-        }
-      });
+      if (mounted) {
+        setState(() {
+          if (value is String) {
+            walletBalance = int.tryParse(value) ?? 0;
+          } else if (value is int) {
+            walletBalance = value;
+          } else {
+            walletBalance = 0;
+          }
+        });
+      }
     });
   }
 
-  // List of all possible 3-digit pannas for suggestions
+  // List of all possible 3-digit pannas for suggestions (100-999)
   static final List<String> _allPannas = List.generate(
     900,
     (index) => (index + 100).toString(),
@@ -241,6 +147,7 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
   }
 
   void _addBid() {
+    if (_isApiCalling) return; // Prevent adding bids while API is in progress
     _clearMessage(); // Clear any previous messages
     final openPanna = _openPannaController.text.trim();
     final closePanna = _closePannaController.text.trim();
@@ -322,6 +229,7 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
   }
 
   void _removeBid(int index) {
+    if (_isApiCalling) return; // Prevent removing bids while API is in progress
     _clearMessage();
     setState(() {
       final removedSangam = _bids[index]['sangam'];
@@ -333,12 +241,14 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
   int _getTotalPoints() {
     return _bids.fold(
       0,
-      (sum, item) => sum + int.tryParse(item['points'] ?? '0')!,
+      (sum, item) => sum + (int.tryParse(item['points'] ?? '0') ?? 0),
     );
   }
 
   void _showConfirmationDialog() {
     _clearMessage();
+    if (_isApiCalling) return; // Prevent showing dialog if API is in progress
+
     if (_bids.isEmpty) {
       _showMessage('Please add at least one bid.', isError: true);
       return;
@@ -362,6 +272,7 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
         "points": bid['points']!,
         "type": bid['type']!, // "FullSangam"
         "sangam": bid['sangam']!, // For display in dialog
+        "jodi": "", // Not applicable for Sangam, but common in bid payloads
       };
     }).toList();
 
@@ -385,12 +296,20 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
           gameType: widget.gameType, // Pass the gameType (e.g., "FullSangam")
           onConfirm: () async {
             Navigator.pop(dialogContext); // Dismiss the confirmation dialog
+            setState(() {
+              _isApiCalling = true; // Set API calling state to true
+            });
             bool success = await _placeFinalBids();
             if (success) {
               setState(() {
                 _bids.clear(); // Clear bids on successful submission
               });
-              _showMessage('Bids placed successfully!');
+              // No need to show success message here as BidSuccessDialog does it
+            }
+            if (mounted) {
+              setState(() {
+                _isApiCalling = false; // Reset API calling state
+              });
             }
           },
         );
@@ -402,16 +321,29 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
   Future<bool> _placeFinalBids() async {
     String url;
     // For Sangam, typically it's 'place-bid' but with specific gameType/sessionType
-    if (widget.screenTitle.toLowerCase().contains('jackpot')) {
+    // Ensure that widget.gameType matches the API's expectation for Sangam.
+    // Assuming 'place-bid' is the general endpoint for non-jackpot/starline.
+    if (widget.gameType.toLowerCase().contains('jackpot')) {
       url = '${Constant.apiEndpoint}place-jackpot-bid';
-    } else if (widget.screenTitle.toLowerCase().contains('starline')) {
+    } else if (widget.gameType.toLowerCase().contains('starline')) {
       url = '${Constant.apiEndpoint}place-starline-bid';
     } else {
       url = '${Constant.apiEndpoint}place-bid'; // General bid placement
     }
 
     if (accessToken.isEmpty || registerId.isEmpty) {
-      _showMessage('Authentication error. Please log in again.', isError: true);
+      if (mounted) {
+        await showDialog(
+          // Await dialog
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return const BidFailureDialog(
+              errorMessage: 'Authentication error. Please log in again.',
+            );
+          },
+        );
+      }
       return false;
     }
 
@@ -471,27 +403,62 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
 
       log('API Response for Final Bid Submission: ${responseBody}');
 
-      if (response.statusCode == 200 && responseBody['status'] == true) {
+      if (response.statusCode == 200 &&
+          (responseBody['status'] == true ||
+              responseBody['status'] == 'true')) {
         // Update wallet balance in GetStorage and local state on successful bid
         int currentWallet = walletBalance;
         int deductedAmount = _getTotalPoints();
         int newWalletBalance = currentWallet - deductedAmount;
-        storage.write(
+        await storage.write(
           'walletBalance',
-          newWalletBalance.toString(),
-        ); // Update storage
-        setState(() {
-          walletBalance = newWalletBalance; // Update local state
-        });
+          newWalletBalance, // Storing as int if possible, or string based on preference.
+          // Your storage listenKey handles both.
+        );
+        if (mounted) {
+          setState(() {
+            walletBalance = newWalletBalance; // Update local state
+          });
+          await showDialog(
+            // Await success dialog
+            context: context,
+            barrierDismissible: false,
+            builder: (BuildContext context) {
+              return const BidSuccessDialog();
+            },
+          );
+          _clearMessage(); // Clear message after success dialog dismissal
+        }
         return true; // Indicate success
       } else {
         String errorMessage = responseBody['msg'] ?? "Unknown error occurred.";
-        _showMessage('Bid submission failed: $errorMessage', isError: true);
+        if (mounted) {
+          await showDialog(
+            // Await failure dialog
+            context: context,
+            barrierDismissible: false,
+            builder: (BuildContext context) {
+              return BidFailureDialog(errorMessage: errorMessage);
+            },
+          );
+        }
         return false; // Indicate failure
       }
     } catch (e) {
       log('Network error during bid submission: $e');
-      _showMessage('Network error during bid submission: $e', isError: true);
+      if (mounted) {
+        await showDialog(
+          // Await failure dialog
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return const BidFailureDialog(
+              errorMessage:
+                  'Network error. Please check your internet connection.',
+            );
+          },
+        );
+      }
       return false; // Indicate failure
     }
   }
@@ -939,17 +906,16 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
           ),
           ElevatedButton(
             onPressed: _showConfirmationDialog, // Call the confirmation dialog
-            child: Text(
-              'SUBMIT',
-              style: GoogleFonts.poppins(color: Colors.white, fontSize: 16),
-            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange[700],
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
-              elevation: 3,
+            ),
+            child: Text(
+              'SUBMIT',
+              style: GoogleFonts.poppins(color: Colors.white, fontSize: 16),
             ),
           ),
         ],

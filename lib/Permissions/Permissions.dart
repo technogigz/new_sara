@@ -107,25 +107,23 @@ class _PermissionScreenState extends State<PermissionScreen> {
   }
 
   void _goToNextScreen() {
+    // Reads the 'isLoggedIn' value from storage
     final isLoggedIn = storage.read('isLoggedIn') ?? false;
 
-    // Use a post-frame callback to ensure navigation happens after the build phase
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (context.mounted) {
-        // Check if context is still valid before navigating
-        if (isLoggedIn) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const LoginWithMpinScreen()),
-          );
-        } else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const EnterMobileScreen()),
-          );
-        }
-      }
-    });
+    // ...
+    if (isLoggedIn) {
+      // If true, navigates to LoginWithMpinScreen
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginWithMpinScreen()),
+      );
+    } else {
+      // If false, navigates to EnterMobileScreen
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const EnterMobileScreen()),
+      );
+    }
   }
 
   Widget _buildPermissionTile({

@@ -3,120 +3,153 @@ import 'dart:convert';
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:new_sara/ulits/Constents.dart'; // Retained your original import path
 
+import '../../../components/AnimatedMessageBar.dart';
 import '../../../components/BidConfirmationDialog.dart';
+import '../../../components/BidFailureDialog.dart'; // Import BidFailureDialog
+import '../../../components/BidSuccessDialog.dart'; // Import BidSuccessDialog
 
-// AnimatedMessageBar component
-class AnimatedMessageBar extends StatefulWidget {
-  final String message;
-  final bool isError;
-  final VoidCallback? onDismissed;
-
-  const AnimatedMessageBar({
-    Key? key,
-    required this.message,
-    this.isError = false,
-    this.onDismissed,
-  }) : super(key: key);
-
-  @override
-  _AnimatedMessageBarState createState() => _AnimatedMessageBarState();
-}
-
-class _AnimatedMessageBarState extends State<AnimatedMessageBar> {
-  double _height = 0.0;
-  Timer? _visibilityTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showBar();
-    });
-  }
-
-  void _showBar() {
-    if (!mounted) return;
-    setState(() {
-      _height = 48.0;
-    });
-
-    _visibilityTimer = Timer(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      setState(() {
-        _height = 0.0;
-      });
-      Timer(const Duration(milliseconds: 300), () {
-        if (mounted && widget.onDismissed != null) {
-          widget.onDismissed!();
-        }
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _visibilityTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      height: _height,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      color: widget.isError ? Colors.red : Colors.green,
-      alignment: Alignment.center,
-      child: _height > 0.0
-          ? Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Row(
-                children: [
-                  Icon(
-                    widget.isError
-                        ? Icons.error_outline
-                        : Icons.check_circle_outline,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      widget.message,
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 13,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : const SizedBox.shrink(),
-    );
-  }
-}
+// Define the Single_Pana list globally or as a static member
+const List<String> Single_Pana = [
+  "120",
+  "123",
+  "124",
+  "125",
+  "126",
+  "127",
+  "128",
+  "129",
+  "130",
+  "134",
+  "135",
+  "136",
+  "137",
+  "138",
+  "139",
+  "140",
+  "145",
+  "146",
+  "147",
+  "148",
+  "149",
+  "150",
+  "156",
+  "157",
+  "158",
+  "159",
+  "160",
+  "167",
+  "168",
+  "169",
+  "170",
+  "178",
+  "179",
+  "180",
+  "189",
+  "190",
+  "230",
+  "234",
+  "235",
+  "236",
+  "237",
+  "238",
+  "239",
+  "240",
+  "245",
+  "246",
+  "247",
+  "248",
+  "249",
+  "250",
+  "256",
+  "257",
+  "258",
+  "259",
+  "260",
+  "267",
+  "268",
+  "269",
+  "270",
+  "278",
+  "279",
+  "280",
+  "289",
+  "290",
+  "340",
+  "345",
+  "346",
+  "347",
+  "348",
+  "349",
+  "350",
+  "356",
+  "357",
+  "358",
+  "359",
+  "360",
+  "367",
+  "368",
+  "369",
+  "370",
+  "378",
+  "379",
+  "380",
+  "389",
+  "390",
+  "450",
+  "456",
+  "457",
+  "458",
+  "459",
+  "460",
+  "467",
+  "468",
+  "469",
+  "470",
+  "478",
+  "479",
+  "480",
+  "489",
+  "490",
+  "560",
+  "567",
+  "568",
+  "569",
+  "570",
+  "578",
+  "579",
+  "580",
+  "589",
+  "590",
+  "670",
+  "678",
+  "679",
+  "680",
+  "689",
+  "690",
+  "780",
+  "789",
+  "790",
+  "890",
+];
 
 class SinglePannaScreen extends StatefulWidget {
   final String title;
   final int gameId;
   final String gameType;
-  final String gameName; // Added gameName for API endpoint logic
+  final String gameName;
 
   const SinglePannaScreen({
     Key? key,
     required this.title,
     required this.gameId,
     required this.gameType,
-    this.gameName = "", // Default empty
+    this.gameName = "",
   }) : super(key: key);
 
   @override
@@ -138,24 +171,141 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
   bool _isErrorForMessage = false;
   Key _messageBarKey = UniqueKey();
 
+  List<String> filteredPanaOptions = [];
+  // bool _isPanaSuggestionsVisible = false; // This is now controlled by overlay visibility
+
+  final LayerLink _layerLink =
+      LayerLink(); // For connecting overlay to the input field
+  OverlayEntry? _overlayEntry; // To manage the suggestion overlay
+
   @override
   void initState() {
     super.initState();
     _loadInitialData();
     _loadSavedBids();
-    // No need to call _loadWalletBalance explicitly here if _loadInitialData covers it.
-    // The listener below will handle updates.
+    digitController.addListener(_onDigitChanged);
+
     GetStorage().listenKey('walletBalance', (value) {
+      if (mounted) {
+        setState(() {
+          if (value is int) {
+            walletBalance = value;
+          } else if (value is String) {
+            walletBalance = int.tryParse(value) ?? 0;
+          } else {
+            walletBalance = 0;
+          }
+        });
+      }
+    });
+  }
+
+  void _onDigitChanged() {
+    final text = digitController.text;
+    if (text.isEmpty) {
+      if (mounted) {
+        setState(() {
+          filteredPanaOptions = [];
+          _removeOverlay(); // Hide overlay when text is empty
+        });
+      }
+      return;
+    }
+
+    if (mounted) {
       setState(() {
-        if (value is int) {
-          walletBalance = value;
-        } else if (value is String) {
-          walletBalance = int.tryParse(value) ?? 0;
+        filteredPanaOptions = Single_Pana.where(
+          (pana) => pana.startsWith(text),
+        ).toList();
+        if (filteredPanaOptions.isNotEmpty) {
+          _showOverlay(); // Show or update overlay
         } else {
-          walletBalance = 0;
+          _removeOverlay(); // Hide overlay if no suggestions
         }
       });
-    });
+    }
+  }
+
+  void _showOverlay() {
+    if (_overlayEntry != null) {
+      _overlayEntry!
+          .remove(); // Remove existing overlay if any before creating new one
+    }
+    _overlayEntry = _createOverlayEntry();
+    Overlay.of(context)?.insert(_overlayEntry!);
+  }
+
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+    if (mounted) {
+      // Ensure state update if overlay is removed externally
+      setState(() {
+        // This ensures that if _isPanaSuggestionsVisible was used before,
+        // its equivalent logic is covered by overlay being null.
+      });
+    }
+  }
+
+  OverlayEntry _createOverlayEntry() {
+    // Find the RenderBox of the CompositedTransformTarget (the TextFormField)
+    // to position the overlay correctly.
+    // We use the _layerLink which is attached to the CompositedTransformTarget.
+
+    return OverlayEntry(
+      builder: (context) => Positioned(
+        width: 150, // Match the TextFormField width
+        child: CompositedTransformFollower(
+          link: _layerLink,
+          showWhenUnlinked: false,
+          offset: const Offset(
+            0.0,
+            35.0 + 4.0,
+          ), // Offset below the TextFormField (height + margin)
+          child: Material(
+            // Material is needed for elevation, shadow and proper theming
+            elevation: 4.0,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              constraints: const BoxConstraints(
+                maxHeight: 150,
+              ), // Max height for the list
+              decoration: BoxDecoration(
+                // Explicit decoration for rounded corners if not using Material directly for shape
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: filteredPanaOptions.length,
+                itemBuilder: (context, index) {
+                  return ListTile(
+                    dense: true,
+                    title: Text(
+                      filteredPanaOptions[index],
+                      style: GoogleFonts.poppins(fontSize: 13),
+                    ),
+                    onTap: () {
+                      if (mounted) {
+                        digitController.text = filteredPanaOptions[index];
+                        digitController.selection = TextSelection.fromPosition(
+                          TextPosition(offset: digitController.text.length),
+                        );
+                        _removeOverlay(); // Hide overlay after selection
+                        FocusScope.of(
+                          context,
+                        ).unfocus(); // Optionally hide keyboard
+                      }
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _loadInitialData() {
@@ -173,13 +323,14 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
         walletBalance = 0;
       }
     } else {
-      walletBalance = 1000;
-      box.write('walletBalance', walletBalance);
+      walletBalance = 0;
     }
   }
 
   @override
   void dispose() {
+    digitController.removeListener(_onDigitChanged);
+    _removeOverlay(); // Crucial: Remove overlay when the widget is disposed
     digitController.dispose();
     amountController.dispose();
     super.dispose();
@@ -187,23 +338,28 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
 
   void _loadSavedBids() {
     final box = GetStorage();
-    final savedBids = box.read<List>('placedBids');
-    if (savedBids != null) {
-      setState(() {
-        bids = savedBids
-            .map((item) {
-              if (item is Map) {
+    final dynamic savedBidsRaw = box.read('placedBids');
+    if (savedBidsRaw is List) {
+      if (mounted) {
+        setState(() {
+          bids = savedBidsRaw
+              .whereType<Map>()
+              .map((item) {
                 return {
                   'digit': item['digit']?.toString() ?? '',
                   'amount': item['amount']?.toString() ?? '',
                   'type': item['type']?.toString() ?? '',
                 };
-              }
-              return <String, String>{};
-            })
-            .where((map) => map.isNotEmpty)
-            .toList();
-      });
+              })
+              .where(
+                (map) =>
+                    map['digit']!.isNotEmpty &&
+                    map['amount']!.isNotEmpty &&
+                    map['type']!.isNotEmpty,
+              )
+              .toList();
+        });
+      }
     }
   }
 
@@ -212,11 +368,13 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
   }
 
   void _showMessage(String message, {bool isError = false}) {
-    setState(() {
-      _messageToShow = message;
-      _isErrorForMessage = isError;
-      _messageBarKey = UniqueKey();
-    });
+    if (mounted) {
+      setState(() {
+        _messageToShow = message;
+        _isErrorForMessage = isError;
+        _messageBarKey = UniqueKey();
+      });
+    }
   }
 
   void _clearMessage() {
@@ -229,43 +387,72 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
 
   Future<void> _addBid() async {
     _clearMessage();
+    _removeOverlay(); // Hide suggestions when add bid is pressed
+
     final digit = digitController.text.trim();
     final amount = amountController.text.trim();
 
     if (digit.isEmpty || amount.isEmpty) {
-      _showMessage('Please fill in all fields', isError: true);
+      _showMessage('Please fill in all fields.', isError: true);
+      return;
+    }
+
+    if (!Single_Pana.contains(digit)) {
+      _showMessage('Please enter a valid Single Panna number.', isError: true);
       return;
     }
 
     final intAmount = int.tryParse(amount);
     if (intAmount == null || intAmount <= 0) {
-      _showMessage('Enter a valid amount', isError: true);
+      _showMessage(
+        'Please enter a valid amount greater than 0.',
+        isError: true,
+      );
       return;
     }
 
-    setState(() {
-      bids.add({'digit': digit, 'amount': amount, 'type': selectedGameType});
-      _saveBids();
-      digitController.clear();
-      amountController.clear();
-    });
-
-    _showMessage(
-      'Bid added to list: Digit $digit, Amount $amount, Type $selectedGameType',
+    final existingIndex = bids.indexWhere(
+      (entry) => entry['digit'] == digit && entry['type'] == selectedGameType,
     );
+
+    if (mounted) {
+      setState(() {
+        if (existingIndex != -1) {
+          final currentAmount = int.parse(bids[existingIndex]['amount']!);
+          bids[existingIndex]['amount'] = (currentAmount + intAmount)
+              .toString();
+          _showMessage(
+            'Updated amount for Panna: $digit, Type: $selectedGameType.',
+          );
+        } else {
+          bids.add({
+            'digit': digit,
+            'amount': amount,
+            'type': selectedGameType,
+          });
+          _showMessage(
+            'Added bid: Panna $digit, Amount $amount, Type $selectedGameType.',
+          );
+        }
+        _saveBids();
+        digitController.clear();
+        amountController.clear();
+        // _isPanaSuggestionsVisible = false; // Now handled by _removeOverlay() via _onDigitChanged
+        FocusScope.of(context).unfocus();
+      });
+    }
   }
 
   void _showBidConfirmationDialog() {
     _clearMessage();
+    _removeOverlay(); // Hide suggestions
+
     if (bids.isEmpty) {
       _showMessage('Please add at least one bid to confirm.', isError: true);
       return;
     }
 
-    int totalPoints = bids.fold(
-      0,
-      (sum, bid) => sum + (int.tryParse(bid['amount'] ?? '0') ?? 0),
-    );
+    int totalPoints = _getTotalPoints();
 
     if (totalPoints > walletBalance) {
       _showMessage('Insufficient wallet balance for all bids.', isError: true);
@@ -291,14 +478,15 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
           gameId: widget.gameId.toString(),
           gameType: widget.gameType,
           onConfirm: () async {
-            Navigator.pop(dialogContext); // Dismiss the confirmation dialog
+            Navigator.pop(dialogContext);
             bool success = await _placeFinalBids();
             if (success) {
-              setState(() {
-                bids.clear();
-              });
+              if (mounted) {
+                setState(() {
+                  bids.clear();
+                });
+              }
               _saveBids();
-              _showMessage('Bids placed successfully!', isError: false);
             }
           },
         );
@@ -317,30 +505,41 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
     }
 
     if (accessToken.isEmpty || registerId.isEmpty) {
-      _showMessage('Authentication error. Please log in again.', isError: true);
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return const BidFailureDialog(
+              errorMessage: 'Authentication error. Please log in again.',
+            );
+          },
+        );
+      }
       return false;
     }
 
+    final String deviceId =
+        GetStorage().read('deviceId') ?? 'unknown_device_id';
+    final String deviceName =
+        GetStorage().read('deviceName') ?? 'unknown_device_name';
+
     final headers = {
-      'deviceId': 'qwert',
-      'deviceName': 'sm2233',
+      'deviceId': deviceId,
+      'deviceName': deviceName,
       'accessStatus': '1',
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $accessToken',
     };
 
     final List<Map<String, dynamic>> bidPayload = bids.map((entry) {
-      String sessionType = entry["type"] ?? "";
+      String sessionType = entry["type"] ?? "CLOSE";
       String digit = entry["digit"] ?? "";
       int bidAmount = int.tryParse(entry["amount"] ?? '0') ?? 0;
 
       return {
-        "sessionType": sessionType == "Open"
-            ? "OPEN"
-            : "CLOSE", // Ensure uppercase for API
-        "digit": digit,
-        "pana":
-            "", // Not applicable for Single Panna, assuming this field isn't needed or is empty
+        "sessionType": sessionType.toUpperCase(),
+        "digit": "",
+        "pana": digit,
         "bidAmount": bidAmount,
       };
     }).toList();
@@ -353,17 +552,15 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
       "bid": bidPayload,
     };
 
-    // Log the cURL and headers here
-    String curlCommand = 'curl -X POST \\';
-    curlCommand += '\n  ${Uri.parse(url)} \\';
+    String curlCommand = 'curl -X POST \\\n  ${Uri.parse(url)} \\';
     headers.forEach((key, value) {
       curlCommand += '\n  -H "$key: $value" \\';
     });
-    curlCommand += '\n  -d \'$body\'';
+    curlCommand += '\n  -d \'${jsonEncode(body)}\'';
 
     log('CURL Command for Final Bid Submission:\n$curlCommand');
     log('Request Headers for Final Bid Submission: $headers');
-    log('Request Body for Final Bid Submission: $body');
+    log('Request Body for Final Bid Submission: ${jsonEncode(body)}');
 
     try {
       final response = await http.post(
@@ -372,24 +569,55 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
         body: jsonEncode(body),
       );
 
+      log('Response Status Code: ${response.statusCode}');
+      log('Response Body: ${response.body}');
+
       final Map<String, dynamic> responseBody = json.decode(response.body);
 
-      if (response.statusCode == 200 && responseBody['status'] == true) {
-        int currentWallet = walletBalance;
-        int deductedAmount = _getTotalPoints();
-        int newWalletBalance = currentWallet - deductedAmount;
-        GetStorage().write('walletBalance', newWalletBalance.toString());
-        setState(() {
-          walletBalance = newWalletBalance;
-        });
-        return true;
-      } else {
-        String errorMessage = responseBody['msg'] ?? "Unknown error occurred.";
-        _showMessage('Bid submission failed: $errorMessage', isError: true);
-        return false;
+      if (mounted) {
+        if (response.statusCode == 200 && responseBody['status'] == true) {
+          int currentWallet = walletBalance;
+          int deductedAmount = _getTotalPoints();
+          int newWalletBalance = currentWallet - deductedAmount;
+
+          GetStorage().write('walletBalance', newWalletBalance.toString());
+          setState(() {
+            walletBalance = newWalletBalance;
+          });
+
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (BuildContext context) {
+              return const BidSuccessDialog();
+            },
+          );
+          return true;
+        } else {
+          String errorMessage =
+              responseBody['msg'] ?? "Unknown error occurred.";
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return BidFailureDialog(errorMessage: errorMessage);
+            },
+          );
+          return false;
+        }
       }
+      return false;
     } catch (e) {
-      _showMessage('Network error during bid submission: $e', isError: true);
+      log('Network error during bid submission: $e');
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return BidFailureDialog(
+              errorMessage: 'Network error: ${e.toString()}',
+            );
+          },
+        );
+      }
       return false;
     }
   }
@@ -399,6 +627,7 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
             label,
@@ -414,13 +643,18 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
   }
 
   Widget _buildDropdown() {
-    return SizedBox(
+    return Container(
       height: 35,
       width: 150,
+      alignment: Alignment.center,
       child: DropdownButtonFormField<String>(
         value: selectedGameType,
+        isDense: true,
         decoration: InputDecoration(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 0,
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
             borderSide: const BorderSide(color: Colors.black),
@@ -437,12 +671,13 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
         items: gameTypes.map((type) {
           return DropdownMenuItem(
             value: type,
-            child: Text(type, style: GoogleFonts.poppins()),
+            child: Text(type, style: GoogleFonts.poppins(fontSize: 14)),
           );
         }).toList(),
         onChanged: (value) {
-          if (value != null) {
+          if (value != null && mounted) {
             setState(() => selectedGameType = value);
+            _removeOverlay(); // Hide suggestions if dropdown changes
           }
         },
       ),
@@ -450,18 +685,42 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
   }
 
   Widget _buildInputField(TextEditingController controller, String hint) {
-    return SizedBox(
+    Widget textField = SizedBox(
       height: 35,
       width: 150,
       child: TextFormField(
         controller: controller,
         cursorColor: Colors.amber,
         keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        onTap: _clearMessage,
+        // Remove content limit by not applying any input formatters
+        onTap: () {
+          _clearMessage();
+          if (controller == digitController) {
+            _onDigitChanged(); // Ensure suggestions show on tap if there's text
+          } else {
+            _removeOverlay(); // Hide Pana suggestions if tapping amount field
+          }
+        },
+        onEditingComplete: () {
+          if (controller == digitController) {
+            // Let _onDigitChanged handle overlay based on text, or remove if needed
+            if (digitController.text.isEmpty) _removeOverlay();
+          }
+          FocusScope.of(context).unfocus(); // General behavior
+        },
+        onTapOutside: (_) {
+          // Added to dismiss suggestions when tapping outside
+          if (controller == digitController && _overlayEntry != null) {
+            _removeOverlay();
+          }
+        },
+        textAlignVertical: TextAlignVertical.center,
         decoration: InputDecoration(
           hintText: hint,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 0,
+          ),
           filled: true,
           fillColor: Colors.white,
           border: OutlineInputBorder(
@@ -480,6 +739,12 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
         style: GoogleFonts.poppins(fontSize: 14),
       ),
     );
+
+    if (controller == digitController) {
+      // Wrap the Digit TextFormField with CompositedTransformTarget
+      return CompositedTransformTarget(link: _layerLink, child: textField);
+    }
+    return textField;
   }
 
   Widget _buildTableHeader() {
@@ -488,20 +753,26 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
       child: Row(
         children: [
           Expanded(
+            flex: 2,
             child: Text(
-              "Digit",
+              "Panna",
+              textAlign: TextAlign.center,
               style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
             ),
           ),
           Expanded(
+            flex: 2,
             child: Text(
               "Amount",
+              textAlign: TextAlign.center,
               style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
             ),
           ),
           Expanded(
+            flex: 3,
             child: Text(
               "Game Type",
+              textAlign: TextAlign.center,
               style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
             ),
           ),
@@ -513,9 +784,11 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
 
   void _removeBid(int index) {
     _clearMessage();
-    setState(() {
-      bids.removeAt(index);
-    });
+    if (mounted) {
+      setState(() {
+        bids.removeAt(index);
+      });
+    }
     _saveBids();
     _showMessage('Bid removed from list.');
   }
@@ -529,237 +802,279 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xfff2f2f2),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          widget.title,
-          style: GoogleFonts.poppins(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-            color: Colors.black,
+    return GestureDetector(
+      // Wrap with GestureDetector to unfocus and hide overlay on tap outside
+      onTap: () {
+        FocusScopeNode currentFocus = FocusScope.of(context);
+        if (!currentFocus.hasPrimaryFocus &&
+            currentFocus.focusedChild != null) {
+          FocusManager.instance.primaryFocus?.unfocus();
+        }
+        _removeOverlay(); // Also explicitly remove overlay
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xfff2f2f2),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
+            onPressed: () => Navigator.pop(context),
           ),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Row(
-              children: [
-                Image.asset(
-                  'assets/images/wallet_icon.png', // Ensure this asset path is correct
-                  width: 24,
-                  height: 24,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  "$walletBalance",
-                  style: GoogleFonts.poppins(color: Colors.black),
-                ),
-              ],
+          title: Text(
+            widget.title,
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: Colors.black,
             ),
           ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Column(
-              children: [
-                _inputRow("Select Game Type:", _buildDropdown()),
-                _inputRow(
-                  "Enter Single Digit:",
-                  _buildInputField(digitController, "Bid Digits"),
-                ),
-                _inputRow(
-                  "Enter Points:",
-                  _buildInputField(amountController, "Enter Amount"),
-                ),
-                const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: SizedBox(
-                    height: 35,
-                    width: 150,
-                    child: ElevatedButton(
-                      onPressed: _addBid,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.amber,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Row(
+                children: [
+                  Image.asset(
+                    'assets/images/wallet_icon.png',
+                    width: 24,
+                    height: 24,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Icon(Icons.account_balance_wallet, size: 24),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    "$walletBalance",
+                    style: GoogleFonts.poppins(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        body: Stack(
+          // Stack is necessary for the AnimatedMessageBar and potentially the Overlay
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Column(
+                children: [
+                  _inputRow("Select Game Type:", _buildDropdown()),
+                  _inputRow(
+                    "Enter Single Panna:",
+                    _buildInputField(digitController, "Bid Panna"),
+                  ),
+                  _inputRow(
+                    "Enter Points:",
+                    _buildInputField(amountController, "Enter Amount"),
+                  ),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: SizedBox(
+                      height: 35,
+                      width: 150,
+                      child: ElevatedButton(
+                        onPressed: _addBid,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.amber,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
                         ),
-                      ),
-                      child: Text(
-                        "ADD BID",
-                        style: GoogleFonts.poppins(color: Colors.white),
+                        child: Text(
+                          "ADD BID",
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                _buildTableHeader(),
-                Divider(color: Colors.grey.shade300),
-                Expanded(
-                  child: bids.isEmpty
-                      ? Center(
-                          child: Text(
-                            "No Bids Added",
-                            style: GoogleFonts.poppins(color: Colors.black38),
+                  _buildTableHeader(),
+                  Divider(color: Colors.grey.shade300),
+                  Expanded(
+                    child: bids.isEmpty
+                        ? Center(
+                            child: Text(
+                              "No Bids Added",
+                              style: GoogleFonts.poppins(
+                                color: Colors.black38,
+                                fontSize: 16,
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: bids.length,
+                            itemBuilder: (context, index) {
+                              final bid = bids[index];
+                              return Card(
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                elevation: 1,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12.0,
+                                    vertical: 10.0,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 2,
+                                        child: Text(
+                                          bid['digit']!,
+                                          textAlign: TextAlign.center,
+                                          style: GoogleFonts.poppins(),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        flex: 2,
+                                        child: Text(
+                                          bid['amount']!,
+                                          textAlign: TextAlign.center,
+                                          style: GoogleFonts.poppins(),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        flex: 3,
+                                        child: Text(
+                                          bid['type']!,
+                                          textAlign: TextAlign.center,
+                                          style: GoogleFonts.poppins(),
+                                        ),
+                                      ),
+                                      SizedBox(
+                                        width: 48,
+                                        child: IconButton(
+                                          icon: const Icon(
+                                            Icons.delete,
+                                            color: Colors.red,
+                                            size: 20,
+                                          ),
+                                          onPressed: () => _removeBid(index),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
                           ),
-                        )
-                      : ListView.builder(
-                          itemCount: bids.length,
-                          itemBuilder: (context, index) {
-                            final bid = bids[index];
-                            return Card(
-                              margin: const EdgeInsets.symmetric(vertical: 4),
-                              elevation: 1,
+                  ),
+                  if (bids.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.3),
+                            spreadRadius: 2,
+                            blurRadius: 5,
+                            offset: const Offset(0, -3),
+                          ),
+                        ],
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(12),
+                          topRight: Radius.circular(12),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Bids',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                              Text(
+                                '${bids.length}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Points',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                              Text(
+                                '${_getTotalPoints()}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          ElevatedButton(
+                            onPressed: _showBidConfirmationDialog,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.amber,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 12,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16.0,
-                                  vertical: 12.0,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        bid['digit']!,
-                                        style: GoogleFonts.poppins(),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Text(
-                                        bid['amount']!,
-                                        style: GoogleFonts.poppins(),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Text(
-                                        bid['type']!,
-                                        style: GoogleFonts.poppins(),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.delete,
-                                        color: Colors.red,
-                                        size: 20,
-                                      ),
-                                      onPressed: () => _removeBid(index),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                ),
-                if (bids.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.3),
-                          spreadRadius: 2,
-                          blurRadius: 5,
-                          offset: const Offset(0, -3),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Total Bids:',
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                color: Colors.grey[700],
-                              ),
+                              elevation: 3,
                             ),
-                            Text(
-                              '${bids.length}',
+                            child: Text(
+                              'SUBMIT',
                               style: GoogleFonts.poppins(
-                                fontSize: 18,
+                                color: Colors.white,
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                          ],
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Total Amount:',
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                color: Colors.grey[700],
-                              ),
-                            ),
-                            Text(
-                              '${_getTotalPoints()}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        ElevatedButton(
-                          onPressed: _showBidConfirmationDialog,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
                           ),
-                          child: Text(
-                            'SUBMIT',
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-              ],
-            ),
-          ),
-          if (_messageToShow != null)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: AnimatedMessageBar(
-                key: _messageBarKey,
-                message: _messageToShow!,
-                isError: _isErrorForMessage,
-                onDismissed: _clearMessage,
+                ],
               ),
             ),
-        ],
+
+            // This is where the AnimatedMessageBar is positioned within the Stack
+            if (_messageToShow != null)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: AnimatedMessageBar(
+                  key: _messageBarKey,
+                  message: _messageToShow!,
+                  isError: _isErrorForMessage,
+                  onDismissed: _clearMessage,
+                ),
+              ),
+            // The Overlay for suggestions is not explicitly placed here in the Stack.
+            // It's managed by Overlay.of(context).insert(_overlayEntry!),
+            // which places it in the app's top-level overlay stack.
+          ],
+        ),
       ),
     );
   }

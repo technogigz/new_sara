@@ -98,7 +98,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-
+    storage.write('isLoggedIn', true);
     // Initial read
     accessToken = storage.read('accessToken') ?? '';
     registerId = storage.read('registerId') ?? '';
@@ -363,13 +363,9 @@ class _HomePageState extends State<HomePage> {
                     // Game Cards
                     for (var game in results)
                       _buildCustomGameCard(
+                        id: game.gameId,
                         title: game.gameName,
-                        result: _formatResult(
-                          game.result.split('-')[0],
-                          game.result.split('-').length > 1
-                              ? game.result.split('-')[2]
-                              : '',
-                        ),
+                        result: game.result,
                         open: game.openTime,
                         close: game.closeTime,
                         openBidLastTime: game.openTime,
@@ -481,7 +477,8 @@ class _HomePageState extends State<HomePage> {
     required String closeBidLastTime,
     required String status,
     required Color statusColor,
-    required bool accountStatus, // true = active, false = inactive/suspended
+    required bool accountStatus,
+    required id, // true = active, false = inactive/suspended
   }) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -568,7 +565,8 @@ class _HomePageState extends State<HomePage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => GameMenuScreen(title: "$title"),
+                          builder: (_) =>
+                              GameMenuScreen(title: "$title", gameId: id),
                         ),
                       );
                     }

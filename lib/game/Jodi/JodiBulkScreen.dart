@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert'; // For jsonEncode and json.decode
+import 'dart:developer' as dev; // Import with prefix to avoid conflict with log
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,16 +8,18 @@ import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http; // For making HTTP requests
 import 'package:intl/intl.dart';
-import 'package:new_sara/components/BidConfirmationDialog.dart';
 
 import '../../components/AnimatedMessageBar.dart';
+import '../../components/BidConfirmationDialog.dart';
+import '../../components/BidFailureDialog.dart'; // Assuming you have this
+import '../../components/BidSuccessDialog.dart'; // Assuming you have this
 import '../../ulits/Constents.dart'; // Ensure this path is correct for Constant.apiEndpoint
 
 class JodiBulkScreen extends StatefulWidget {
   final String screenTitle;
-  final String gameType;
+  final String gameType; // e.g., "jodi", "single"
   final int gameId;
-  final String gameName;
+  final String gameName; // e.g., "KALYAN", "STARLINE MAIN"
 
   const JodiBulkScreen({
     Key? key,
@@ -32,77 +35,97 @@ class JodiBulkScreen extends StatefulWidget {
 
 class _JodiBulkScreenState extends State<JodiBulkScreen> {
   final TextEditingController _pointsController = TextEditingController();
-  final TextEditingController _singleDigitController = TextEditingController();
+  final TextEditingController _jodiDigitController =
+      TextEditingController(); // Renamed for clarity
 
   List<Map<String, String>> _bids = [];
 
   final GetStorage storage = GetStorage();
 
-  String mobile = '';
-  String name = '';
-  bool accountActiveStatus = false;
-  String walletBalance = '0';
+  String _accessToken = ''; // Use private variable for internal state
+  String _registerId = ''; // Use private variable for internal state
+  bool _accountStatus = false; // Use private variable for internal state
+  String _walletBalance = '0'; // Use private variable for internal state
 
   String? _messageToShow;
   bool _isErrorForMessage = false;
   Key _messageBarKey = UniqueKey();
   Timer? _messageDismissTimer;
+  bool _isSubmitting = false; // New state to track submission in progress
+
+  // Device info (consider getting actual device info if in production)
+  final String _deviceId = 'test_device_id_flutter_jodibulk';
+  final String _deviceName = 'test_device_name_flutter_jodibulk';
 
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    _loadInitialData();
     _setupStorageListeners();
   }
 
   @override
   void dispose() {
     _pointsController.dispose();
-    _singleDigitController.dispose();
+    _jodiDigitController.dispose(); // Use renamed controller
     _messageDismissTimer?.cancel();
     super.dispose();
   }
 
-  void _loadUserData() {
-    mobile = storage.read('mobileNoEnc') ?? '';
-    name = storage.read('fullName') ?? '';
-    accountActiveStatus = storage.read('accountStatus') ?? false;
-    walletBalance = storage.read('walletBalance')?.toString() ?? '0';
+  Future<void> _loadInitialData() async {
+    _accessToken = storage.read('accessToken') ?? '';
+    _registerId = storage.read('registerId') ?? '';
+    _accountStatus = storage.read('accountStatus') ?? false;
+    _walletBalance = storage.read('walletBalance')?.toString() ?? '0';
+    // Ensure the state is updated for UI on initial load
+    setState(() {});
   }
 
   void _setupStorageListeners() {
-    storage.listenKey('mobileNoEnc', (value) {
-      setState(() {
-        mobile = value ?? '';
-      });
+    // Only update if mounted to prevent calling setState on disposed objects
+    storage.listenKey('accessToken', (value) {
+      if (mounted) {
+        setState(() {
+          _accessToken = value ?? '';
+        });
+      }
     });
 
-    storage.listenKey('fullName', (value) {
-      setState(() {
-        name = value ?? '';
-      });
+    storage.listenKey('registerId', (value) {
+      if (mounted) {
+        setState(() {
+          _registerId = value ?? '';
+        });
+      }
     });
 
     storage.listenKey('accountStatus', (value) {
-      setState(() {
-        accountActiveStatus = value ?? false;
-      });
+      if (mounted) {
+        setState(() {
+          _accountStatus = value ?? false;
+        });
+      }
     });
 
     storage.listenKey('walletBalance', (value) {
-      setState(() {
-        walletBalance = value?.toString() ?? '0';
-      });
+      if (mounted) {
+        setState(() {
+          _walletBalance = value?.toString() ?? '0';
+        });
+      }
     });
   }
 
   void _showMessage(String message, {bool isError = false}) {
+    // Ensure previous timer is cancelled before setting a new message
     _messageDismissTimer?.cancel();
+
+    if (!mounted) return; // Don't call setState if the widget is not mounted
 
     setState(() {
       _messageToShow = message;
       _isErrorForMessage = isError;
-      _messageBarKey = UniqueKey();
+      _messageBarKey = UniqueKey(); // Force rebuild/re-animation
     });
 
     _messageDismissTimer = Timer(const Duration(seconds: 3), () {
@@ -120,9 +143,12 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
 
   void _addBidAutomatically() {
     _clearMessage();
-    final digit = _singleDigitController.text.trim();
+    if (_isSubmitting) return; // Prevent adding bids during submission
+
+    final digit = _jodiDigitController.text.trim();
     final points = _pointsController.text.trim();
 
+    // Validate Jodi digit
     if (digit.length != 2 || int.tryParse(digit) == null) {
       _showMessage(
         'Jodi digit must be exactly 2 numbers (00-99).',
@@ -130,7 +156,13 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
       );
       return;
     }
+    // Check for '00' to '99' range
+    if (int.parse(digit) < 0 || int.parse(digit) > 99) {
+      _showMessage('Jodi must be a number between 00 and 99.', isError: true);
+      return;
+    }
 
+    // Validate points
     if (points.isEmpty || int.tryParse(points) == null) {
       _showMessage('Please enter valid points.', isError: true);
       return;
@@ -143,15 +175,17 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
       return;
     }
 
-    final int currentWalletBalance = int.tryParse(walletBalance) ?? 0;
+    final int currentWalletBalance = int.tryParse(_walletBalance) ?? 0;
+    // Check if adding this bid alone exceeds wallet balance
     if (parsedPoints > currentWalletBalance) {
       _showMessage(
-        'Insufficient wallet balance to add this bid.',
+        'Insufficient wallet balance for this single bid amount.',
         isError: true,
       );
       return;
     }
 
+    // Check for duplicate Jodi already in the list
     bool alreadyExists = _bids.any(
       (entry) =>
           entry['digit'] == digit && entry['gameType'] == widget.gameType,
@@ -162,11 +196,11 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
         _bids.add({
           "digit": digit,
           "points": points,
-          "gameType": widget.gameType,
-          "type": "Jodi",
+          "gameType": widget.gameType, // Keep widget.gameType as it's passed
+          "type": "Jodi", // Use a more specific type if needed for display
         });
-        _singleDigitController.clear();
-        _pointsController.clear();
+        _jodiDigitController.clear(); // Clear Jodi digit
+        _pointsController.clear(); // Clear points
         _showMessage('Jodi $digit with $points points added.', isError: false);
       });
     } else {
@@ -178,6 +212,7 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
   }
 
   void _removeBid(int index) {
+    if (_isSubmitting) return; // Prevent removing bids during submission
     setState(() {
       final Map<String, String> removedBid = _bids.removeAt(index);
       _showMessage('Jodi ${removedBid['digit']} removed.', isError: false);
@@ -196,7 +231,7 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
     }
 
     final int totalPoints = _getTotalPoints();
-    final int currentWalletBalance = int.tryParse(walletBalance) ?? 0;
+    final int currentWalletBalance = int.tryParse(_walletBalance) ?? 0;
 
     if (currentWalletBalance < totalPoints) {
       _showMessage(
@@ -215,18 +250,16 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
         return BidConfirmationDialog(
-          gameTitle: widget.screenTitle,
+          gameTitle:
+              "${widget.gameName} - ${widget.gameType}", // More specific title
           gameDate: formattedDate,
-          bids: _bids
-              .map(
-                (bid) => {
-                  "digit": bid['digit']!,
-                  "points": bid['points']!,
-                  "type": bid['type']!,
-                  "gameType": bid['gameType']!,
-                },
-              )
-              .toList(),
+          bids: _bids.map((bid) {
+            return {
+              "digit": bid['digit']!,
+              "points": bid['points']!,
+              "type": bid['type']!, // Use the 'type' field from the bid map
+            };
+          }).toList(),
           totalBids: _bids.length,
           totalBidsAmount: totalPoints,
           walletBalanceBeforeDeduction: currentWalletBalance,
@@ -235,17 +268,46 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
           gameId: widget.gameId.toString(),
           gameType: widget.gameType,
           onConfirm: () async {
-            bool success = await _placeFinalBids();
-            if (success) {
-              setState(() {
-                _bids.clear();
-              });
-              _showMessage("All bids submitted successfully!", isError: false);
-            } else {
+            // No need to pop here, the dialog is already popped by its own button handler
+            // Navigator.of(dialogContext).pop(true); // This line is handled by BidConfirmationDialog's internal logic
+
+            setState(() {
+              _isSubmitting = true; // Set submitting state to true
+            });
+
+            bool success = false;
+            try {
+              final lowerGameName = widget.gameName.toLowerCase();
+
+              if (lowerGameName.contains('jackpot')) {
+                success = await _placeJackpotBid();
+              } else if (lowerGameName.contains('starline')) {
+                success = await _placeStarlineBid();
+              } else {
+                success = await _placeGeneralBid();
+              }
+
+              if (success) {
+                // Clear bids only on successful API submission
+                setState(() {
+                  _bids.clear();
+                  // Wallet balance updated in place bid methods
+                });
+                // Success message and dialog are handled within place bid methods
+              }
+              // Error message and dialog are handled within place bid methods
+            } catch (e) {
+              dev.log("🚨 Error during bid confirmation process: $e");
               _showMessage(
-                "Bid submission failed. Please try again.",
+                "An unexpected error occurred during submission: ${e.toString()}",
                 isError: true,
               );
+            } finally {
+              if (mounted) {
+                setState(() {
+                  _isSubmitting = false; // Always set to false when done
+                });
+              }
             }
           },
         );
@@ -253,61 +315,44 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
     );
   }
 
-  Future<bool> _placeFinalBids() async {
-    String url;
-    if (widget.gameName.toLowerCase().contains('jackpot')) {
-      url = '${Constant.apiEndpoint}place-jackpot-bid';
-    } else if (widget.gameName.toLowerCase().contains('starline')) {
-      url = '${Constant.apiEndpoint}place-starline-bid';
-    } else {
-      url = '${Constant.apiEndpoint}place-bid';
-    }
-
-    if (mobile.isEmpty ||
-        name.isEmpty ||
-        storage.read('accessToken') == null ||
-        storage.read('registerId') == null) {
-      _showMessage("Authentication error. Please log in again.", isError: true);
+  // --- API Methods (Copied/Adapted from JodiBidScreen) ---
+  Future<bool> _placeGeneralBid() async {
+    final url = '${Constant.apiEndpoint}place-bid';
+    if (_accessToken.isEmpty || _registerId.isEmpty) {
+      _showMessage('Authentication error. Please log in again.', isError: true);
       return false;
     }
 
     final headers = {
-      'deviceId': 'qwert',
-      'deviceName': 'sm2233',
-      'accessStatus': '1',
+      'deviceId': _deviceId,
+      'deviceName': _deviceName,
+      'accessStatus': _accountStatus ? '1' : '0',
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer ${storage.read('accessToken')}',
+      'Authorization': 'Bearer $_accessToken',
     };
 
     final List<Map<String, dynamic>> bidPayload = _bids.map((bid) {
-      String sessionType = bid["type"] ?? "";
-      String digit = bid["digit"] ?? "";
-      int bidAmount = int.tryParse(bid["points"] ?? '0') ?? 0;
-
-      if (bid["type"] != null && bid["type"]!.contains('(')) {
-        final String fullType = bid["type"]!;
-        final int startIndex = fullType.indexOf('(') + 1;
-        final int endIndex = fullType.indexOf(')');
-        if (startIndex > 0 && endIndex > startIndex) {
-          sessionType = fullType.substring(startIndex, endIndex).toUpperCase();
-        }
-      }
-
+      // For Jodi, digit and pana would typically be the same value (the 2-digit Jodi itself)
       return {
-        "sessionType": sessionType,
-        "digit": digit,
-        "pana": digit,
-        "bidAmount": bidAmount,
+        "sessionType": "OPEN", // Jodi bids are usually "OPEN"
+        "digit": bid["digit"], // The Jodi number (e.g., "25")
+        "pana":
+            "", // Jodi doesn't typically have a 'pana' field in this context
+        "bidAmount": int.tryParse(bid["points"] ?? '0') ?? 0,
       };
     }).toList();
 
     final body = {
-      "registerId": storage.read('registerId'),
-      "gameId": widget.gameId,
+      "registerId": _registerId,
+      "gameId": widget.gameId.toString(),
       "bidAmount": _getTotalPoints(),
       "gameType": widget.gameType,
       "bid": bidPayload,
     };
+
+    dev.log("Sending General Bid Request to: $url");
+    dev.log("Headers: $headers");
+    dev.log("Body: ${jsonEncode(body)}");
 
     try {
       final response = await http.post(
@@ -319,24 +364,255 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
       final Map<String, dynamic> responseBody = json.decode(response.body);
 
       if (response.statusCode == 200 && responseBody['status'] == true) {
-        int currentWallet = int.tryParse(walletBalance) ?? 0;
-        int deductedAmount = _getTotalPoints();
-        int newWalletBalance = currentWallet - deductedAmount;
-        storage.write('walletBalance', newWalletBalance.toString());
-        setState(() {
-          walletBalance = newWalletBalance.toString();
-        });
+        int newWalletBalance =
+            (int.tryParse(_walletBalance) ?? 0) - _getTotalPoints();
+        if (mounted) {
+          setState(() {
+            _walletBalance = newWalletBalance.toString();
+          });
+        }
+        await storage.write('walletBalance', newWalletBalance.toString());
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext dialogContext) => const BidSuccessDialog(),
+        );
+        _showMessage(
+          responseBody['msg'] ?? "General bid placed successfully!",
+          isError: false,
+        );
+        dev.log("✅ General bid placed successfully. Response: $responseBody");
         return true;
       } else {
-        String errorMessage = responseBody['msg'] ?? "Unknown error occurred.";
-        _showMessage('Bid submission failed: $errorMessage', isError: true);
+        String errorMessage =
+            responseBody['msg'] ??
+            "Failed to place general bid. Unknown error.";
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext dialogContext) =>
+              BidFailureDialog(errorMessage: errorMessage),
+        );
+        _showMessage(errorMessage, isError: true);
+        dev.log(
+          "❌ Failed to place general bid. Status: ${response.statusCode}, Body: ${response.body}",
+        );
         return false;
       }
     } catch (e) {
-      _showMessage('Network error during bid submission: $e', isError: true);
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext dialogContext) => BidFailureDialog(
+          errorMessage: "Network error or server unavailable: ${e.toString()}",
+        ),
+      );
+      _showMessage(
+        "Network error or server unavailable: ${e.toString()}",
+        isError: true,
+      );
+      dev.log("🚨 Error placing general bid: $e");
       return false;
     }
   }
+
+  Future<bool> _placeStarlineBid() async {
+    final url = '${Constant.apiEndpoint}place-starline-bid';
+    if (_accessToken.isEmpty || _registerId.isEmpty) {
+      _showMessage('Authentication error. Please log in again.', isError: true);
+      return false;
+    }
+
+    final headers = {
+      'deviceId': _deviceId,
+      'deviceName': _deviceName,
+      'accessStatus': _accountStatus ? '1' : '0',
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $_accessToken',
+    };
+
+    final List<Map<String, dynamic>> bidPayload = _bids.map((bid) {
+      return {
+        "sessionType": "", // Usually empty for Starline Jodi
+        "digit": bid["digit"],
+        "pana": "", // Jodi does not have pana
+        "bidAmount": int.tryParse(bid["points"] ?? '0') ?? 0,
+      };
+    }).toList();
+
+    final body = {
+      "registerId": _registerId,
+      "gameId": widget.gameId.toString(),
+      "bidAmount": _getTotalPoints(),
+      "gameType": widget.gameType,
+      "bid": bidPayload,
+    };
+
+    dev.log("Sending Starline Bid Request to: $url");
+    dev.log("Headers: $headers");
+    dev.log("Body: ${jsonEncode(body)}");
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: headers,
+        body: jsonEncode(body),
+      );
+
+      final Map<String, dynamic> responseBody = json.decode(response.body);
+
+      if (response.statusCode == 200 && responseBody['status'] == true) {
+        int newWalletBalance =
+            (int.tryParse(_walletBalance) ?? 0) - _getTotalPoints();
+        if (mounted) {
+          setState(() {
+            _walletBalance = newWalletBalance.toString();
+          });
+        }
+        await storage.write('walletBalance', newWalletBalance.toString());
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext dialogContext) => const BidSuccessDialog(),
+        );
+        _showMessage(
+          responseBody['msg'] ?? "Starline bid placed successfully!",
+          isError: false,
+        );
+        dev.log("✅ Starline bid placed successfully. Response: $responseBody");
+        return true;
+      } else {
+        String errorMessage =
+            responseBody['msg'] ??
+            "Failed to place Starline bid. Unknown error.";
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext dialogContext) =>
+              BidFailureDialog(errorMessage: errorMessage),
+        );
+        _showMessage(errorMessage, isError: true);
+        dev.log(
+          "❌ Failed to place Starline bid. Status: ${response.statusCode}, Body: ${response.body}",
+        );
+        return false;
+      }
+    } catch (e) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext dialogContext) => BidFailureDialog(
+          errorMessage: "Network error or server unavailable: ${e.toString()}",
+        ),
+      );
+      _showMessage(
+        "Network error or server unavailable: ${e.toString()}",
+        isError: true,
+      );
+      dev.log("🚨 Error placing Starline bid: $e");
+      return false;
+    }
+  }
+
+  Future<bool> _placeJackpotBid() async {
+    final url = '${Constant.apiEndpoint}place-jackpot-bid';
+    if (_accessToken.isEmpty || _registerId.isEmpty) {
+      _showMessage('Authentication error. Please log in again.', isError: true);
+      return false;
+    }
+
+    final headers = {
+      'deviceId': _deviceId,
+      'deviceName': _deviceName,
+      'accessStatus': _accountStatus ? '1' : '0',
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $_accessToken',
+    };
+
+    final List<Map<String, dynamic>> bidPayload = _bids.map((bid) {
+      return {
+        "sessionType": "OPEN", // Common for Jackpot Jodi if applicable
+        "digit": bid["digit"],
+        "pana": "", // Jodi does not have pana
+        "bidAmount": int.tryParse(bid["points"] ?? '0') ?? 0,
+      };
+    }).toList();
+
+    final body = {
+      "registerId": _registerId,
+      "gameId": widget.gameId.toString(),
+      "bidAmount": _getTotalPoints(),
+      "gameType": widget.gameType,
+      "bid": bidPayload,
+    };
+
+    dev.log("Sending Jackpot Bid Request to: $url");
+    dev.log("Headers: $headers");
+    dev.log("Body: ${jsonEncode(body)}");
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: headers,
+        body: jsonEncode(body),
+      );
+
+      final Map<String, dynamic> responseBody = json.decode(response.body);
+
+      if (response.statusCode == 200 && responseBody['status'] == true) {
+        int newWalletBalance =
+            (int.tryParse(_walletBalance) ?? 0) - _getTotalPoints();
+        if (mounted) {
+          setState(() {
+            _walletBalance = newWalletBalance.toString();
+          });
+        }
+        await storage.write('walletBalance', newWalletBalance.toString());
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext dialogContext) => const BidSuccessDialog(),
+        );
+        _showMessage(
+          responseBody['msg'] ?? "Jackpot bid placed successfully!",
+          isError: false,
+        );
+        dev.log("✅ Jackpot bid placed successfully. Response: $responseBody");
+        return true;
+      } else {
+        String errorMessage =
+            responseBody['msg'] ??
+            "Failed to place Jackpot bid. Unknown error.";
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext dialogContext) =>
+              BidFailureDialog(errorMessage: errorMessage),
+        );
+        _showMessage(errorMessage, isError: true);
+        dev.log(
+          "❌ Failed to place Jackpot bid. Status: ${response.statusCode}, Body: ${response.body}",
+        );
+        return false;
+      }
+    } catch (e) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext dialogContext) => BidFailureDialog(
+          errorMessage: "Network error or server unavailable: ${e.toString()}",
+        ),
+      );
+      _showMessage(
+        "Network error or server unavailable: ${e.toString()}",
+        isError: true,
+      );
+      dev.log("🚨 Error placing Jackpot bid: $e");
+      return false;
+    }
+  }
+
+  // --- End API Methods ---
 
   int _getTotalPoints() {
     return _bids.fold(
@@ -372,7 +648,7 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
           const SizedBox(width: 6),
           Center(
             child: Text(
-              walletBalance,
+              _walletBalance, // Use private variable here
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -455,7 +731,8 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
                           height: 40,
                           child: TextField(
                             cursorColor: Colors.amber,
-                            controller: _singleDigitController,
+                            controller:
+                                _jodiDigitController, // Use renamed controller
                             keyboardType: TextInputType.number,
                             inputFormatters: [
                               LengthLimitingTextInputFormatter(2),
@@ -600,7 +877,9 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
                                       Icons.delete,
                                       color: Colors.red,
                                     ),
-                                    onPressed: () => _removeBid(index),
+                                    onPressed: _isSubmitting
+                                        ? null
+                                        : () => _removeBid(index),
                                   ),
                                 ],
                               ),
@@ -688,542 +967,34 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
             ],
           ),
           ElevatedButton(
-            onPressed: _showConfirmationDialog,
+            onPressed: _isSubmitting ? null : _showConfirmationDialog,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange[700],
+              backgroundColor: _isSubmitting ? Colors.grey : Colors.orange[700],
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
               elevation: 3,
             ),
-            child: Text(
-              'SUBMIT',
-              style: GoogleFonts.poppins(color: Colors.white, fontSize: 16),
-            ),
+            child: _isSubmitting
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : Text(
+                    'SUBMIT',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
+                  ),
           ),
         ],
       ),
     );
   }
 }
-
-// import 'package:flutter/material.dart';
-// import 'package:flutter/services.dart'; // For TextInputFormatter
-// import 'package:get_storage/get_storage.dart';
-// import 'package:google_fonts/google_fonts.dart';
-//
-// import '../../components/BidConfirmationDialog.dart'; // For GoogleFonts
-//
-// class JodiBulkScreen extends StatefulWidget {
-//   final String screenTitle;
-//
-//   const JodiBulkScreen({
-//     Key? key,
-//     required this.screenTitle,
-//     required String gameType,
-//     required int gameId,
-//   }) : super(key: key);
-//
-//   @override
-//   State<JodiBulkScreen> createState() => _JodiBulkScreenState();
-// }
-//
-// class _JodiBulkScreenState extends State<JodiBulkScreen> {
-//   final TextEditingController _pointsController = TextEditingController();
-//   final TextEditingController _singleDigitController = TextEditingController();
-//
-//   List<Map<String, String>> _bids = []; // List to store the added bids
-//
-//   late GetStorage storage =
-//       GetStorage(); // Use the late keyword for direct initialization
-//
-//   late String mobile = '';
-//   late String name = '';
-//   late bool accountActiveStatus;
-//   late String walletBallence;
-//
-//   @override
-//   void initState() {
-//     super.initState();
-//
-//     final storage = GetStorage();
-//
-//     // Initial reads
-//     mobile = storage.read('mobileNoEnc') ?? '';
-//     name = storage.read('fullName') ?? '';
-//     accountActiveStatus = storage.read('accountStatus') ?? false;
-//     walletBallence = storage.read('walletBalance') ?? '';
-//
-//     // Listen to updates
-//     storage.listenKey('mobileNoEnc', (value) {
-//       setState(() {
-//         mobile = value ?? '';
-//       });
-//     });
-//
-//     storage.listenKey('fullName', (value) {
-//       setState(() {
-//         name = value ?? '';
-//       });
-//     });
-//
-//     storage.listenKey('accountStatus', (value) {
-//       setState(() {
-//         accountActiveStatus = value ?? false;
-//       });
-//     });
-//
-//     storage.listenKey('walletBalance', (value) {
-//       setState(() {
-//         walletBallence = value ?? '0';
-//       });
-//     });
-//   }
-//
-//   @override
-//   void dispose() {
-//     _pointsController.dispose();
-//     _singleDigitController.dispose();
-//     super.dispose();
-//   }
-//
-//   // Function to add a new bid automatically
-//   void _addBidAutomatically() {
-//     final digit = _singleDigitController.text.trim();
-//     final points = _pointsController.text.trim();
-//
-//     // Only add if both fields have valid input
-//     if (digit.length == 1 &&
-//         int.tryParse(digit) != null &&
-//         points.isNotEmpty &&
-//         int.tryParse(points) != null) {
-//       setState(() {
-//         // Check if this digit already exists in the current game type (assuming 'Open' for now)
-//         // This prevents adding the same single digit multiple times.
-//         bool alreadyExists = _bids.any(
-//           (entry) => entry['digit'] == digit && entry['gameType'] == 'Open',
-//         );
-//
-//         if (!alreadyExists) {
-//           _bids.add({
-//             "digit": digit,
-//             "points": points,
-//             "gameType":
-//                 "Open", // Assuming 'Open' as a default game type for single digit bids
-//           });
-//           _singleDigitController.clear(); // Clear digit after successful add
-//           _pointsController.clear(); // Clear points after successful add
-//         } else {
-//           // Optionally provide feedback if the digit already exists
-//           ScaffoldMessenger.of(context).showSnackBar(
-//             SnackBar(
-//               content: Text('Digit $digit already added for this game type.'),
-//             ),
-//           );
-//         }
-//       });
-//     }
-//   }
-//
-//   // Function to remove a bid from the list
-//   void _removeBid(int index) {
-//     setState(() {
-//       _bids.removeAt(index);
-//     });
-//   }
-//
-//   void _showConfirmationDialog() {
-//     if (bidAmounts.isEmpty) {
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         const SnackBar(content: Text('Please add at least one bid.')),
-//       );
-//       return;
-//     }
-//
-//     final int totalPoints = _getTotalPoints();
-//
-//     if (walletBallence as int < totalPoints) {
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         const SnackBar(
-//           content: Text('Insufficient wallet balance to place this bid.'),
-//           backgroundColor: Colors.red,
-//         ),
-//       );
-//       return;
-//     }
-//
-//     List<Map<String, String>> bidsForDialog = [];
-//     bidAmounts.forEach((digit, points) {
-//       bidsForDialog.add({
-//         "digit": digit,
-//         "points": points,
-//         "type": selectedGameType,
-//         "pana":
-//             digit, // Assuming 'pana' is the same as 'digit' for single digits
-//       });
-//     });
-//
-//     final String formattedDate = DateFormat(
-//       'dd MMM yyyy, hh:mm a',
-//     ).format(DateTime.now());
-//
-//     showDialog(
-//       context: context,
-//       builder: (BuildContext context) {
-//         return BidConfirmationDialog(
-//           gameTitle: widget.gameName,
-//           gameDate: formattedDate,
-//           bids: bidsForDialog,
-//           totalBids: bidsForDialog.length,
-//           totalBidsAmount: totalPoints,
-//           walletBalanceBeforeDeduction: walletBallence as int,
-//           walletBalanceAfterDeduction: ((walletBallence as int) - totalPoints)
-//               .toString(),
-//           gameId: widget.gameId.toString(),
-//           gameType: widget.gameType,
-//         );
-//       },
-//     ).then((_) {});
-//   }
-//
-//   // Calculate total points
-//   int _getTotalPoints() {
-//     return _bids.fold(
-//       0,
-//       (sum, item) => sum + int.tryParse(item['points'] ?? '0')!,
-//     );
-//   }
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       backgroundColor: const Color(0xFFF5F5F5), // Light gray background
-//       appBar: AppBar(
-//         backgroundColor: Colors.white,
-//         elevation: 1,
-//         leading: IconButton(
-//           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
-//           onPressed: () => Navigator.pop(context),
-//         ),
-//         title: Text(
-//           widget.screenTitle,
-//           style: const TextStyle(
-//             color: Colors.black,
-//             fontSize: 16,
-//             fontWeight: FontWeight.w600,
-//           ),
-//         ),
-//         actions: [
-//           const Icon(
-//             Icons.account_balance_wallet_outlined,
-//             color: Colors.black,
-//           ), // Replaced Image.asset
-//           const SizedBox(width: 6),
-//           const Center(
-//             child: Text(
-//               '5',
-//               style: TextStyle(
-//                 fontSize: 16,
-//                 fontWeight: FontWeight.bold,
-//                 color: Colors.black,
-//               ),
-//             ),
-//           ),
-//           const SizedBox(width: 12),
-//         ],
-//       ),
-//       body: Column(
-//         children: [
-//           Padding(
-//             padding: const EdgeInsets.symmetric(
-//               horizontal: 16.0,
-//               vertical: 12.0,
-//             ),
-//             child: Column(
-//               crossAxisAlignment: CrossAxisAlignment.start,
-//               children: [
-//                 Row(
-//                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                   children: [
-//                     const Text('Enter Points:', style: TextStyle(fontSize: 16)),
-//                     SizedBox(
-//                       width: 150,
-//                       height: 40,
-//                       child: TextField(
-//                         cursorColor: Colors.amber,
-//                         controller: _pointsController,
-//                         keyboardType: TextInputType.number,
-//                         inputFormatters: [
-//                           FilteringTextInputFormatter.digitsOnly,
-//                         ], // Only digits
-//                         onChanged: (value) =>
-//                             _addBidAutomatically(), // Trigger add on change
-//                         decoration: const InputDecoration(
-//                           hintText: 'Enter Amount',
-//                           contentPadding: EdgeInsets.symmetric(horizontal: 12),
-//                           border: OutlineInputBorder(
-//                             borderRadius: BorderRadius.all(Radius.circular(20)),
-//                             borderSide: BorderSide(color: Colors.black),
-//                           ),
-//                           enabledBorder: OutlineInputBorder(
-//                             borderRadius: BorderRadius.all(Radius.circular(20)),
-//                             borderSide: BorderSide(color: Colors.black),
-//                           ),
-//                           focusedBorder: OutlineInputBorder(
-//                             borderRadius: BorderRadius.all(Radius.circular(20)),
-//                             borderSide: BorderSide(
-//                               color: Colors.amber,
-//                               width: 2,
-//                             ),
-//                           ),
-//                         ),
-//                       ),
-//                     ),
-//                   ],
-//                 ),
-//                 const SizedBox(height: 16),
-//                 Row(
-//                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                   children: [
-//                     const Text(
-//                       'Enter Single Digit:',
-//                       style: TextStyle(fontSize: 16),
-//                     ),
-//                     SizedBox(
-//                       width: 150,
-//                       height: 40,
-//                       child: TextField(
-//                         cursorColor: Colors.amber,
-//                         controller: _singleDigitController,
-//                         keyboardType: TextInputType.number,
-//                         inputFormatters: [
-//                           LengthLimitingTextInputFormatter(
-//                             1,
-//                           ), // Limit to 1 digit
-//                           FilteringTextInputFormatter.digitsOnly, // Only digits
-//                         ],
-//                         onChanged: (value) =>
-//                             _addBidAutomatically(), // Trigger add on change
-//                         decoration: const InputDecoration(
-//                           hintText: 'Bid Digits',
-//                           contentPadding: EdgeInsets.symmetric(horizontal: 12),
-//                           border: OutlineInputBorder(
-//                             borderRadius: BorderRadius.all(Radius.circular(20)),
-//                             borderSide: BorderSide(color: Colors.black),
-//                           ),
-//                           enabledBorder: OutlineInputBorder(
-//                             borderRadius: BorderRadius.all(Radius.circular(20)),
-//                             borderSide: BorderSide(color: Colors.black),
-//                           ),
-//                           focusedBorder: OutlineInputBorder(
-//                             borderRadius: BorderRadius.all(Radius.circular(20)),
-//                             borderSide: BorderSide(
-//                               color: Colors.amber,
-//                               width: 2,
-//                             ),
-//                           ),
-//                         ),
-//                       ),
-//                     ),
-//                   ],
-//                 ),
-//                 const SizedBox(height: 15),
-//               ],
-//             ),
-//           ),
-//           const Divider(thickness: 1), // Divider after input section
-//           // Table Headers (conditionally rendered)
-//           if (_bids.isNotEmpty)
-//             Padding(
-//               padding: const EdgeInsets.symmetric(
-//                 horizontal: 16.0,
-//                 vertical: 8.0,
-//               ),
-//               child: Row(
-//                 children: [
-//                   Expanded(
-//                     child: Text(
-//                       'Digit',
-//                       style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-//                     ),
-//                   ),
-//                   Expanded(
-//                     child: Text(
-//                       'Amount',
-//                       style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-//                     ),
-//                   ),
-//                   Expanded(
-//                     child: Text(
-//                       'Game Type',
-//                       style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-//                     ),
-//                   ),
-//                   const SizedBox(width: 48), // Space for delete icon
-//                 ],
-//               ),
-//             ),
-//           if (_bids.isNotEmpty) const Divider(thickness: 1),
-//
-//           // Dynamic List of Bids
-//           Expanded(
-//             child: _bids.isEmpty
-//                 ? Center(
-//                     child: Text(
-//                       'No Bids Placed',
-//                       style: GoogleFonts.poppins(color: Colors.grey),
-//                     ),
-//                   )
-//                 : ListView.builder(
-//                     itemCount: _bids.length,
-//                     itemBuilder: (context, index) {
-//                       final bid = _bids[index];
-//                       return Container(
-//                         margin: const EdgeInsets.symmetric(
-//                           horizontal: 10,
-//                           vertical: 4,
-//                         ),
-//                         decoration: BoxDecoration(
-//                           color: Colors.white,
-//                           borderRadius: BorderRadius.circular(8),
-//                           boxShadow: [
-//                             BoxShadow(
-//                               color: Colors.grey.withOpacity(0.2),
-//                               spreadRadius: 1,
-//                               blurRadius: 3,
-//                               offset: const Offset(0, 1),
-//                             ),
-//                           ],
-//                         ),
-//                         child: Padding(
-//                           padding: const EdgeInsets.symmetric(
-//                             horizontal: 16.0,
-//                             vertical: 8.0,
-//                           ),
-//                           child: Row(
-//                             children: [
-//                               Expanded(
-//                                 child: Text(
-//                                   bid['digit']!,
-//                                   style: GoogleFonts.poppins(),
-//                                 ),
-//                               ),
-//                               Expanded(
-//                                 child: Text(
-//                                   bid['points']!,
-//                                   style: GoogleFonts.poppins(),
-//                                 ),
-//                               ),
-//                               Expanded(
-//                                 child: Text(
-//                                   bid['gameType']!,
-//                                   style: GoogleFonts.poppins(
-//                                     color: Colors.green[700],
-//                                   ),
-//                                 ),
-//                               ),
-//                               IconButton(
-//                                 icon: const Icon(
-//                                   Icons.delete,
-//                                   color: Colors.red,
-//                                 ),
-//                                 onPressed: () => _removeBid(index),
-//                               ),
-//                             ],
-//                           ),
-//                         ),
-//                       );
-//                     },
-//                   ),
-//           ),
-//           // Bottom Bar (conditionally rendered)
-//           if (_bids.isNotEmpty) _buildBottomBar(),
-//         ],
-//       ),
-//     );
-//   }
-//
-//   // Helper for bottom bar
-//   Widget _buildBottomBar() {
-//     int totalBids = _bids.length;
-//     int totalPoints = _getTotalPoints();
-//
-//     return Container(
-//       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-//       decoration: BoxDecoration(
-//         color: Colors.white,
-//         boxShadow: [
-//           BoxShadow(
-//             color: Colors.grey.withOpacity(0.3),
-//             spreadRadius: 2,
-//             blurRadius: 5,
-//             offset: const Offset(0, -3),
-//           ),
-//         ],
-//       ),
-//       child: Row(
-//         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//         children: [
-//           Column(
-//             crossAxisAlignment: CrossAxisAlignment.start,
-//             children: [
-//               Text(
-//                 'Bids',
-//                 style: GoogleFonts.poppins(
-//                   fontSize: 14,
-//                   color: Colors.grey[700],
-//                 ),
-//               ),
-//               Text(
-//                 '$totalBids',
-//                 style: GoogleFonts.poppins(
-//                   fontSize: 18,
-//                   fontWeight: FontWeight.bold,
-//                 ),
-//               ),
-//             ],
-//           ),
-//           Column(
-//             crossAxisAlignment: CrossAxisAlignment.start,
-//             children: [
-//               Text(
-//                 'Points',
-//                 style: GoogleFonts.poppins(
-//                   fontSize: 14,
-//                   color: Colors.grey[700],
-//                 ),
-//               ),
-//               Text(
-//                 '$totalPoints',
-//                 style: GoogleFonts.poppins(
-//                   fontSize: 18,
-//                   fontWeight: FontWeight.bold,
-//                 ),
-//               ),
-//             ],
-//           ),
-//           ElevatedButton(
-//             onPressed: () {
-//               ScaffoldMessenger.of(context).showSnackBar(
-//                 const SnackBar(content: Text('Submit button pressed!')),
-//               );
-//             },
-//             child: Text(
-//               'SUBMIT',
-//               style: GoogleFonts.poppins(color: Colors.white, fontSize: 16),
-//             ),
-//             style: ElevatedButton.styleFrom(
-//               backgroundColor: Colors.orange[700],
-//               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-//               shape: RoundedRectangleBorder(
-//                 borderRadius: BorderRadius.circular(8),
-//               ),
-//               elevation: 3,
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }

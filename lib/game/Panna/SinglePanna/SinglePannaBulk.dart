@@ -8,111 +8,22 @@ import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:new_sara/ulits/Constents.dart';
+import 'package:new_sara/ulits/Constents.dart'; // Ensure this path is correct for Constant.apiEndpoint
 
+import '../../../components/AnimatedMessageBar.dart';
 import '../../../components/BidConfirmationDialog.dart';
+import '../../../components/BidFailureDialog.dart'; // Assuming you have this
+import '../../../components/BidSuccessDialog.dart'; // Assuming you have this
 
-// AnimatedMessageBar component (as provided by you)
-class AnimatedMessageBar extends StatefulWidget {
-  final String message;
-  final bool isError;
-  final VoidCallback? onDismissed;
-
-  const AnimatedMessageBar({
-    Key? key,
-    required this.message,
-    this.isError = false,
-    this.onDismissed,
-  }) : super(key: key);
-
-  @override
-  _AnimatedMessageBarState createState() => _AnimatedMessageBarState();
-}
-
-class _AnimatedMessageBarState extends State<AnimatedMessageBar> {
-  double _height = 0.0;
-  Timer? _visibilityTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showBar();
-    });
-  }
-
-  void _showBar() {
-    if (!mounted) return;
-    setState(() {
-      _height = 48.0;
-    });
-
-    _visibilityTimer = Timer(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      setState(() {
-        _height = 0.0;
-      });
-      Timer(const Duration(milliseconds: 300), () {
-        if (mounted && widget.onDismissed != null) {
-          widget.onDismissed!();
-        }
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _visibilityTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      height: _height,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      color: widget.isError ? Colors.red : Colors.green,
-      alignment: Alignment.center,
-      child: _height > 0.0
-          ? Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Row(
-                children: [
-                  Icon(
-                    widget.isError
-                        ? Icons.error_outline
-                        : Icons.check_circle_outline,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      widget.message,
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 13,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : const SizedBox.shrink(),
-    );
-  }
-}
-// End of AnimatedMessageBar component
-
+// Enum to represent whether the Patti is for 'Open' or 'Close'
 enum PattiDayType { open, close }
 
+// Main StatefulWidget for the Single Panna Bulk Board
 class SinglePannaBulkBoardScreen extends StatefulWidget {
-  final String title;
-  final int gameId;
-  final String gameName;
-  final String gameType;
+  final String title; // Title for the screen (e.g., "Single Panna Board")
+  final int gameId; // ID of the game
+  final String gameName; // Name of the game (e.g., "KALYAN", "STARLINE MAIN")
+  final String gameType; // Type of the game (e.g., "singlePana")
 
   const SinglePannaBulkBoardScreen({
     Key? key,
@@ -127,109 +38,130 @@ class SinglePannaBulkBoardScreen extends StatefulWidget {
       _SinglePannaBulkBoardScreenState();
 }
 
+// State class for SinglePannaBulkBoardScreen
 class _SinglePannaBulkBoardScreenState
     extends State<SinglePannaBulkBoardScreen> {
-  PattiDayType _selectedPattiDayType = PattiDayType.close;
-  final TextEditingController _pointsController = TextEditingController();
+  // State variables for UI and logic
+  PattiDayType _selectedPattiDayType =
+      PattiDayType.close; // Default selection for open/close
+  final TextEditingController _pointsController =
+      TextEditingController(); // Controller for points input
 
+  // Stores the bids: Key is the 'pana' (e.g., "127"),
+  // Value is a Map containing "points", "dayType", and the "singleDigit" derived from pana.
+  // Storing `singleDigit` is crucial for the API payload.
   Map<String, Map<String, String>> _bids = {};
 
-  late GetStorage storage = GetStorage();
-  late String accessToken;
-  late String registerId;
-  late String preferredLanguage;
-  bool accountStatus = false;
-  late int walletBalance;
+  // GetStorage instance for local data persistence
+  late GetStorage storage;
+  // User data from storage
+  late String _accessToken;
+  late String _registerId;
+  bool _accountStatus = false;
+  late int _walletBalance;
 
-  bool _isApiCalling = false;
-  bool _isWalletLoading = true;
+  // UI state indicators
+  bool _isApiCalling =
+      false; // Indicates if an API call (like adding a bulk bid or final submission) is in progress
+  bool _isWalletLoading = true; // Indicates if wallet balance is being loaded
 
+  // Device information for API headers
   final String _deviceId = 'test_device_id_flutter';
   final String _deviceName = 'test_device_name_flutter';
 
   // --- AnimatedMessageBar State Management ---
-  String? _messageToShow;
-  bool _isErrorForMessage = false;
-  Key _messageBarKey = UniqueKey();
+  String? _messageToShow; // Message to display in the custom message bar
+  bool _isErrorForMessage = false; // Whether the message is an error
+  Key _messageBarKey =
+      UniqueKey(); // Key to force re-animation of the message bar
   // --- End AnimatedMessageBar State Management ---
 
   @override
   void initState() {
     super.initState();
-    _loadInitialData();
-    _setupStorageListeners();
+    storage = GetStorage(); // Initialize GetStorage
+    _loadInitialData(); // Load user data and wallet balance
+    _setupStorageListeners(); // Set up listeners for storage changes
   }
 
+  // Asynchronously loads initial user data and wallet balance from GetStorage
   Future<void> _loadInitialData() async {
-    accessToken = storage.read('accessToken') ?? '';
-    registerId = storage.read('registerId') ?? '';
-    accountStatus = storage.read('accountStatus') ?? false;
-    preferredLanguage = storage.read('selectedLanguage') ?? 'en';
+    _accessToken = storage.read('accessToken') ?? '';
+    _registerId = storage.read('registerId') ?? '';
+    _accountStatus = storage.read('accountStatus') ?? false;
 
+    // Safely parse wallet balance, handling both String and int types
     final dynamic storedWalletBalance = storage.read('walletBalance');
     if (storedWalletBalance is String) {
-      walletBalance = int.tryParse(storedWalletBalance) ?? 0;
+      _walletBalance = int.tryParse(storedWalletBalance) ?? 0;
     } else if (storedWalletBalance is int) {
-      walletBalance = storedWalletBalance;
+      _walletBalance = storedWalletBalance;
     } else {
-      walletBalance = 0;
+      _walletBalance = 0;
     }
 
     setState(() {
-      _isWalletLoading = false;
+      _isWalletLoading = false; // Mark wallet loading as complete
     });
   }
 
+  // Sets up listeners for changes in specific GetStorage keys, updating UI state
   void _setupStorageListeners() {
     storage.listenKey('accessToken', (value) {
-      setState(() {
-        accessToken = value ?? '';
-      });
+      if (mounted) {
+        setState(() {
+          _accessToken = value ?? '';
+        });
+      }
     });
     storage.listenKey('registerId', (value) {
-      setState(() {
-        registerId = value ?? '';
-      });
+      if (mounted) {
+        setState(() {
+          _registerId = value ?? '';
+        });
+      }
     });
     storage.listenKey('accountStatus', (value) {
-      setState(() {
-        accountStatus = value ?? false;
-      });
-    });
-    storage.listenKey('selectedLanguage', (value) {
-      setState(() {
-        preferredLanguage = value ?? 'en';
-      });
+      if (mounted) {
+        setState(() {
+          _accountStatus = value ?? false;
+        });
+      }
     });
     storage.listenKey('walletBalance', (value) {
-      setState(() {
-        if (value is String) {
-          walletBalance = int.tryParse(value) ?? 0;
-        } else if (value is int) {
-          walletBalance = value;
-        } else {
-          walletBalance = 0;
-        }
-        _isWalletLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          if (value is String) {
+            _walletBalance = int.tryParse(value) ?? 0;
+          } else if (value is int) {
+            _walletBalance = value;
+          } else {
+            _walletBalance = 0;
+          }
+          _isWalletLoading = false;
+        });
+      }
     });
   }
 
   @override
   void dispose() {
-    _pointsController.dispose();
+    _pointsController.dispose(); // Dispose the TextEditingController
     super.dispose();
   }
 
   // --- AnimatedMessageBar Helper Methods ---
+  // Displays a message using the custom AnimatedMessageBar
   void _showMessage(String message, {bool isError = false}) {
+    if (!mounted) return; // Only update state if the widget is mounted
     setState(() {
       _messageToShow = message;
       _isErrorForMessage = isError;
-      _messageBarKey = UniqueKey();
+      _messageBarKey = UniqueKey(); // Assign new key to trigger animation
     });
   }
 
+  // Clears the displayed message
   void _clearMessage() {
     if (mounted) {
       setState(() {
@@ -239,14 +171,16 @@ class _SinglePannaBulkBoardScreenState
   }
   // --- End AnimatedMessageBar Helper Methods ---
 
+  // Handles pressing a number button on the custom number pad
   Future<void> _onNumberPressed(String digit) async {
-    _clearMessage();
-    if (_isApiCalling) return;
+    _clearMessage(); // Clear any previous messages
+    if (_isApiCalling) return; // Prevent multiple API calls at once
 
     final points = _pointsController.text.trim();
     final String requestSessionType =
         _selectedPattiDayType == PattiDayType.close ? 'close' : 'open';
 
+    // Input validation
     if (points.isEmpty) {
       _showMessage('Please enter points to place a bid.', isError: true);
       return;
@@ -258,27 +192,29 @@ class _SinglePannaBulkBoardScreenState
       return;
     }
 
-    if (parsedPoints > walletBalance) {
+    if (parsedPoints > _walletBalance) {
       _showMessage('Insufficient wallet balance.', isError: true);
       return;
     }
 
     setState(() {
-      _isApiCalling = true;
+      _isApiCalling = true; // Set API calling state to true
     });
 
+    // Construct API URL and headers
     final url = Uri.parse('${Constant.apiEndpoint}single-pana-bulk');
     final headers = {
       'deviceId': _deviceId,
       'deviceName': _deviceName,
-      'accessStatus': accountStatus ? '1' : '0',
+      'accessStatus': _accountStatus ? '1' : '0',
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer $accessToken',
+      'Authorization': 'Bearer $_accessToken',
     };
 
+    // Construct request body for the bulk API call
     final body = jsonEncode({
       "game_id": widget.gameId,
-      "register_id": registerId,
+      "register_id": _registerId,
       "session_type": requestSessionType,
       "digit": digit,
       "amount": parsedPoints,
@@ -299,6 +235,12 @@ class _SinglePannaBulkBoardScreenState
               final String amount = item['amount'].toString();
               String bidDisplayType;
               final String? apiSessionType = item['sessionType']?.toString();
+              // IMPORTANT: Assuming the 'single-pana-bulk' API returns a 'digit'
+              // field for each pana in the 'info' array. If not, you need to
+              // derive the single digit from the pana (e.g., sum of digits % 10).
+              final String derivedSingleDigit =
+                  item['digit']?.toString() ??
+                  _deriveSingleDigitFromPana(pana); // Fallback to derivation
 
               if (apiSessionType != null && apiSessionType.isNotEmpty) {
                 bidDisplayType = apiSessionType;
@@ -306,10 +248,12 @@ class _SinglePannaBulkBoardScreenState
                 bidDisplayType = requestSessionType;
               }
 
+              // Store the full pana as the key, and the derived single digit
               _bids[pana] = {
                 "points": amount,
                 "dayType": bidDisplayType.toLowerCase(),
-                "associatedDigit": digit,
+                "singleDigit":
+                    derivedSingleDigit, // Store the single digit for later submission
               };
             }
           });
@@ -333,27 +277,51 @@ class _SinglePannaBulkBoardScreenState
       _showMessage('Network error: $e', isError: true);
     } finally {
       setState(() {
-        _isApiCalling = false;
+        _isApiCalling = false; // Reset API calling state
       });
     }
   }
 
+  // Helper function to derive single digit from pana (e.g., "127" -> "0")
+  String _deriveSingleDigitFromPana(String pana) {
+    if (pana.length != 3) return ""; // Or handle error appropriately
+    try {
+      int sum = 0;
+      for (int i = 0; i < pana.length; i++) {
+        sum += int.parse(pana[i]);
+      }
+      return (sum % 10).toString();
+    } catch (e) {
+      log(
+        "Error deriving single digit from pana '$pana': $e",
+        name: 'PanaDerivationError',
+      );
+      return ""; // Return empty or handle as error
+    }
+  }
+
+  // Removes a bid from the local list
   void _removeBid(String pana) {
     _clearMessage();
+    if (_isApiCalling) return; // Prevent removing during API submission
     setState(() {
       _bids.remove(pana);
     });
     _showMessage('Bid for Pana $pana removed from list.');
   }
 
+  // Calculates the total points for all bids in the list
   int _getTotalPoints() {
     return _bids.values
         .map((bid) => int.tryParse(bid['points'] ?? '0') ?? 0)
         .fold(0, (sum, points) => sum + points);
   }
 
+  // Shows the confirmation dialog and then initiates final bid submission
   void _showConfirmationDialogAndSubmitBids() {
-    _clearMessage();
+    _clearMessage(); // Clear any existing messages
+    if (_isApiCalling) return; // Prevent multiple submissions
+
     if (_bids.isEmpty) {
       _showMessage(
         'No bids added yet. Please add bids before submitting.',
@@ -364,7 +332,7 @@ class _SinglePannaBulkBoardScreenState
 
     final int totalPointsToSubmit = _getTotalPoints();
 
-    if (totalPointsToSubmit > walletBalance) {
+    if (totalPointsToSubmit > _walletBalance) {
       _showMessage(
         'Insufficient wallet balance to submit all bids.',
         isError: true,
@@ -372,13 +340,15 @@ class _SinglePannaBulkBoardScreenState
       return;
     }
 
+    // Prepare bids data for the confirmation dialog
     List<Map<String, String>> bidsForConfirmationDialog = [];
     _bids.forEach((pana, bidData) {
       bidsForConfirmationDialog.add({
-        "digit": pana,
+        "digit":
+            bidData['singleDigit']!, // Use the stored single digit for display
         "points": bidData['points']!,
-        "type": bidData['dayType']!.toUpperCase(),
-        "pana": pana, // Ensure pana is also passed in the bid map
+        "type": bidData['dayType']!.toUpperCase(), // Display type (OPEN/CLOSE)
+        "pana": pana, // This is the full pana for display
       });
     });
 
@@ -386,9 +356,10 @@ class _SinglePannaBulkBoardScreenState
       'dd MMM yyyy, hh:mm a',
     ).format(DateTime.now());
 
+    // Show the confirmation dialog
     showDialog(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: false, // User must interact with buttons
       builder: (BuildContext dialogContext) {
         return BidConfirmationDialog(
           gameTitle:
@@ -397,19 +368,38 @@ class _SinglePannaBulkBoardScreenState
           bids: bidsForConfirmationDialog,
           totalBids: _bids.length,
           totalBidsAmount: totalPointsToSubmit,
-          walletBalanceBeforeDeduction: walletBalance,
-          walletBalanceAfterDeduction: (walletBalance - totalPointsToSubmit)
+          walletBalanceBeforeDeduction: _walletBalance,
+          walletBalanceAfterDeduction: (_walletBalance - totalPointsToSubmit)
               .toString(),
           gameId: widget.gameId.toString(),
           gameType: widget.gameType,
           onConfirm: () async {
             Navigator.pop(dialogContext); // Dismiss the confirmation dialog
-            bool success = await _placeFinalBids();
-            if (success) {
-              setState(() {
-                _bids.clear();
-              });
-              _showMessage('Bids placed successfully!', isError: false);
+
+            setState(() {
+              _isApiCalling =
+                  true; // Set API calling state for final submission
+            });
+
+            bool success = false;
+            try {
+              success =
+                  await _placeFinalBids(); // Call the final submission logic
+              if (success) {
+                // _bids.clear() is now handled within _placeFinalBids if successful
+                // Overall success message is handled by BidSuccessDialog
+              } else {
+                // Overall failure message is handled by BidFailureDialog
+              }
+            } catch (e) {
+              log("Error during final bid submission: $e");
+              _showMessage('An unexpected error occurred: $e', isError: true);
+            } finally {
+              if (mounted) {
+                setState(() {
+                  _isApiCalling = false; // Reset API calling state
+                });
+              }
             }
           },
         );
@@ -417,89 +407,391 @@ class _SinglePannaBulkBoardScreenState
     );
   }
 
+  // --- Final Bid Submission Logic ---
+  // This function iterates through all collected bids and sends them
+  // individually to the appropriate API endpoint.
   Future<bool> _placeFinalBids() async {
-    String url;
+    bool allBidsSuccessful = true; // Flag to track overall success
+
+    log(
+      'Starting final bid submission process. Total bids to process: ${_bids.length}',
+      name: 'FinalBidSubmission',
+    );
+
+    // Determine the base API URL (jackpot/starline/regular) based on gameName
+    String baseUrl;
     if (widget.gameName.toLowerCase().contains('jackpot')) {
-      url = '${Constant.apiEndpoint}place-jackpot-bid';
+      baseUrl = '${Constant.apiEndpoint}place-jackpot-bid';
     } else if (widget.gameName.toLowerCase().contains('starline')) {
-      url = '${Constant.apiEndpoint}place-starline-bid';
+      baseUrl = '${Constant.apiEndpoint}place-starline-bid';
     } else {
-      url = '${Constant.apiEndpoint}place-bid';
+      baseUrl = '${Constant.apiEndpoint}place-bid';
     }
 
-    if (accessToken.isEmpty || registerId.isEmpty) {
-      _showMessage('Authentication error. Please log in again.', isError: true);
-      return false;
-    }
-
+    // Define common request headers
     final headers = {
       'deviceId': _deviceId,
       'deviceName': _deviceName,
-      'accessStatus': accountStatus ? '1' : '0',
+      'accessStatus': _accountStatus
+          ? '1'
+          : '0', // Convert boolean to string '1' or '0'
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer $accessToken',
+      'Authorization': 'Bearer $_accessToken',
     };
 
-    final List<Map<String, dynamic>> bidPayload = _bids.entries.map((entry) {
-      String sessionType = entry.value["dayType"] ?? "";
-      String digit = entry.key; // The pana is the digit for submission
-      int bidAmount = int.tryParse(entry.value["points"] ?? '0') ?? 0;
+    // Make a copy of _bids to iterate over, as _bids might be cleared if all successful
+    final Map<String, Map<String, String>> bidsToProcess = Map.from(_bids);
 
-      return {
-        "sessionType": sessionType.toUpperCase(),
-        "digit": digit,
-        "pana": digit, // For patti, digit is the pana itself
+    // Iterate over each bid in the _bids map and send individual requests
+    for (var entry in bidsToProcess.entries) {
+      final String currentPanaFromKey =
+          entry.key; // This is the Pana, like "127"
+      final Map<String, dynamic> bidDetails = entry.value;
+
+      final String sessionType = bidDetails["dayType"]?.toUpperCase() ?? "";
+      final int bidAmount = int.tryParse(bidDetails["points"] ?? '0') ?? 0;
+
+      // Retrieve the single digit that was stored alongside the pana
+      final String singleDigitForThisPana = bidDetails["singleDigit"] ?? "";
+      // The actual pana value is the key itself
+      final String actualPana = currentPanaFromKey;
+
+      // Construct the single bid object for the 'bid' field
+      final Map<String, dynamic> singleBidPayload = {
+        "sessionType": sessionType,
+        "digit": singleDigitForThisPana, // Send the derived single digit
+        "pana": actualPana, // Send the full Pana
         "bidAmount": bidAmount,
       };
-    }).toList();
 
-    final body = {
-      "registerId": registerId,
-      "gameId": widget.gameId,
-      "bidAmount": _getTotalPoints(),
-      "gameType": widget.gameType,
-      "bid": bidPayload,
-    };
+      // Construct the full request body for this individual bid
+      final body = jsonEncode({
+        "registerId": _registerId,
+        "gameId": widget.gameId
+            .toString(), // Ensure gameId is a string as per curl example
+        "bidAmount":
+            bidAmount, // This is the amount for the current individual bid
+        "gameType": widget.gameType, // Use the original gameCategoryType
+        "bid": [
+          singleBidPayload,
+        ], // IMPORTANT: 'bid' should be a LIST of bid objects
+      });
 
-    // Log the cURL and headers here
-    String curlCommand = 'curl -X POST \\';
-    curlCommand += '\n  ${Uri.parse(url)} \\';
-    headers.forEach((key, value) {
-      curlCommand += '\n  -H "$key: $value" \\';
-    });
-    curlCommand += '\n  -d \'$body\'';
+      // Log the cURL command and headers for debugging purposes for each bid
+      String curlCommand = 'curl -X POST \\';
+      curlCommand += '\n  $baseUrl \\';
+      headers.forEach((key, value) {
+        curlCommand += '\n  -H "$key: $value" \\';
+      });
+      curlCommand += '\n  -d \'$body\'';
 
-    log('CURL Command for Final Bid Submission:\n$curlCommand');
-    log('Request Headers for Final Bid Submission: $headers');
-    log('Request Body for Final Bid Submission: $body');
-
-    try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: headers,
-        body: jsonEncode(body),
+      log(
+        'CURL Command for Individual Bid Submission (Pana: $currentPanaFromKey):\n$curlCommand',
+        name: 'FinalBidSubmission',
+      );
+      log(
+        'Request Headers for Individual Bid Submission: $headers',
+        name: 'FinalBidSubmission',
+      );
+      log(
+        'Request Body for Individual Bid Submission: $body',
+        name: 'FinalBidSubmission',
       );
 
-      final Map<String, dynamic> responseBody = json.decode(response.body);
+      // Make the API call for the current bid
+      try {
+        final response = await http.post(
+          Uri.parse(baseUrl),
+          headers: headers,
+          body: body,
+        );
 
-      if (response.statusCode == 200 && responseBody['status'] == true) {
-        int currentWallet = walletBalance;
-        int deductedAmount = _getTotalPoints();
-        int newWalletBalance = currentWallet - deductedAmount;
-        storage.write('walletBalance', newWalletBalance.toString());
-        setState(() {
-          walletBalance = newWalletBalance;
-        });
-        return true;
-      } else {
-        String errorMessage = responseBody['msg'] ?? "Unknown error occurred.";
-        _showMessage('Bid submission failed: $errorMessage', isError: true);
-        return false;
+        final Map<String, dynamic> responseBody = json.decode(response.body);
+
+        // Handle the API response for the current bid
+        if (response.statusCode == 200 && responseBody['status'] == true) {
+          log(
+            "Bid Status for Pana $currentPanaFromKey: ${response.statusCode}",
+          );
+          // Deduct points for this successful bid
+          int newWalletBalance = _walletBalance - bidAmount;
+          await storage.write('walletBalance', newWalletBalance.toString());
+
+          // Update UI wallet balance only if mounted
+          if (mounted) {
+            setState(() {
+              _walletBalance = newWalletBalance;
+            });
+          }
+          log(
+            'Bid for Pana $currentPanaFromKey successful. Wallet updated: $_walletBalance',
+            name: 'FinalBidSubmission',
+          );
+        } else {
+          String errorMessage =
+              responseBody['msg'] ?? "Unknown error occurred.";
+          _showMessage(
+            'Bid for Pana $currentPanaFromKey failed: $errorMessage',
+            isError: true,
+          );
+          allBidsSuccessful = false; // Mark overall as failed if any bid fails
+          log(
+            'Bid for Pana $currentPanaFromKey failed: $errorMessage',
+            name: 'FinalBidSubmission',
+            error: responseBody,
+          );
+          // Don't break, try to submit remaining bids
+        }
+      } catch (e) {
+        _showMessage(
+          'Network error for Pana $currentPanaFromKey: $e',
+          isError: true,
+        );
+        allBidsSuccessful = false; // Mark overall as failed on network error
+        log(
+          'Network error for Pana $currentPanaFromKey: $e',
+          name: 'FinalBidSubmission',
+          error: e,
+        );
+        // Don't break, try to submit remaining bids
       }
-    } catch (e) {
-      _showMessage('Network error during bid submission: $e', isError: true);
-      return false;
     }
+
+    // After processing all bids, if all were successful, clear the local bids
+    if (allBidsSuccessful) {
+      // Show overall success dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext dialogContext) => const BidSuccessDialog(),
+        );
+        _bids.clear(); // Clear the bids after successful submission
+      }
+      log(
+        'All bids processed. Bids cleared locally.',
+        name: 'FinalBidSubmission',
+      );
+    } else {
+      // Show overall failure dialog if any bid failed
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext dialogContext) => BidFailureDialog(
+            errorMessage: "Some bids failed to place. Please check messages.",
+          ),
+        );
+      }
+      log(
+        'Some bids failed. Bids not cleared locally.',
+        name: 'FinalBidSubmission',
+      );
+    }
+
+    return allBidsSuccessful; // Return overall success status
+  }
+
+  // Builds the custom number pad for selecting single digits (0-9)
+  Widget _buildNumberPad() {
+    final numbers = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
+    return Wrap(
+      spacing: 10, // Adjusted for better visual spacing
+      runSpacing: 10, // Adjusted for better visual spacing
+      alignment: WrapAlignment.center,
+      children: numbers.map((number) {
+        return GestureDetector(
+          // Disable tap if an API call is in progress
+          onTap: _isApiCalling ? null : () => _onNumberPressed(number),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: _isApiCalling
+                      ? Colors.grey
+                      : Colors.amber, // Dim if disabled
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow:
+                      _isApiCalling // Less prominent shadow if disabled
+                      ? []
+                      : [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            spreadRadius: 1,
+                            blurRadius: 3,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                ),
+                child: Text(
+                  number,
+                  style: GoogleFonts.poppins(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  // Builds a single bid entry item for display in the list
+  Widget _buildBidEntryItem(String pana, String points, String type) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: Text(
+                pana, // Display the full pana
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 3,
+              child: Text(
+                points,
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: Text(
+                type.toUpperCase(), // Display type (OPEN/CLOSE)
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: type.toLowerCase() == 'open'
+                      ? Colors.blue[700] // Differentiate open/close visually
+                      : Colors.green[700],
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              // Disable removal if an API call is in progress
+              onPressed: _isApiCalling ? null : () => _removeBid(pana),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Builds the persistent bottom bar showing total bids, points, and submit button
+  Widget _buildBottomBar() {
+    int totalBidsCount = _bids.length;
+    int totalPoints = _getTotalPoints();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.3),
+            spreadRadius: 2,
+            blurRadius: 5,
+            offset: const Offset(0, -3),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Bids', // Changed from 'Bid' for better clarity
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: Colors.grey[700],
+                ),
+              ),
+              Text(
+                '$totalBidsCount',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Points', // Changed from 'Total' for better clarity
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: Colors.grey[700],
+                ),
+              ),
+              Text(
+                '$totalPoints',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          ElevatedButton(
+            // Disable button if an API call is in progress
+            onPressed: _isApiCalling
+                ? null
+                : _showConfirmationDialogAndSubmitBids,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _isApiCalling
+                  ? Colors.grey
+                  : Colors.amber, // Dim if disabled
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              elevation: 3,
+            ),
+            child: _isApiCalling
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : Text(
+                    'SUBMIT',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -542,7 +834,7 @@ class _SinglePannaBulkBoardScreenState
                         ),
                       )
                     : Text(
-                        "${walletBalance.toString()}",
+                        "${_walletBalance.toString()}",
                         style: GoogleFonts.poppins(
                           color: Colors.black,
                           fontSize: 16,
@@ -581,6 +873,8 @@ class _SinglePannaBulkBoardScreenState
                             _selectedPattiDayType == PattiDayType.open,
                           ],
                           onPressed: (int index) {
+                            if (_isApiCalling)
+                              return; // Disable selection during API call
                             setState(() {
                               if (index == 0) {
                                 _selectedPattiDayType = PattiDayType.close;
@@ -644,6 +938,7 @@ class _SinglePannaBulkBoardScreenState
                             ],
                             style: GoogleFonts.poppins(fontSize: 14),
                             onTap: _clearMessage, // Clear message on tap
+                            enabled: !_isApiCalling, // Disable during API call
                             decoration: InputDecoration(
                               hintText: 'Enter Amount',
                               contentPadding: const EdgeInsets.symmetric(
@@ -762,171 +1057,6 @@ class _SinglePannaBulkBoardScreenState
                 onDismissed: _clearMessage,
               ),
             ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNumberPad() {
-    final numbers = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-
-    return Wrap(
-      spacing: 3,
-      runSpacing: 5,
-      alignment: WrapAlignment.center,
-      children: numbers.map((number) {
-        return GestureDetector(
-          onTap: () => _onNumberPressed(number),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Container(
-                width: 60,
-                height: 60,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Colors.amber,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  number,
-                  style: GoogleFonts.poppins(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildBidEntryItem(String pana, String points, String type) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-        child: Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: Text(
-                pana,
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            Expanded(
-              flex: 3,
-              child: Text(
-                points,
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            Expanded(
-              flex: 2,
-              child: Text(
-                type.toUpperCase(),
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.green[700],
-                ),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: () => _removeBid(pana),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomBar() {
-    int totalBidsCount = _bids.length;
-    int totalPoints = _getTotalPoints();
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.3),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: const Offset(0, -3),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Bid',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                ),
-              ),
-              Text(
-                '$totalBidsCount',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Total',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                ),
-              ),
-              Text(
-                '$totalPoints',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          ElevatedButton(
-            onPressed: _showConfirmationDialogAndSubmitBids,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              elevation: 3,
-            ),
-            child: Text(
-              'SUBMIT',
-              style: GoogleFonts.poppins(color: Colors.white, fontSize: 16),
-            ),
-          ),
         ],
       ),
     );

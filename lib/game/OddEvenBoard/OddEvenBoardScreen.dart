@@ -12,8 +12,10 @@ import 'package:marquee/marquee.dart';
 import 'package:new_sara/ulits/Constents.dart'; // Retained your original import path for Constents
 
 import '../../components/BidConfirmationDialog.dart';
+import '../../components/BidFailureDialog.dart'; // Make sure you have this import
+import '../../components/BidSuccessDialog.dart'; // Make sure you have this import
 
-// AnimatedMessageBar component
+// AnimatedMessageBar component (keep as is)
 class AnimatedMessageBar extends StatefulWidget {
   final String message;
   final bool isError;
@@ -53,6 +55,7 @@ class _AnimatedMessageBarState extends State<AnimatedMessageBar> {
       setState(() {
         _height = 0.0;
       });
+      // Give a small delay for the animation to complete before dismissing
       Timer(const Duration(milliseconds: 300), () {
         if (mounted && widget.onDismissed != null) {
           widget.onDismissed!();
@@ -137,11 +140,12 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
   List<Map<String, String>> _entries = [];
 
   late GetStorage storage = GetStorage();
-  late String accessToken;
-  late String registerId;
-  late String preferredLanguage;
-  bool accountStatus = false;
-  late int walletBalance;
+  late String
+  _accessToken; // Renamed to _accessToken for consistency with previous discussion
+  late String _registerId; // Renamed to _registerId
+  late String _preferredLanguage; // Renamed to _preferredLanguage
+  bool _accountStatus = false; // Renamed to _accountStatus
+  late int _walletBalance; // Renamed to _walletBalance
 
   String? _messageToShow;
   bool _isErrorForMessage = false;
@@ -150,52 +154,52 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
   @override
   void initState() {
     super.initState();
-    accessToken = storage.read('accessToken') ?? '';
-    registerId = storage.read('registerId') ?? '';
-    accountStatus = storage.read('accountStatus') ?? false;
-    preferredLanguage = storage.read('selectedLanguage') ?? 'en';
+    _accessToken = storage.read('accessToken') ?? '';
+    _registerId = storage.read('registerId') ?? '';
+    _accountStatus = storage.read('accountStatus') ?? false;
+    _preferredLanguage = storage.read('selectedLanguage') ?? 'en';
 
     final dynamic storedWalletBalance = storage.read('walletBalance');
     if (storedWalletBalance is String) {
-      walletBalance = int.tryParse(storedWalletBalance) ?? 0;
+      _walletBalance = int.tryParse(storedWalletBalance) ?? 0;
     } else if (storedWalletBalance is int) {
-      walletBalance = storedWalletBalance;
+      _walletBalance = storedWalletBalance;
     } else {
-      walletBalance = 0;
+      _walletBalance = 0;
     }
 
     storage.listenKey('accessToken', (value) {
       setState(() {
-        accessToken = value ?? '';
+        _accessToken = value ?? '';
       });
     });
 
     storage.listenKey('registerId', (value) {
       setState(() {
-        registerId = value ?? '';
+        _registerId = value ?? '';
       });
     });
 
     storage.listenKey('accountStatus', (value) {
       setState(() {
-        accountStatus = value ?? false;
+        _accountStatus = value ?? false;
       });
     });
 
     storage.listenKey('selectedLanguage', (value) {
       setState(() {
-        preferredLanguage = value ?? 'en';
+        _preferredLanguage = value ?? 'en';
       });
     });
 
     storage.listenKey('walletBalance', (value) {
       setState(() {
         if (value is String) {
-          walletBalance = int.tryParse(value) ?? 0;
+          _walletBalance = int.tryParse(value) ?? 0;
         } else if (value is int) {
-          walletBalance = value;
+          _walletBalance = value;
         } else {
-          walletBalance = 0;
+          _walletBalance = 0;
         }
       });
     });
@@ -207,16 +211,20 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
     super.dispose();
   }
 
+  // Helper to show the AnimatedMessageBar
   void _showMessage(String message, {bool isError = false}) {
+    // Only show if the widget is still mounted
+    if (!mounted) return;
     setState(() {
       _messageToShow = message;
       _isErrorForMessage = isError;
-      _messageBarKey = UniqueKey();
+      _messageBarKey = UniqueKey(); // Force rebuild of AnimatedMessageBar
     });
   }
 
+  // Helper to clear the AnimatedMessageBar
   void _clearMessage() {
-    if (mounted) {
+    if (mounted && _messageToShow != null) {
       setState(() {
         _messageToShow = null;
       });
@@ -224,33 +232,32 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
   }
 
   void _addEntry() {
-    _clearMessage();
+    _clearMessage(); // Clear any previous message before adding a new entry
 
-    setState(() {
-      String points = _pointsController.text.trim();
-      String type = _selectedLataDayType == LataDayType.close
-          ? 'CLOSE'
-          : 'OPEN';
+    String points = _pointsController.text.trim();
+    String type = _selectedLataDayType == LataDayType.close ? 'CLOSE' : 'OPEN';
 
-      if (points.isEmpty ||
-          int.tryParse(points) == null ||
-          int.parse(points) < 10 ||
-          int.parse(points) > 1000) {
-        _showMessage('Points must be between 10 and 1000.', isError: true);
-        return;
+    if (points.isEmpty ||
+        int.tryParse(points) == null ||
+        int.parse(points) < 10 ||
+        int.parse(points) > 1000) {
+      _showMessage('Points must be between 10 and 1000.', isError: true);
+      return;
+    }
+
+    if (_selectedGameType != null) {
+      List<String> digitsToAdd;
+      String bidType;
+      if (_selectedGameType == GameType.odd) {
+        digitsToAdd = ['1', '3', '5', '7', '9'];
+        bidType = "Odd";
+      } else {
+        digitsToAdd = ['0', '2', '4', '6', '8'];
+        bidType = "Even";
       }
 
-      if (_selectedGameType != null) {
-        List<String> digitsToAdd;
-        String bidType;
-        if (_selectedGameType == GameType.odd) {
-          digitsToAdd = ['1', '3', '5', '7', '9'];
-          bidType = "Odd";
-        } else {
-          digitsToAdd = ['0', '2', '4', '6', '8'];
-          bidType = "Even";
-        }
-
+      setState(() {
+        // Remove existing Odd/Even entries for the selected type to prevent duplicates
         _entries.removeWhere(
           (entry) =>
               entry['type'] == type &&
@@ -267,13 +274,10 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
         }
         _pointsController.clear();
         _showMessage('Entry added successfully!', isError: false);
-      } else {
-        _showMessage(
-          'Please select game type and enter points.',
-          isError: true,
-        );
-      }
-    });
+      });
+    } else {
+      _showMessage('Please select game type and enter points.', isError: true);
+    }
   }
 
   void _deleteEntry(int index) {
@@ -284,7 +288,8 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
     });
   }
 
-  int getTotalPoints() {
+  int _getTotalPoints() {
+    // Renamed to _getTotalPoints for consistency
     return _entries.fold(
       0,
       (sum, item) => sum + int.tryParse(item['points'] ?? '0')!,
@@ -292,16 +297,16 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
   }
 
   void _showConfirmationDialog() {
-    _clearMessage();
+    _clearMessage(); // Clear any previous transient message
 
     if (_entries.isEmpty) {
       _showMessage('Please add at least one entry.', isError: true);
       return;
     }
 
-    final int totalPoints = getTotalPoints();
+    final int totalPoints = _getTotalPoints();
 
-    if (walletBalance < totalPoints) {
+    if (_walletBalance < totalPoints) {
       _showMessage(
         'Insufficient wallet balance to place this bid.',
         isError: true,
@@ -323,6 +328,7 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
       'dd MMM yyyy, hh:mm a',
     ).format(DateTime.now());
 
+    // Await the confirmation dialog to ensure it completes before proceeding
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -333,18 +339,19 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
           bids: bidsForDialog,
           totalBids: bidsForDialog.length,
           totalBidsAmount: totalPoints,
-          walletBalanceBeforeDeduction: walletBalance,
-          walletBalanceAfterDeduction: (walletBalance - totalPoints).toString(),
+          walletBalanceBeforeDeduction: _walletBalance,
+          walletBalanceAfterDeduction: (_walletBalance - totalPoints)
+              .toString(),
           gameId: widget.gameId.toString(),
           gameType: widget.gameType,
           onConfirm: () async {
-            Navigator.pop(dialogContext);
+            Navigator.pop(dialogContext); // Dismiss confirmation dialog first
             bool success = await _placeFinalBids();
             if (success) {
               setState(() {
-                _entries.clear();
+                _entries.clear(); // Clear entries only on successful bid
               });
-              _showMessage('Bids placed successfully!', isError: false);
+              // The success dialog will be shown by _placeFinalBids
             }
           },
         );
@@ -353,26 +360,37 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
   }
 
   Future<bool> _placeFinalBids() async {
-    String url;
+    String apiUrl; // Changed `url` to `apiUrl` for consistency
     if (widget.gameName.toLowerCase().contains('jackpot')) {
-      url = '${Constant.apiEndpoint}place-jackpot-bid';
+      apiUrl = '${Constant.apiEndpoint}place-jackpot-bid';
     } else if (widget.gameName.toLowerCase().contains('starline')) {
-      url = '${Constant.apiEndpoint}place-starline-bid';
+      apiUrl = '${Constant.apiEndpoint}place-starline-bid';
     } else {
-      url = '${Constant.apiEndpoint}place-bid';
+      apiUrl = '${Constant.apiEndpoint}place-bid';
     }
 
-    if (accessToken.isEmpty || registerId.isEmpty) {
-      _showMessage('Authentication error. Please log in again.', isError: true);
+    // Authentication check, now showing a dialog instead of message bar
+    if (_accessToken.isEmpty || _registerId.isEmpty) {
+      if (mounted) {
+        await showDialog(
+          // Await the dialog
+          context: context,
+          builder: (BuildContext dialogContext) {
+            return const BidFailureDialog(
+              errorMessage: 'Authentication error. Please log in again.',
+            );
+          },
+        );
+      }
       return false;
     }
 
     final headers = {
-      'deviceId': 'qwert',
-      'deviceName': 'sm2233',
-      'accessStatus': '1',
+      'deviceId': 'qwert', // Placeholder, ensure you get a real deviceId
+      'deviceName': 'sm2233', // Placeholder, ensure you get a real deviceName
+      'accessStatus': _accountStatus ? '1' : '0', // Convert bool to '1' or '0'
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer $accessToken',
+      'Authorization': 'Bearer $_accessToken',
     };
 
     final List<Map<String, dynamic>> bidPayload = _entries.map((entry) {
@@ -389,52 +407,91 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
     }).toList();
 
     final body = {
-      "registerId": registerId,
-      "gameId": widget.gameId,
-      "bidAmount": getTotalPoints(),
+      "registerId": _registerId,
+      "gameId": widget.gameId.toString(), // Ensure gameId is string
+      "bidAmount": _getTotalPoints(),
       "gameType": widget.gameType,
       "bid": bidPayload,
     };
 
     // Log the cURL and headers here
     String curlCommand = 'curl -X POST \\';
-    curlCommand += '\n  ${Uri.parse(url)} \\';
+    curlCommand += '\n  $apiUrl \\'; // Use apiUrl here
     headers.forEach((key, value) {
       curlCommand += '\n  -H "$key: $value" \\';
     });
-    curlCommand += '\n  -d \'$body\'';
+    curlCommand +=
+        '\n  -d \'${jsonEncode(body)}\''; // Properly encode body for curl
 
-    log('CURL Command for Final Bid Submission:\n$curlCommand');
-
-    log('Request Headers for Final Bid Submission: $headers');
-    log('Request Body for Final Bid Submission: $body');
+    log('CURL Command for Final Bid Submission:\n$curlCommand', name: 'BidAPI');
+    log('Request Headers for Final Bid Submission: $headers', name: 'BidAPI');
+    log(
+      'Request Body for Final Bid Submission: ${jsonEncode(body)}',
+      name: 'BidAPI',
+    );
 
     try {
       final response = await http.post(
-        Uri.parse(url),
+        Uri.parse(apiUrl),
         headers: headers,
         body: jsonEncode(body),
       );
 
+      log('Response Status Code: ${response.statusCode}', name: 'BidAPI');
+      log('Response Body: ${response.body}', name: 'BidAPI');
+
       final Map<String, dynamic> responseBody = json.decode(response.body);
 
-      if (response.statusCode == 200 && responseBody['status'] == true) {
-        int currentWallet = walletBalance;
-        int deductedAmount = getTotalPoints();
-        int newWalletBalance = currentWallet - deductedAmount;
-        storage.write('walletBalance', newWalletBalance.toString());
-        setState(() {
-          walletBalance = newWalletBalance;
-        });
-        return true;
-      } else {
-        String errorMessage = responseBody['msg'] ?? "Unknown error occurred.";
-        _showMessage('Bid submission failed: $errorMessage', isError: true);
-        return false;
+      if (mounted) {
+        // Check mounted status before showing dialogs
+        if (response.statusCode == 200 && responseBody['status'] == true) {
+          int newWalletBalance = _walletBalance - _getTotalPoints();
+          await storage.write(
+            'walletBalance',
+            newWalletBalance.toString(),
+          ); // Await storage write
+          setState(() {
+            _walletBalance = newWalletBalance;
+          });
+
+          // Show success dialog, and await it
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (BuildContext dialogContext) {
+              return const BidSuccessDialog();
+            },
+          );
+          return true; // Indicate success
+        } else {
+          String errorMessage =
+              responseBody['msg'] ?? "Unknown error occurred.";
+          // Show failure dialog, and await it
+          await showDialog(
+            context: context,
+            builder: (BuildContext dialogContext) {
+              return BidFailureDialog(errorMessage: errorMessage);
+            },
+          );
+          return false; // Indicate failure
+        }
       }
+      return false; // Should not be reached if mounted, but for completeness
     } catch (e) {
-      _showMessage('Network error during bid submission: $e', isError: true);
-      return false;
+      log('Network error during bid submission: $e', name: 'BidAPIError');
+      if (mounted) {
+        // Show network error dialog, and await it
+        await showDialog(
+          context: context,
+          builder: (BuildContext dialogContext) {
+            return const BidFailureDialog(
+              errorMessage:
+                  'Network error. Please check your internet connection.',
+            );
+          },
+        );
+      }
+      return false; // Indicate failure
     }
   }
 
@@ -467,7 +524,7 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
                 const Icon(Icons.account_balance_wallet, color: Colors.black),
                 const SizedBox(width: 4),
                 Text(
-                  walletBalance.toString(),
+                  _walletBalance.toString(), // Use _walletBalance
                   style: const TextStyle(color: Colors.black, fontSize: 16),
                 ),
               ],
@@ -710,6 +767,7 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
               if (_entries.isNotEmpty) _buildBottomBar(),
             ],
           ),
+          // Position AnimatedMessageBar on top
           if (_messageToShow != null)
             Positioned(
               top: 0,
@@ -739,7 +797,7 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
         controller: controller,
         keyboardType: TextInputType.number,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        onTap: _clearMessage,
+        onTap: _clearMessage, // Clear message when typing starts
         decoration: InputDecoration(
           hintText: 'Enter Points',
           border: InputBorder.none,
@@ -816,7 +874,7 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
 
   Widget _buildBottomBar() {
     int totalBids = _entries.length;
-    int totalPoints = getTotalPoints();
+    int totalPoints = _getTotalPoints();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

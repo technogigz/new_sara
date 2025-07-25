@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:get_storage/get_storage.dart';
@@ -110,9 +111,9 @@ class _VerifyMobileScreenState extends State<VerifyMobileScreen> {
 
   Future<void> verifyOtp() async {
     final otp = otpController.text.trim();
-    if (otp.isEmpty || otp.length != 6) {
+    if (otp.isEmpty) {
       popToast(
-        "Please enter a valid 6-digit OTP",
+        "Please enter a valid OTP",
         4,
         Colors.white,
         ColorsR.appColorRed,
@@ -172,6 +173,14 @@ class _VerifyMobileScreenState extends State<VerifyMobileScreen> {
       final json = jsonDecode(response.body);
       final status = json['status'];
       final msg = json['message'] ?? json['msg'] ?? "Something went wrong";
+      final accessToken = json['accessToken'];
+      final registerId = json['registerId'];
+
+      storage.write('accessToken', accessToken);
+      storage.write('registerId', registerId);
+
+      log("Access Token: $accessToken");
+      log("Register Id: $registerId");
 
       if (status == true) {
         popToast("✅ $msg", 2, Colors.white, Colors.green);
@@ -290,7 +299,6 @@ class _VerifyMobileScreenState extends State<VerifyMobileScreen> {
                 child: TextField(
                   controller: otpController,
                   keyboardType: TextInputType.number,
-                  maxLength: 6,
                   cursorColor: Colors.amber,
                   decoration: const InputDecoration(
                     counterText: "",

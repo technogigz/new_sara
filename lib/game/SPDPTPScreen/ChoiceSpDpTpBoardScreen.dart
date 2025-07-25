@@ -1,109 +1,21 @@
 import 'dart:async'; // For Timer
+import 'dart:convert'; // For jsonEncode, json.decode
 import 'dart:developer'; // For log
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For TextInputFormatter
 import 'package:get_storage/get_storage.dart'; // Required for wallet balance and tokens
 import 'package:google_fonts/google_fonts.dart'; // For GoogleFonts
+import 'package:http/http.dart' as http; // Import for making HTTP requests
+import 'package:intl/intl.dart'; // For date formatting in dialog
 import 'package:marquee/marquee.dart'; // For Marquee widget
 
-// Assuming this path is correct for your BidConfirmationDialog
+// Assuming these paths are correct for your components
+import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
-
-// AnimatedMessageBar component (Ensure this is a common component or defined here)
-// If this component is already defined in a separate file (e.g., components/animated_message_bar.dart)
-// then you should import it and remove this duplicate definition.
-class AnimatedMessageBar extends StatefulWidget {
-  final String message;
-  final bool isError;
-  final VoidCallback? onDismissed;
-
-  const AnimatedMessageBar({
-    Key? key,
-    required this.message,
-    this.isError = false,
-    this.onDismissed,
-  }) : super(key: key);
-
-  @override
-  _AnimatedMessageBarState createState() => _AnimatedMessageBarState();
-}
-
-class _AnimatedMessageBarState extends State<AnimatedMessageBar> {
-  double _height = 0.0;
-  Timer? _visibilityTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showBar();
-    });
-  }
-
-  void _showBar() {
-    if (!mounted) return;
-    setState(() {
-      _height = 48.0;
-    });
-
-    _visibilityTimer = Timer(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      setState(() {
-        _height = 0.0;
-      });
-      Timer(const Duration(milliseconds: 300), () {
-        if (mounted && widget.onDismissed != null) {
-          widget.onDismissed!();
-        }
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _visibilityTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      height: _height,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      color: widget.isError ? Colors.red : Colors.green,
-      alignment: Alignment.center,
-      child: _height > 0.0
-          ? Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Row(
-                children: [
-                  Icon(
-                    widget.isError
-                        ? Icons.error_outline
-                        : Icons.check_circle_outline,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      widget.message,
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 13,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : const SizedBox.shrink(),
-    );
-  }
-}
+import '../../components/BidFailureDialog.dart'; // Added for potential API failure
+import '../../components/BidSuccessDialog.dart'; // Added for potential API success
+import '../../ulits/Constents.dart'; // Assuming this provides Constant.apiEndpoint
 
 class ChoiceSpDpTpBoardScreen extends StatefulWidget {
   final String screenTitle;
@@ -139,35 +51,75 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
   // Wallet and user data from GetStorage
   late String walletBalance;
   final GetStorage _storage = GetStorage();
+  late String accessToken; // For API calls
+  late String registerId; // For API calls
+  bool accountStatus = false; // For API calls
+  late String
+  preferredLanguage; // For API calls, though not used in API body directly
+
+  final String _deviceId = 'test_device_id_flutter'; // Example device ID
+  final String _deviceName = 'test_device_name_flutter'; // Example device Name
 
   // State management for AnimatedMessageBar
   String? _messageToShow;
   bool _isErrorForMessage = false;
   Key _messageBarKey = UniqueKey(); // Key to force rebuild/re-animation
 
+  // State variable to track API call status
+  bool _isApiCalling = false; // Added to disable UI during API call
+
   @override
   void initState() {
     super.initState();
     _selectedGameTypeOption = 'OPEN'; // Default to OPEN
 
-    // Initialize wallet balance from GetStorage
-    _updateWalletBalance();
-    _storage.listenKey('walletBalance', (value) {
-      setState(() {
-        _updateWalletBalance();
-      });
-    });
+    // Initialize wallet balance and other user data from GetStorage
+    _loadInitialData();
+    _setupStorageListeners();
   }
 
-  void _updateWalletBalance() {
-    final storedBalance = _storage.read('walletBalance');
-    if (storedBalance is int) {
-      walletBalance = storedBalance.toString();
-    } else if (storedBalance is String) {
-      walletBalance = storedBalance;
+  Future<void> _loadInitialData() async {
+    accessToken = _storage.read('accessToken') ?? '';
+    registerId = _storage.read('registerId') ?? '';
+    accountStatus = _storage.read('accountStatus') ?? false;
+    preferredLanguage = _storage.read('selectedLanguage') ?? 'en';
+
+    final dynamic storedWalletBalance = _storage.read('walletBalance');
+    if (storedWalletBalance is int) {
+      walletBalance = storedWalletBalance.toString();
+    } else if (storedWalletBalance is String) {
+      walletBalance = storedWalletBalance;
     } else {
       walletBalance = '0'; // Default if not found or unexpected type
     }
+  }
+
+  void _setupStorageListeners() {
+    _storage.listenKey('accessToken', (value) {
+      if (mounted) setState(() => accessToken = value ?? '');
+    });
+    _storage.listenKey('registerId', (value) {
+      if (mounted) setState(() => registerId = value ?? '');
+    });
+    _storage.listenKey('accountStatus', (value) {
+      if (mounted) setState(() => accountStatus = value ?? false);
+    });
+    _storage.listenKey('selectedLanguage', (value) {
+      if (mounted) setState(() => preferredLanguage = value ?? 'en');
+    });
+    _storage.listenKey('walletBalance', (value) {
+      if (mounted) {
+        setState(() {
+          if (value is int) {
+            walletBalance = value.toString();
+          } else if (value is String) {
+            walletBalance = value;
+          } else {
+            walletBalance = '0';
+          }
+        });
+      }
+    });
   }
 
   @override
@@ -204,15 +156,14 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
     return uniqueDigits.length == 3;
   }
 
+  // Corrected DP Panna validation
   bool _isValidDpPanna(String panna) {
     if (panna.length != 3) return false;
     List<String> digits = panna.split('');
-    Map<String, int> freq = {};
-    for (var d in digits) {
-      freq[d] = (freq[d] ?? 0) + 1;
-    }
-    // Check if there are exactly two unique digits and one of them appears twice.
-    return freq.length == 2 && freq.values.any((count) => count == 2);
+    digits.sort(); // Sort to easily check for two same digits
+    // DP can be XYY or XXY or YXX. This logic covers that.
+    return (digits[0] == digits[1] && digits[1] != digits[2]) ||
+        (digits[0] != digits[1] && digits[1] == digits[2]);
   }
 
   bool _isValidTpPanna(String panna) {
@@ -222,6 +173,8 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 
   void _addBid() {
     _clearMessage(); // Clear any previous messages
+    if (_isApiCalling) return; // Prevent adding bids while API is busy
+
     log("ADD button pressed - entering _addBid"); // Debug print
     final leftDigit = _leftDigitController.text.trim();
     final middleDigit = _middleDigitController.text.trim();
@@ -331,6 +284,10 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
           _middleDigitController.clear();
           _rightDigitController.clear();
           _pointsController.clear();
+          // Reset checkboxes after successful add to prevent accidental multiple adds with wrong type
+          _isSPSelected = false;
+          _isDPSelected = false;
+          _isTPSelected = false;
           _showMessage(
             'Bid added successfully for $gameCategory: $pannaInput.',
           );
@@ -346,6 +303,8 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 
   void _removeBid(int index) {
     _clearMessage(); // Clear any previous messages
+    if (_isApiCalling) return; // Prevent removing bids while API is busy
+
     setState(() {
       final removedBid = _bids.removeAt(index);
       _showMessage(
@@ -363,6 +322,8 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 
   void _showBidConfirmationDialog() {
     _clearMessage(); // Clear any previous messages
+    if (_isApiCalling) return; // Prevent showing dialog if API is busy
+
     if (_bids.isEmpty) {
       _showMessage('Please add bids before submitting.', isError: true);
       return;
@@ -388,13 +349,17 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
       };
     }).toList();
 
+    final String formattedDate = DateFormat(
+      'dd MMM yyyy, hh:mm a',
+    ).format(DateTime.now());
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
         return BidConfirmationDialog(
           gameTitle: widget.screenTitle,
-          gameDate: DateTime.now().toLocal().toString().split(' ')[0],
+          gameDate: formattedDate,
           bids: bidsForDialog,
           totalBids: bidsForDialog.length,
           totalBidsAmount: currentTotalPoints,
@@ -403,20 +368,158 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
               (currentWalletBalance - currentTotalPoints).toString(),
           gameId: widget.gameId.toString(),
           gameType: widget.gameType,
-          onConfirm: () {
+          onConfirm: () async {
             log('Bids Confirmed for API submission: $bidsForDialog');
             Navigator.pop(dialogContext); // Dismiss the confirmation dialog
-            // TODO: Implement your API call here
-            _showMessage(
-              'Bids submitted successfully (API integration needed)!',
-            );
+
             setState(() {
-              _bids.clear(); // Clear bids after "submission"
+              _isApiCalling = true; // Set API calling state
             });
+
+            bool success =
+                await _placeFinalBids(); // Call the actual API method
+
+            if (success) {
+              setState(() {
+                _bids.clear(); // Clear bids only on successful submission
+              });
+            }
+            // Ensure API calling state is reset regardless of outcome
+            if (mounted) {
+              setState(() {
+                _isApiCalling = false;
+              });
+            }
           },
         );
       },
     );
+  }
+
+  Future<bool> _placeFinalBids() async {
+    String url;
+    final gameCategory = widget.gameType.toLowerCase();
+
+    // Determine the correct API endpoint based on gameType
+    if (gameCategory.contains('jackpot')) {
+      url = '${Constant.apiEndpoint}place-jackpot-bid';
+    } else if (gameCategory.contains('starline')) {
+      url = '${Constant.apiEndpoint}place-starline-bid';
+    } else {
+      // Assuming 'place-bid' for regular games like SP/DP/TP
+      url = '${Constant.apiEndpoint}place-bid';
+    }
+
+    // --- Authentication Check ---
+    if (accessToken.isEmpty || registerId.isEmpty) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return const BidFailureDialog(
+              errorMessage: 'Authentication error. Please log in again.',
+            );
+          },
+        );
+      }
+      return false;
+    }
+
+    final headers = {
+      'deviceId': _deviceId,
+      'deviceName': _deviceName,
+      'accessStatus': accountStatus ? '1' : '0', // Convert bool to '1' or '0'
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $accessToken',
+    };
+
+    final List<Map<String, dynamic>> bidPayload = _bids.map((entry) {
+      final String bidDigit = entry['digit'] ?? '';
+      final int bidAmount = int.tryParse(entry['points'] ?? '0') ?? 0;
+      final String gameTypeCategory = entry['gameType'] ?? ''; // SP/DP/TP
+
+      return {
+        "sessionType": entry['type']?.toUpperCase() ?? '', // OPEN/CLOSE
+        "digit": bidDigit,
+        "pana": bidDigit, // For SP/DP/TP, the panna is the digit itself
+        "jodi":
+            "", // Assuming jodi is not applicable or an empty string for this game
+        "gameTypeCategory": gameTypeCategory, // SP, DP, TP
+        "bidAmount": bidAmount,
+      };
+    }).toList();
+
+    final body = jsonEncode({
+      "registerId": registerId,
+      "gameId": widget.gameId,
+      "bidAmount": _getTotalPoints(),
+      "gameType": widget.gameType, // Pass the original gameType from widget
+      "bid": bidPayload,
+    });
+
+    log('Placing bid to URL: $url');
+    log('Request Headers: $headers');
+    log('Request Body: $body');
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: headers,
+        body: body,
+      );
+
+      final Map<String, dynamic> responseBody = json.decode(response.body);
+      log('API Response: $responseBody');
+
+      if (response.statusCode == 200 && responseBody['status'] == true) {
+        int newWalletBalance =
+            (int.tryParse(walletBalance) ?? 0) - _getTotalPoints();
+        await _storage.write('walletBalance', newWalletBalance); // Store as int
+
+        if (mounted) {
+          setState(() {
+            walletBalance = newWalletBalance.toString(); // Update local state
+          });
+          // Show success dialog
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (BuildContext context) {
+              return const BidSuccessDialog();
+            },
+          );
+        }
+        return true;
+      } else {
+        String errorMessage = responseBody['msg'] ?? "Unknown error occurred.";
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (BuildContext context) {
+              return BidFailureDialog(errorMessage: errorMessage);
+            },
+          );
+        }
+        return false;
+      }
+    } catch (e) {
+      log('Error during bid submission: $e');
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return const BidFailureDialog(
+              errorMessage:
+                  'Network error. Please check your internet connection.',
+            );
+          },
+        );
+      }
+      return false;
+    }
   }
 
   @override
@@ -500,52 +603,62 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                   Icons.keyboard_arrow_down,
                                   color: Colors.amber,
                                 ),
-                                onChanged: (String? newValue) {
-                                  setState(() {
-                                    _selectedGameTypeOption = newValue;
-                                    _clearMessage(); // Clear message on dropdown change
-                                  });
-                                },
-                                items: <String>['OPEN', 'CLOSE']
-                                    .map<DropdownMenuItem<String>>((
-                                      String value,
-                                    ) {
-                                      return DropdownMenuItem<String>(
-                                        value: value,
-                                        child: SizedBox(
-                                          width: 150,
-                                          height: 20,
-                                          child: Marquee(
-                                            text: '$marketName $value',
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 14,
-                                              color: Colors.black87,
-                                            ),
-                                            scrollAxis: Axis.horizontal,
-                                            blankSpace: 40.0,
-                                            velocity: 30.0,
-                                            pauseAfterRound: const Duration(
-                                              seconds: 2,
-                                            ),
-                                            showFadingOnlyWhenScrolling: true,
-                                            fadingEdgeStartFraction: 0.1,
-                                            fadingEdgeEndFraction: 0.1,
-                                            startPadding: 10.0,
-                                            accelerationDuration:
-                                                const Duration(
-                                                  milliseconds: 500,
+                                onChanged:
+                                    _isApiCalling // Disable if API is calling
+                                    ? null
+                                    : (String? newValue) {
+                                        setState(() {
+                                          _selectedGameTypeOption = newValue;
+                                          _clearMessage(); // Clear message on dropdown change
+                                        });
+                                      },
+                                items:
+                                    const <String>[
+                                          'OPEN',
+                                          'CLOSE',
+                                        ] // Added const
+                                        .map<DropdownMenuItem<String>>((
+                                          String value,
+                                        ) {
+                                          return DropdownMenuItem<String>(
+                                            value: value,
+                                            child: SizedBox(
+                                              width: 150,
+                                              height: 20,
+                                              child: Marquee(
+                                                text: '$marketName $value',
+                                                style: GoogleFonts.poppins(
+                                                  fontSize: 14,
+                                                  color: Colors.black87,
                                                 ),
-                                            accelerationCurve: Curves.linear,
-                                            decelerationDuration:
-                                                const Duration(
-                                                  milliseconds: 500,
+                                                scrollAxis: Axis.horizontal,
+                                                blankSpace: 40.0,
+                                                velocity: 30.0,
+                                                pauseAfterRound: const Duration(
+                                                  seconds: 2,
                                                 ),
-                                            decelerationCurve: Curves.easeOut,
-                                          ),
-                                        ),
-                                      );
-                                    })
-                                    .toList(),
+                                                showFadingOnlyWhenScrolling:
+                                                    true,
+                                                fadingEdgeStartFraction: 0.1,
+                                                fadingEdgeEndFraction: 0.1,
+                                                startPadding: 10.0,
+                                                accelerationDuration:
+                                                    const Duration(
+                                                      milliseconds: 500,
+                                                    ),
+                                                accelerationCurve:
+                                                    Curves.linear,
+                                                decelerationDuration:
+                                                    const Duration(
+                                                      milliseconds: 500,
+                                                    ),
+                                                decelerationCurve:
+                                                    Curves.easeOut,
+                                              ),
+                                            ),
+                                          );
+                                        })
+                                        .toList(),
                               ),
                             ),
                           ),
@@ -561,16 +674,19 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                             children: [
                               Checkbox(
                                 value: _isSPSelected,
-                                onChanged: (bool? value) {
-                                  setState(() {
-                                    _isSPSelected = value ?? false;
-                                    if (_isSPSelected) {
-                                      _isDPSelected = false;
-                                      _isTPSelected = false;
-                                    }
-                                    _clearMessage(); // Clear message on checkbox change
-                                  });
-                                },
+                                onChanged:
+                                    _isApiCalling // Disable if API is calling
+                                    ? null
+                                    : (bool? value) {
+                                        setState(() {
+                                          _isSPSelected = value ?? false;
+                                          if (_isSPSelected) {
+                                            _isDPSelected = false;
+                                            _isTPSelected = false;
+                                          }
+                                          _clearMessage(); // Clear message on checkbox change
+                                        });
+                                      },
                                 activeColor: Colors.amber,
                                 checkColor: Colors.white,
                               ),
@@ -587,16 +703,19 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                             children: [
                               Checkbox(
                                 value: _isDPSelected,
-                                onChanged: (bool? value) {
-                                  setState(() {
-                                    _isDPSelected = value ?? false;
-                                    if (_isDPSelected) {
-                                      _isSPSelected = false;
-                                      _isTPSelected = false;
-                                    }
-                                    _clearMessage(); // Clear message on checkbox change
-                                  });
-                                },
+                                onChanged:
+                                    _isApiCalling // Disable if API is calling
+                                    ? null
+                                    : (bool? value) {
+                                        setState(() {
+                                          _isDPSelected = value ?? false;
+                                          if (_isDPSelected) {
+                                            _isSPSelected = false;
+                                            _isTPSelected = false;
+                                          }
+                                          _clearMessage(); // Clear message on checkbox change
+                                        });
+                                      },
                                 activeColor: Colors.amber,
                                 checkColor: Colors.white,
                               ),
@@ -613,16 +732,19 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                             children: [
                               Checkbox(
                                 value: _isTPSelected,
-                                onChanged: (bool? value) {
-                                  setState(() {
-                                    _isTPSelected = value ?? false;
-                                    if (_isTPSelected) {
-                                      _isSPSelected = false;
-                                      _isDPSelected = false;
-                                    }
-                                    _clearMessage(); // Clear message on checkbox change
-                                  });
-                                },
+                                onChanged:
+                                    _isApiCalling // Disable if API is calling
+                                    ? null
+                                    : (bool? value) {
+                                        setState(() {
+                                          _isTPSelected = value ?? false;
+                                          if (_isTPSelected) {
+                                            _isSPSelected = false;
+                                            _isDPSelected = false;
+                                          }
+                                          _clearMessage(); // Clear message on checkbox change
+                                        });
+                                      },
                                 activeColor: Colors.amber,
                                 checkColor: Colors.white,
                               ),
@@ -714,6 +836,8 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                             ),
                             onTap:
                                 _clearMessage, // Clear message on text field tap
+                            enabled:
+                                !_isApiCalling, // Disable if API is calling
                           ),
                         ),
                       ],
@@ -725,8 +849,9 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                         width: 150,
                         height: 45,
                         child: ElevatedButton(
-                          onPressed:
-                              _addBid, // Correctly calls the single bid function
+                          onPressed: _isApiCalling
+                              ? null
+                              : _addBid, // Disable if API is calling
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.amber,
                             shape: RoundedRectangleBorder(
@@ -736,15 +861,20 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                             ),
                             elevation: 2,
                           ),
-                          child: Text(
-                            "ADD", // More descriptive text
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                            ),
-                          ),
+                          child: _isApiCalling
+                              ? const CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                )
+                              : Text(
+                                  "ADD", // More descriptive text
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                  ),
+                                ),
                         ),
                       ),
                     ),
@@ -881,7 +1011,11 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                       EdgeInsets.zero, // Remove extra padding
                                   constraints:
                                       const BoxConstraints(), // Remove extra constraints
-                                  onPressed: () => _removeBid(index),
+                                  onPressed: _isApiCalling
+                                      ? null
+                                      : () => _removeBid(
+                                          index,
+                                        ), // Disable if API is calling
                                 ),
                               ],
                             ),
@@ -943,6 +1077,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
           ),
         ),
         onTap: _clearMessage, // Clear message on text field tap
+        enabled: !_isApiCalling, // Disable if API is calling
       ),
     );
   }
@@ -1016,24 +1151,32 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
             ],
           ),
           ElevatedButton(
-            onPressed:
-                _showBidConfirmationDialog, // Call the new method to show dialog
+            onPressed: _isApiCalling
+                ? null
+                : _showBidConfirmationDialog, // Disable if API is calling
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber, // Changed to green for submit
+              backgroundColor: _isApiCalling
+                  ? Colors.grey
+                  : Colors.amber, // Dim if disabled
               padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
               elevation: 2,
             ),
-            child: Text(
-              'SUBMIT',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            child: _isApiCalling
+                ? const CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  )
+                : Text(
+                    'SUBMIT',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
           ),
         ],
       ),

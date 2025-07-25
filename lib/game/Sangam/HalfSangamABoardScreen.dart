@@ -9,108 +9,16 @@ import 'package:google_fonts/google_fonts.dart'; // For GoogleFonts
 import 'package:http/http.dart' as http; // For API calls
 import 'package:intl/intl.dart';
 
+import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
+import '../../components/BidFailureDialog.dart'; // Assuming you have this
+import '../../components/BidSuccessDialog.dart'; // Assuming you have this
 import '../../ulits/Constents.dart'; // Import the Constants file for API endpoint
-
-// AnimatedMessageBar component (Ensure this is a common component or defined here)
-// If this component is already defined in a separate file (e.g., components/animated_message_bar.dart)
-// then you should import it and remove this duplicate definition.
-class AnimatedMessageBar extends StatefulWidget {
-  final String message;
-  final bool isError;
-  final VoidCallback? onDismissed;
-
-  const AnimatedMessageBar({
-    Key? key,
-    required this.message,
-    this.isError = false,
-    this.onDismissed,
-  }) : super(key: key);
-
-  @override
-  _AnimatedMessageBarState createState() => _AnimatedMessageBarState();
-}
-
-class _AnimatedMessageBarState extends State<AnimatedMessageBar> {
-  double _height = 0.0;
-  Timer? _visibilityTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showBar();
-    });
-  }
-
-  void _showBar() {
-    if (!mounted) return;
-    setState(() {
-      _height = 48.0;
-    });
-
-    _visibilityTimer = Timer(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      setState(() {
-        _height = 0.0;
-      });
-      Timer(const Duration(milliseconds: 300), () {
-        if (mounted && widget.onDismissed != null) {
-          widget.onDismissed!();
-        }
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _visibilityTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      height: _height,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      color: widget.isError ? Colors.red : Colors.green,
-      alignment: Alignment.center,
-      child: _height > 0.0
-          ? Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Row(
-                children: [
-                  Icon(
-                    widget.isError
-                        ? Icons.error_outline
-                        : Icons.check_circle_outline,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      widget.message,
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 13,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : const SizedBox.shrink(),
-    );
-  }
-}
 
 class HalfSangamABoardScreen extends StatefulWidget {
   final String screenTitle;
   final int gameId;
-  final String gameType;
+  final String gameType; // e.g., "HalfSangamA"
 
   const HalfSangamABoardScreen({
     Key? key,
@@ -135,6 +43,9 @@ class _HalfSangamABoardScreenState extends State<HalfSangamABoardScreen> {
   late String preferredLanguage;
   bool accountStatus = false;
   late int walletBalance;
+
+  // State to manage API call in progress
+  bool _isApiCalling = false;
 
   // Placeholder for device info. In a real app, these would be dynamic.
   final String _deviceId = 'test_device_id_flutter';
@@ -172,39 +83,33 @@ class _HalfSangamABoardScreenState extends State<HalfSangamABoardScreen> {
   // Set up listeners for GetStorage keys
   void _setupStorageListeners() {
     storage.listenKey('accessToken', (value) {
-      setState(() {
-        accessToken = value ?? '';
-      });
+      if (mounted) setState(() => accessToken = value ?? '');
     });
 
     storage.listenKey('registerId', (value) {
-      setState(() {
-        registerId = value ?? '';
-      });
+      if (mounted) setState(() => registerId = value ?? '');
     });
 
     storage.listenKey('accountStatus', (value) {
-      setState(() {
-        accountStatus = value ?? false;
-      });
+      if (mounted) setState(() => accountStatus = value ?? false);
     });
 
     storage.listenKey('selectedLanguage', (value) {
-      setState(() {
-        preferredLanguage = value ?? 'en';
-      });
+      if (mounted) setState(() => preferredLanguage = value ?? 'en');
     });
 
     storage.listenKey('walletBalance', (value) {
-      setState(() {
-        if (value is String) {
-          walletBalance = int.tryParse(value) ?? 0;
-        } else if (value is int) {
-          walletBalance = value;
-        } else {
-          walletBalance = 0;
-        }
-      });
+      if (mounted) {
+        setState(() {
+          if (value is String) {
+            walletBalance = int.tryParse(value) ?? 0;
+          } else if (value is int) {
+            walletBalance = value;
+          } else {
+            walletBalance = 0;
+          }
+        });
+      }
     });
   }
 
@@ -241,6 +146,7 @@ class _HalfSangamABoardScreenState extends State<HalfSangamABoardScreen> {
   }
 
   void _addBid() {
+    if (_isApiCalling) return; // Prevent adding bids while API is in progress
     _clearMessage(); // Clear any previous messages
     final openDigit = _openDigitController.text.trim();
     final closePanna = _closePannaController.text.trim();
@@ -310,7 +216,7 @@ class _HalfSangamABoardScreenState extends State<HalfSangamABoardScreen> {
           "points": points,
           "openDigit": openDigit, // Store openDigit for API
           "closePanna": closePanna, // Store closePanna for API
-          "type": "HalfSangamA", // Indicate game type for API
+          "type": widget.gameType, // Use widget.gameType for API
         });
         _showMessage('Added bid: $sangam with $points points.');
       }
@@ -323,6 +229,7 @@ class _HalfSangamABoardScreenState extends State<HalfSangamABoardScreen> {
   }
 
   void _removeBid(int index) {
+    if (_isApiCalling) return; // Prevent removing bids while API is in progress
     _clearMessage();
     setState(() {
       final removedSangam = _bids[index]['sangam'];
@@ -334,12 +241,14 @@ class _HalfSangamABoardScreenState extends State<HalfSangamABoardScreen> {
   int _getTotalPoints() {
     return _bids.fold(
       0,
-      (sum, item) => sum + int.tryParse(item['points'] ?? '0')!,
+      (sum, item) => sum + (int.tryParse(item['points'] ?? '0') ?? 0),
     );
   }
 
   void _showConfirmationDialog() {
     _clearMessage();
+    if (_isApiCalling) return; // Prevent showing dialog if API is in progress
+
     if (_bids.isEmpty) {
       _showMessage('Please add at least one bid.', isError: true);
       return;
@@ -365,6 +274,7 @@ class _HalfSangamABoardScreenState extends State<HalfSangamABoardScreen> {
         "points": bid['points']!,
         "type": bid['type']!, // Hardcoded type as per your game model
         "sangam": bid['sangam']!, // Keep sangam for display purposes in dialog
+        "jodi": "", // Not applicable for Sangam, but common in bid payloads
       };
     }).toList();
 
@@ -389,12 +299,20 @@ class _HalfSangamABoardScreenState extends State<HalfSangamABoardScreen> {
               .gameType, // Pass the correct gameType (e.g., "halfSangamA")
           onConfirm: () async {
             Navigator.pop(dialogContext); // Dismiss the confirmation dialog
+            setState(() {
+              _isApiCalling = true; // Set API calling state to true
+            });
             bool success = await _placeFinalBids();
             if (success) {
               setState(() {
                 _bids.clear(); // Clear bids on successful submission
               });
-              _showMessage('Bids placed successfully!');
+              // No need to show success message here as BidSuccessDialog does it
+            }
+            if (mounted) {
+              setState(() {
+                _isApiCalling = false; // Reset API calling state
+              });
             }
           },
         );
@@ -415,7 +333,17 @@ class _HalfSangamABoardScreenState extends State<HalfSangamABoardScreen> {
     }
 
     if (accessToken.isEmpty || registerId.isEmpty) {
-      _showMessage('Authentication error. Please log in again.', isError: true);
+      if (mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return const BidFailureDialog(
+              errorMessage: 'Authentication error. Please log in again.',
+            );
+          },
+        );
+      }
       return false;
     }
 
@@ -445,8 +373,17 @@ class _HalfSangamABoardScreenState extends State<HalfSangamABoardScreen> {
       "bid": bidPayload,
     });
 
-    log('Placing final bids to URL: $url');
-    log('Request Body: $body');
+    // Log the cURL and headers here for debugging
+    String curlCommand = 'curl -X POST \\';
+    curlCommand += '\n  ${Uri.parse(url)} \\';
+    headers.forEach((key, value) {
+      curlCommand += '\n  -H "$key: $value" \\';
+    });
+    curlCommand += '\n  -d \'$body\'';
+
+    log('CURL Command for Final Bid Submission:\n$curlCommand');
+    log('Request Headers for Final Bid Submission: $headers');
+    log('Request Body for Final Bid Submission: $body');
 
     try {
       final response = await http.post(
@@ -459,27 +396,58 @@ class _HalfSangamABoardScreenState extends State<HalfSangamABoardScreen> {
 
       log('API Response for Final Bid Submission: ${responseBody}');
 
-      if (response.statusCode == 200 && responseBody['status'] == true) {
+      if (response.statusCode == 200 &&
+          (responseBody['status'] == true ||
+              responseBody['status'] == 'true')) {
         // Update wallet balance in GetStorage and local state on successful bid
         int currentWallet = walletBalance;
         int deductedAmount = _getTotalPoints();
         int newWalletBalance = currentWallet - deductedAmount;
-        storage.write(
+        await storage.write(
           'walletBalance',
-          newWalletBalance.toString(),
-        ); // Update storage
-        setState(() {
-          walletBalance = newWalletBalance; // Update local state
-        });
+          newWalletBalance, // Store as int
+        );
+        if (mounted) {
+          setState(() {
+            walletBalance = newWalletBalance; // Update local state
+          });
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (BuildContext context) {
+              return const BidSuccessDialog();
+            },
+          );
+          _clearMessage(); // Clear message after success dialog dismissal
+        }
         return true; // Indicate success
       } else {
         String errorMessage = responseBody['msg'] ?? "Unknown error occurred.";
-        _showMessage('Bid submission failed: $errorMessage', isError: true);
+        if (mounted) {
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (BuildContext context) {
+              return BidFailureDialog(errorMessage: errorMessage);
+            },
+          );
+        }
         return false; // Indicate failure
       }
     } catch (e) {
       log('Network error during bid submission: $e');
-      _showMessage('Network error during bid submission: $e', isError: true);
+      if (mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return const BidFailureDialog(
+              errorMessage:
+                  'Network error. Please check your internet connection.',
+            );
+          },
+        );
+      }
       return false; // Indicate failure
     }
   }
@@ -559,22 +527,30 @@ class _HalfSangamABoardScreenState extends State<HalfSangamABoardScreen> {
                       width: double.infinity,
                       height: 45,
                       child: ElevatedButton(
-                        onPressed: _addBid,
+                        onPressed: _isApiCalling
+                            ? null
+                            : _addBid, // Disable when API is calling
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.amber,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(6),
                           ),
                         ),
-                        child: Text(
-                          "ADD",
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5,
-                            fontSize: 16,
-                          ),
-                        ),
+                        child: _isApiCalling
+                            ? const CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              )
+                            : Text(
+                                "ADD",
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.5,
+                                  fontSize: 16,
+                                ),
+                              ),
                       ),
                     ),
                   ],
@@ -667,7 +643,11 @@ class _HalfSangamABoardScreenState extends State<HalfSangamABoardScreen> {
                                       Icons.delete,
                                       color: Colors.red,
                                     ),
-                                    onPressed: () => _removeBid(index),
+                                    onPressed: _isApiCalling
+                                        ? null
+                                        : () => _removeBid(
+                                            index,
+                                          ), // Disable when API is calling
                                   ),
                                 ],
                               ),
@@ -925,11 +905,9 @@ class _HalfSangamABoardScreenState extends State<HalfSangamABoardScreen> {
             ],
           ),
           ElevatedButton(
-            onPressed: _showConfirmationDialog, // Call the confirmation dialog
-            child: Text(
-              'SUBMIT',
-              style: GoogleFonts.poppins(color: Colors.white, fontSize: 16),
-            ),
+            onPressed: _isApiCalling
+                ? null
+                : _showConfirmationDialog, // Disable when API is calling
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange[700],
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -938,6 +916,17 @@ class _HalfSangamABoardScreenState extends State<HalfSangamABoardScreen> {
               ),
               elevation: 3,
             ),
+            child: _isApiCalling
+                ? const CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  )
+                : Text(
+                    'SUBMIT',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
+                  ),
           ),
         ],
       ),

@@ -10,6 +10,8 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
 import '../../components/BidConfirmationDialog.dart';
+import '../../components/BidFailureDialog.dart'; // Make sure you have this file
+import '../../components/BidSuccessDialog.dart'; // Make sure you have this file
 import '../../ulits/Constents.dart';
 
 class AnimatedMessageBar extends StatefulWidget {
@@ -127,11 +129,11 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
   List<Map<String, String>> _bids = [];
 
   late GetStorage storage = GetStorage();
-  late String accessToken;
-  late String registerId;
-  late String preferredLanguage;
-  bool accountStatus = false;
-  late int walletBalance;
+  late String _accessToken; // Renamed for consistency
+  late String _registerId; // Renamed for consistency
+  late String _preferredLanguage; // Renamed for consistency
+  bool _accountStatus = false; // Renamed for consistency
+  late int _walletBalance; // Renamed for consistency
 
   final String _deviceId = 'test_device_id_flutter';
   final String _deviceName = 'test_device_name_flutter';
@@ -153,54 +155,54 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
   }
 
   Future<void> _loadInitialData() async {
-    accessToken = storage.read('accessToken') ?? '';
-    registerId = storage.read('registerId') ?? '';
-    accountStatus = storage.read('accountStatus') ?? false;
-    preferredLanguage = storage.read('selectedLanguage') ?? 'en';
+    _accessToken = storage.read('accessToken') ?? '';
+    _registerId = storage.read('registerId') ?? '';
+    _accountStatus = storage.read('accountStatus') ?? false;
+    _preferredLanguage = storage.read('selectedLanguage') ?? 'en';
 
     final dynamic storedWalletBalance = storage.read('walletBalance');
     if (storedWalletBalance is String) {
-      walletBalance = int.tryParse(storedWalletBalance) ?? 0;
+      _walletBalance = int.tryParse(storedWalletBalance) ?? 0;
     } else if (storedWalletBalance is int) {
-      walletBalance = storedWalletBalance;
+      _walletBalance = storedWalletBalance;
     } else {
-      walletBalance = 0;
+      _walletBalance = 0;
     }
   }
 
   void _setupStorageListeners() {
     storage.listenKey('accessToken', (value) {
       setState(() {
-        accessToken = value ?? '';
+        _accessToken = value ?? '';
       });
     });
 
     storage.listenKey('registerId', (value) {
       setState(() {
-        registerId = value ?? '';
+        _registerId = value ?? '';
       });
     });
 
     storage.listenKey('accountStatus', (value) {
       setState(() {
-        accountStatus = value ?? false;
+        _accountStatus = value ?? false;
       });
     });
 
     storage.listenKey('selectedLanguage', (value) {
       setState(() {
-        preferredLanguage = value ?? 'en';
+        _preferredLanguage = value ?? 'en';
       });
     });
 
     storage.listenKey('walletBalance', (value) {
       setState(() {
         if (value is String) {
-          walletBalance = int.tryParse(value) ?? 0;
+          _walletBalance = int.tryParse(value) ?? 0;
         } else if (value is int) {
-          walletBalance = value;
+          _walletBalance = value;
         } else {
-          walletBalance = 0;
+          _walletBalance = 0;
         }
       });
     });
@@ -214,6 +216,7 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
   }
 
   void _showMessage(String message, {bool isError = false}) {
+    if (!mounted) return;
     setState(() {
       _messageToShow = message;
       _isErrorForMessage = isError;
@@ -292,7 +295,8 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
   }
 
   void _showConfirmationDialog() {
-    _clearMessage();
+    _clearMessage(); // Clear any transient message before showing a dialog
+
     if (_bids.isEmpty) {
       _showMessage('Please add at least one bid.', isError: true);
       return;
@@ -300,7 +304,7 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
 
     final int totalPoints = _getTotalPoints();
 
-    if (walletBalance < totalPoints) {
+    if (_walletBalance < totalPoints) {
       _showMessage(
         'Insufficient wallet balance to place this bid.',
         isError: true,
@@ -322,6 +326,7 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
       'dd MMM yyyy, hh:mm a',
     ).format(DateTime.now());
 
+    // Await the confirmation dialog to ensure it completes before proceeding
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -332,18 +337,19 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
           bids: bidsForDialog,
           totalBids: bidsForDialog.length,
           totalBidsAmount: totalPoints,
-          walletBalanceBeforeDeduction: walletBalance,
-          walletBalanceAfterDeduction: (walletBalance - totalPoints).toString(),
+          walletBalanceBeforeDeduction: _walletBalance,
+          walletBalanceAfterDeduction: (_walletBalance - totalPoints)
+              .toString(),
           gameId: widget.gameId.toString(),
           gameType: widget.gameType,
           onConfirm: () async {
-            Navigator.pop(dialogContext);
+            Navigator.pop(dialogContext); // Dismiss confirmation dialog
             bool success = await _placeFinalBids();
             if (success) {
               setState(() {
-                _bids.clear();
+                _bids.clear(); // Clear bids only on successful submission
               });
-              _showMessage('Bids placed successfully!');
+              // Success dialog is now handled inside _placeFinalBids
             }
           },
         );
@@ -352,26 +358,36 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
   }
 
   Future<bool> _placeFinalBids() async {
-    String url;
+    String apiUrl; // Changed `url` to `apiUrl` for consistency
     if (widget.screenTitle.toLowerCase().contains('jackpot')) {
-      url = '${Constant.apiEndpoint}place-jackpot-bid';
+      apiUrl = '${Constant.apiEndpoint}place-jackpot-bid';
     } else if (widget.screenTitle.toLowerCase().contains('starline')) {
-      url = '${Constant.apiEndpoint}place-starline-bid';
+      apiUrl = '${Constant.apiEndpoint}place-starline-bid';
     } else {
-      url = '${Constant.apiEndpoint}place-bid';
+      apiUrl = '${Constant.apiEndpoint}place-bid';
     }
 
-    if (accessToken.isEmpty || registerId.isEmpty) {
-      _showMessage('Authentication error. Please log in again.', isError: true);
+    if (_accessToken.isEmpty || _registerId.isEmpty) {
+      if (mounted) {
+        await showDialog(
+          // Use a dialog for critical errors
+          context: context,
+          builder: (BuildContext dialogContext) {
+            return const BidFailureDialog(
+              errorMessage: 'Authentication error. Please log in again.',
+            );
+          },
+        );
+      }
       return false;
     }
 
     final headers = {
       'deviceId': _deviceId,
       'deviceName': _deviceName,
-      'accessStatus': accountStatus ? '1' : '0',
+      'accessStatus': _accountStatus ? '1' : '0',
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer $accessToken',
+      'Authorization': 'Bearer $_accessToken',
     };
 
     final List<Map<String, dynamic>> bidPayload = _bids.map((bid) {
@@ -384,7 +400,7 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
     }).toList();
 
     final body = jsonEncode({
-      "registerId": registerId,
+      "registerId": _registerId,
       "gameId": widget.gameId,
       "bidAmount": _getTotalPoints(),
       "gameType": widget.gameType,
@@ -393,48 +409,80 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
 
     // Log the cURL and headers here
     String curlCommand = 'curl -X POST \\';
-    curlCommand += '\n  ${Uri.parse(url)} \\';
+    curlCommand += '\n  $apiUrl \\';
     headers.forEach((key, value) {
       curlCommand += '\n  -H "$key: $value" \\';
     });
     curlCommand += '\n  -d \'$body\'';
 
-    log('CURL Command for Final Bid Submission:\n$curlCommand');
+    log('CURL Command for Final Bid Submission:\n$curlCommand', name: 'BidAPI');
+    log('Request Headers for Final Bid Submission: $headers', name: 'BidAPI');
+    log('Request Body for Final Bid Submission: $body', name: 'BidAPI');
 
-    log('Request Headers for Final Bid Submission: $headers');
-    log('Request Body for Final Bid Submission: $body');
-
-    log('Placing final bids to URL: $url');
+    log('Placing final bids to URL: $apiUrl'); // Use apiUrl here
     log('Request Body: $body');
 
     try {
       final response = await http.post(
-        Uri.parse(url),
+        Uri.parse(apiUrl),
         headers: headers,
         body: body,
       );
 
+      log('Response Status Code: ${response.statusCode}', name: 'BidAPI');
+      log('Response Body: ${response.body}', name: 'BidAPI');
+
       final Map<String, dynamic> responseBody = json.decode(response.body);
 
-      log('API Response for Final Bid Submission: ${responseBody}');
+      if (mounted) {
+        // Ensure widget is still mounted before showing dialog
+        if (response.statusCode == 200 && responseBody['status'] == true) {
+          int newWalletBalance = _walletBalance - _getTotalPoints();
+          await storage.write(
+            'walletBalance',
+            newWalletBalance.toString(),
+          ); // Await storage write
+          setState(() {
+            _walletBalance = newWalletBalance;
+          });
 
-      if (response.statusCode == 200 && responseBody['status'] == true) {
-        int currentWallet = walletBalance;
-        int deductedAmount = _getTotalPoints();
-        int newWalletBalance = currentWallet - deductedAmount;
-        storage.write('walletBalance', newWalletBalance.toString());
-        setState(() {
-          walletBalance = newWalletBalance;
-        });
-        return true;
-      } else {
-        String errorMessage = responseBody['msg'] ?? "Unknown error occurred.";
-        _showMessage('Bid submission failed: $errorMessage', isError: true);
-        return false;
+          // Show success dialog
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (BuildContext dialogContext) {
+              return const BidSuccessDialog();
+            },
+          );
+          return true;
+        } else {
+          String errorMessage =
+              responseBody['msg'] ?? "Unknown error occurred.";
+          // Show failure dialog
+          await showDialog(
+            context: context,
+            builder: (BuildContext dialogContext) {
+              return BidFailureDialog(errorMessage: errorMessage);
+            },
+          );
+          return false;
+        }
       }
+      return false; // Fallback if not mounted
     } catch (e) {
-      log('Network error during bid submission: $e');
-      _showMessage('Network error during bid submission: $e', isError: true);
+      log('Network error during bid submission: $e', name: 'BidAPIError');
+      if (mounted) {
+        // Show network error dialog
+        await showDialog(
+          context: context,
+          builder: (BuildContext dialogContext) {
+            return const BidFailureDialog(
+              errorMessage:
+                  'Network error. Please check your internet connection.',
+            );
+          },
+        );
+      }
       return false;
     }
   }
@@ -466,7 +514,7 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
           const SizedBox(width: 6),
           Center(
             child: Text(
-              walletBalance.toString(),
+              _walletBalance.toString(), // Use _walletBalance
               style: GoogleFonts.poppins(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -864,10 +912,6 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
           ),
           ElevatedButton(
             onPressed: _showConfirmationDialog,
-            child: Text(
-              'SUBMIT',
-              style: GoogleFonts.poppins(color: Colors.white, fontSize: 16),
-            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange[700],
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -875,6 +919,10 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               elevation: 3,
+            ),
+            child: Text(
+              'SUBMIT',
+              style: GoogleFonts.poppins(color: Colors.white, fontSize: 16),
             ),
           ),
         ],

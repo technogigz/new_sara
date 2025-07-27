@@ -55,13 +55,13 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
 
   List<Map<String, String>> addedEntries = [];
   late GetStorage storage = GetStorage();
-  late BidService _bidService; // Declare BidService
+  late BidService _bidService;
   late String accessToken;
   late String registerId;
   late String preferredLanguage;
   bool accountStatus = false;
   late int walletBalance;
-  bool _isApiCalling = false; // Added for API loading state
+  bool _isApiCalling = false;
 
   final String _deviceId = 'test_device_id_flutter';
   final String _deviceName = 'test_device_name_flutter';
@@ -69,13 +69,12 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
   String? _messageToShow;
   bool _isErrorForMessage = false;
   Key _messageBarKey = UniqueKey();
-  Timer? _messageDismissTimer; // Added for auto-dismissing message bar
+  Timer? _messageDismissTimer;
 
   @override
   void initState() {
     super.initState();
-    // Initialize GetStorage
-    _bidService = BidService(storage); // Initialize BidService
+    _bidService = BidService(storage);
     _loadInitialData();
     _setupStorageListeners();
     digitController.addListener(_onDigitChanged);
@@ -115,8 +114,8 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
     }
 
     selectedGameBetType = widget.selectionStatus
-        ? gameTypesOptions[0] // Default to "Open" if both allowed
-        : gameTypesOptions[1]; // Default to "Close" if only close allowed
+        ? gameTypesOptions[0]
+        : gameTypesOptions[1];
   }
 
   void _setupStorageListeners() {
@@ -204,7 +203,6 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
       return;
     }
 
-    // Calculate total points with new bid to check against wallet
     int currentTotalPoints = _getTotalPoints();
     int pointsForThisBid = parsedPoints;
 
@@ -276,9 +274,33 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
       return;
     }
 
-    final int totalPoints = _getTotalPoints();
+    // Filter bids for the currently selected game type to show in confirmation dialog
+    final List<Map<String, String>> bidsForConfirmation = addedEntries
+        .where((entry) => entry['type'] == selectedGameBetType)
+        .map((bid) {
+          return {
+            "digit": bid['digit']!,
+            "points": bid['points']!,
+            "type": bid['type']!,
+            "pana": "",
+          };
+        })
+        .toList();
 
-    if (walletBalance < totalPoints) {
+    if (bidsForConfirmation.isEmpty) {
+      _showMessage(
+        'No bids for the selected game type to submit.',
+        isError: true,
+      );
+      return;
+    }
+
+    final int totalPointsForConfirmation = bidsForConfirmation.fold(
+      0,
+      (sum, item) => sum + (int.tryParse(item['points'] ?? '0') ?? 0),
+    );
+
+    if (walletBalance < totalPointsForConfirmation) {
       _showMessage(
         'Insufficient wallet balance to place this bid.',
         isError: true,
@@ -297,23 +319,19 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
         return BidConfirmationDialog(
           gameTitle: widget.gameName,
           gameDate: formattedDate,
-          bids: addedEntries.map((bid) {
-            return {
-              "digit": bid['digit']!,
-              "points": bid['points']!,
-              "type": bid['type']!,
-              "pana": "", // Single Digit, so pana is empty
-            };
-          }).toList(),
-          totalBids: addedEntries.length,
-          totalBidsAmount: totalPoints,
+          bids: bidsForConfirmation,
+          totalBids: bidsForConfirmation.length,
+          totalBidsAmount: totalPointsForConfirmation,
           walletBalanceBeforeDeduction: walletBalance,
-          walletBalanceAfterDeduction: (walletBalance - totalPoints).toString(),
+          walletBalanceAfterDeduction:
+              (walletBalance - totalPointsForConfirmation).toString(),
           gameId: widget.gameId.toString(),
           gameType: widget.gameCategoryType,
           onConfirm: () async {
-            Navigator.pop(dialogContext); // Dismiss confirmation dialog
-            await _placeFinalBids(); // Call the bid placement method
+            Navigator.pop(
+              dialogContext,
+            ); // This correctly dismisses the confirmation dialog
+            await _placeFinalBids();
           },
         );
       },
@@ -322,19 +340,29 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
 
   Future<void> _placeFinalBids() async {
     setState(() {
-      _isApiCalling = true; // Set loading state to true
+      _isApiCalling = true;
     });
 
-    final List<Map<String, String>> formattedBidsForService = addedEntries.map((
-      entry,
-    ) {
-      return {
-        "digit": entry['digit']!,
-        "points": entry['points']!,
-        "type": entry['type']!,
-        "pana": "", // For single digits, pana should be empty
-      };
-    }).toList();
+    final Map<String, String> bidsToSubmit = {};
+    int totalPointsForSubmission = 0;
+
+    for (var entry in addedEntries) {
+      if (entry['type'] == selectedGameBetType) {
+        bidsToSubmit[entry['digit']!] = entry['points']!;
+        totalPointsForSubmission += (int.tryParse(entry['points']!) ?? 0);
+      }
+    }
+
+    if (bidsToSubmit.isEmpty) {
+      _showMessage(
+        'No bids to submit for the selected game type.',
+        isError: true,
+      );
+      setState(() {
+        _isApiCalling = false;
+      });
+      return;
+    }
 
     final result = await _bidService.placeFinalBids(
       gameName: widget.gameName,
@@ -343,12 +371,11 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
       deviceId: _deviceId,
       deviceName: _deviceName,
       accountStatus: accountStatus,
-      bidAmounts: formattedBidsForService,
-      selectedGameType:
-          selectedGameBetType, // Use the dynamically selected game type
+      bidAmounts: bidsToSubmit,
+      selectedGameType: selectedGameBetType,
       gameId: widget.gameId,
       gameType: widget.gameCategoryType,
-      totalBidAmount: _getTotalPoints(),
+      totalBidAmount: totalPointsForSubmission,
     );
 
     if (!mounted) {
@@ -357,12 +384,14 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
     }
 
     setState(() {
-      _isApiCalling = false; // Set loading state to false after API call
+      _isApiCalling = false;
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!context.mounted) return;
 
+      // This is where the success/failure dialog is shown.
+      // It should await this dialog to be dismissed before continuing.
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -372,15 +401,19 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
       );
 
       if (result['status'] && context.mounted) {
-        final int newBalance = walletBalance - _getTotalPoints();
+        final int newBalance = walletBalance - totalPointsForSubmission;
         setState(() {
           walletBalance = newBalance;
-          addedEntries.clear(); // Clear bids on successful submission
+          addedEntries.removeWhere(
+            (entry) => entry['type'] == selectedGameBetType,
+          );
           digitController.clear();
           pointsController.clear();
         });
         await _bidService.updateWalletBalance(newBalance);
-        _showMessage('Bids submitted successfully!'); // Show success message
+        _showMessage('Bids submitted successfully!');
+      } else {
+        _showMessage(result['msg'] ?? "Bid failed.", isError: true);
       }
     });
   }
@@ -643,8 +676,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
             isExpanded: true,
             value: selectedGameBetType,
             icon: const Icon(Icons.keyboard_arrow_down),
-            onChanged:
-                _isApiCalling // Disable dropdown when API is calling
+            onChanged: _isApiCalling
                 ? null
                 : (String? newValue) {
                     setState(() {
@@ -683,7 +715,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
               FilteringTextInputFormatter.digitsOnly,
             ],
             onTap: _clearMessage,
-            enabled: !_isApiCalling, // Disable text field during API call
+            enabled: !_isApiCalling,
             decoration: InputDecoration(
               hintText: "Enter Digit",
               contentPadding: const EdgeInsets.symmetric(
@@ -717,9 +749,10 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
               borderRadius: BorderRadius.circular(8),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.5),
+                  color: Colors.black.withOpacity(0.2),
                   spreadRadius: 1,
                   blurRadius: 3,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
@@ -761,7 +794,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: inputFormatters,
         onTap: _clearMessage,
-        enabled: !_isApiCalling, // Disable text field during API call
+        enabled: !_isApiCalling,
         decoration: InputDecoration(
           hintText: hint,
           contentPadding: const EdgeInsets.symmetric(

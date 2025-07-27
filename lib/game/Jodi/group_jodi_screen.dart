@@ -1,17 +1,14 @@
 import 'dart:async'; // Import for Timer
-import 'dart:convert';
-import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get_storage/get_storage.dart';
-import 'package:http/http.dart' as http;
+import 'package:new_sara/components/BidFailureDialog.dart';
 
+import '../../BidService.dart';
 import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
-// import '../../components/BidFailureDialog.dart'; // No longer directly used for showing bid failure
-// import '../../components/BidSuccessDialog.dart'; // No longer directly used for showing bid success
-import '../../ulits/Constents.dart'; // Make sure this path is correct
+import '../../components/BidSuccessDialog.dart';
 
 class GroupJodiScreen extends StatefulWidget {
   final String title;
@@ -194,98 +191,252 @@ class _GroupJodiScreenState extends State<GroupJodiScreen> {
     }
   }
 
-  Future<void> _placeFinalBids() async {
-    String url;
-    if (widget.gameType.toLowerCase().contains('jackpot')) {
-      url = '${Constant.apiEndpoint}place-jackpot-bid';
-    } else if (widget.gameType.toLowerCase().contains('starline')) {
-      url = '${Constant.apiEndpoint}place-starline-bid';
-    } else {
-      url = '${Constant.apiEndpoint}place-bid';
-    }
+  // Future<void> _placeFinalBids() async {
+  //   String url;
+  //   if (widget.gameType.toLowerCase().contains('jackpot')) {
+  //     url = '${Constant.apiEndpoint}place-jackpot-bid';
+  //   } else if (widget.gameType.toLowerCase().contains('starline')) {
+  //     url = '${Constant.apiEndpoint}place-starline-bid';
+  //   } else {
+  //     url = '${Constant.apiEndpoint}place-bid';
+  //   }
+  //
+  //   if (_accessToken.isEmpty || _registerId.isEmpty) {
+  //     _showMessageBar(
+  //       'Authentication error. Please log in again.',
+  //       isError: true,
+  //     );
+  //     return;
+  //   }
+  //
+  //   final headers = {
+  //     'deviceId': _deviceId,
+  //     'deviceName': _deviceName,
+  //     'accessStatus': _accountActiveStatus ? '1' : '0',
+  //     'Content-Type': 'application/json',
+  //     'Authorization': 'Bearer $_accessToken',
+  //   };
+  //
+  //   final List<Map<String, dynamic>> bidPayload = bids.map((entry) {
+  //     return {
+  //       "sessionType": "OPEN",
+  //       "digit": entry['jodi']!,
+  //       "bidAmount": int.tryParse(entry['points'] ?? '0') ?? 0,
+  //     };
+  //   }).toList();
+  //
+  //   final body = jsonEncode({
+  //     "registerId": _registerId,
+  //     "gameId": widget.gameId,
+  //     "bidAmount": totalPoints,
+  //     "gameType": widget.gameType,
+  //     "bid": bidPayload,
+  //   });
+  //
+  //   String curlCommand = 'curl -X POST \\';
+  //   curlCommand += '\n  ${Uri.parse(url).toString()} \\';
+  //   headers.forEach((key, value) {
+  //     curlCommand += '\n  -H "$key: $value" \\';
+  //   });
+  //   curlCommand += '\n  -d \'${jsonEncode(json.decode(body))}\'';
+  //
+  //   log('CURL Command for Final Bid Submission:\n$curlCommand');
+  //   log('Request Headers for Final Bid Submission: $headers');
+  //   log('Request Body for Final Bid Submission: $body');
+  //
+  //   try {
+  //     final response = await http.post(
+  //       Uri.parse(url),
+  //       headers: headers,
+  //       body: body,
+  //     );
+  //
+  //     final Map<String, dynamic> responseBody = json.decode(response.body);
+  //
+  //     log('API Response for Final Bid Submission: $responseBody');
+  //
+  //     if (response.statusCode == 200 && responseBody['status'] == true) {
+  //       log('Bid submission successful. ${responseBody['msg']}');
+  //       int deductedAmount = totalPoints;
+  //       int newWalletBalance = _walletBalance - deductedAmount;
+  //       _storage.write('walletBalance', newWalletBalance.toString());
+  //
+  //       if (mounted) {
+  //         setState(() {
+  //           _walletBalance = newWalletBalance;
+  //           bids.clear();
+  //         });
+  //
+  //         // ✅ Show success dialog
+  //         showDialog(
+  //           context: context,
+  //           builder: (context) => AlertDialog(
+  //             title: const Text("Success"),
+  //             content: Text(responseBody['msg'] ?? 'Bid placed successfully!'),
+  //             actions: [
+  //               TextButton(
+  //                 child: const Text("OK"),
+  //                 onPressed: () => Navigator.of(context).pop(),
+  //               ),
+  //             ],
+  //           ),
+  //         );
+  //       }
+  //     } else {
+  //       String errorMessage = responseBody['msg'] ?? "Unknown error occurred.";
+  //       log('Bid submission failed: $errorMessage');
+  //       if (mounted) {
+  //         // ❌ Show failure dialog
+  //         showDialog(
+  //           context: context,
+  //           builder: (context) => AlertDialog(
+  //             title: const Text("Bid Failed"),
+  //             content: Text(errorMessage),
+  //             actions: [
+  //               TextButton(
+  //                 child: const Text("OK"),
+  //                 onPressed: () => Navigator.of(context).pop(),
+  //               ),
+  //             ],
+  //           ),
+  //         );
+  //       }
+  //     }
+  //   } catch (e) {
+  //     log('Network error during bid submission: $e');
+  //     if (mounted) {
+  //       _showMessageBar(
+  //         'Network error during bid submission: ${e.toString()}',
+  //         isError: true,
+  //       );
+  //     }
+  //   }
+  // }
 
-    if (_accessToken.isEmpty || _registerId.isEmpty) {
-      _showMessageBar(
-        'Authentication error. Please log in again.',
-        isError: true,
-      );
-      return;
-    }
+  // Future<void> _placeFinalBids() async {
+  //   final bidService = BidService(_storage);
+  //
+  //   if (_accessToken.isEmpty || _registerId.isEmpty) {
+  //     _showMessageBar(
+  //       'Authentication error. Please log in again.',
+  //       isError: true,
+  //     );
+  //     return;
+  //   }
+  //
+  //   final Map<String, String> bidAmounts = {
+  //     for (var entry in bids) entry['jodi']!: entry['points'] ?? '0',
+  //   };
+  //
+  //   final result = await bidService.placeFinalBids(
+  //     gameName: widget.title,
+  //     accessToken: _accessToken,
+  //     registerId: _registerId,
+  //     deviceId: _deviceId,
+  //     deviceName: _deviceName,
+  //     accountStatus: _accountActiveStatus,
+  //     bidAmounts: bidAmounts,
+  //     selectedGameType: "OPEN", // or dynamically set
+  //     gameId: widget.gameId,
+  //     gameType: widget.gameType,
+  //     totalBidAmount: totalPoints,
+  //   );
+  //
+  //   if (!mounted) return;
+  //
+  //   if (result['status'] == true) {
+  //     final newBalance = _walletBalance - totalPoints;
+  //     await bidService.updateWalletBalance(newBalance);
+  //
+  //     if (mounted) {
+  //       setState(() {
+  //         _walletBalance = newBalance;
+  //         bids.clear();
+  //       });
+  //
+  //       // ✅ Show Success Dialog
+  //       await showDialog(context: context, builder: (_) => BidSuccessDialog());
+  //     }
+  //   } else {
+  //     final errorMsg = result['msg'] ?? 'Failed to place bid.';
+  //
+  //     // ❌ Show Failure Dialog
+  //     if (mounted) {
+  //       await showDialog(
+  //         context: context,
+  //         builder: (_) => BidFailureDialog(errorMessage: errorMsg),
+  //       );
+  //     }
+  //   }
+  // }
 
-    final headers = {
-      'deviceId': _deviceId,
-      'deviceName': _deviceName,
-      'accessStatus': _accountActiveStatus ? '1' : '0',
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $_accessToken',
+  Future<bool> _placeFinalBids() async {
+    final _bidService = BidService(_storage);
+    final Map<String, String> bidAmounts = {
+      for (var entry in bids) entry['jodi']!: entry['points'] ?? '0',
     };
 
-    final List<Map<String, dynamic>> bidPayload = bids.map((entry) {
-      return {
-        "sessionType": "OPEN",
-        "digit": entry['jodi']!,
-        "bidAmount": int.tryParse(entry['points'] ?? '0') ?? 0,
-      };
-    }).toList();
+    if (_accessToken.isEmpty || _registerId.isEmpty) {
+      if (!mounted) return false;
 
-    final body = jsonEncode({
-      "registerId": _registerId,
-      "gameId": widget.gameId,
-      "bidAmount": totalPoints,
-      "gameType": widget.gameType,
-      "bid": bidPayload,
-    });
-
-    String curlCommand = 'curl -X POST \\';
-    curlCommand += '\n  ${Uri.parse(url).toString()} \\';
-    headers.forEach((key, value) {
-      curlCommand += '\n  -H "$key: $value" \\';
-    });
-    curlCommand += '\n  -d \'${jsonEncode(json.decode(body))}\'';
-
-    log('CURL Command for Final Bid Submission:\n$curlCommand');
-    log('Request Headers for Final Bid Submission: $headers');
-    log('Request Body for Final Bid Submission: $body');
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const BidFailureDialog(
+          errorMessage: 'Authentication error. Please log in again.',
+        ),
+      );
+      return false;
+    }
 
     try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: headers,
-        body: body,
+      final result = await _bidService.placeFinalBids(
+        gameName: widget.title,
+        accessToken: _accessToken,
+        registerId: _registerId,
+        deviceId: _deviceId,
+        deviceName: _deviceName,
+        accountStatus: _accountActiveStatus,
+        bidAmounts: bidAmounts,
+        selectedGameType: "OPEN",
+        gameId: widget.gameId,
+        gameType: widget.gameType,
+        totalBidAmount: totalPoints,
       );
 
-      final Map<String, dynamic> responseBody = json.decode(response.body);
+      if (!mounted) return false;
 
-      log('API Response for Final Bid Submission: $responseBody');
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => result['status']
+            ? const BidSuccessDialog()
+            : BidFailureDialog(
+                errorMessage: result['msg'] ?? 'Something went wrong',
+              ),
+      );
 
-      if (response.statusCode == 200 && responseBody['status'] == true) {
-        log('Bid submission successful. ${responseBody['msg']}');
-        int deductedAmount = totalPoints;
-        int newWalletBalance = _walletBalance - deductedAmount;
-        _storage.write('walletBalance', newWalletBalance.toString());
-
-        if (mounted) {
-          setState(() {
-            _walletBalance = newWalletBalance;
-            bids.clear();
-          });
-          _showMessageBar(responseBody['msg'] ?? 'Bid placed successfully!');
-        }
+      if (result['status'] == true) {
+        final newWalletBalance = _walletBalance - totalPoints;
+        setState(() {
+          _walletBalance = newWalletBalance;
+        });
+        await _bidService.updateWalletBalance(newWalletBalance);
+        return true;
       } else {
-        String errorMessage = responseBody['msg'] ?? "Unknown error occurred.";
-        log('Bid submission failed: $errorMessage');
-        if (mounted) {
-          _showMessageBar(errorMessage, isError: true);
-        }
+        return false;
       }
     } catch (e) {
-      log('Network error during bid submission: $e');
-      if (mounted) {
-        _showMessageBar(
-          'Network error during bid submission: ${e.toString()}',
-          isError: true,
-        );
-      }
+      if (!mounted) return false;
+
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const BidFailureDialog(
+          errorMessage: 'An unexpected error occurred.',
+        ),
+      );
+      return false;
     }
   }
 

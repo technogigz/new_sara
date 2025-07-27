@@ -207,8 +207,8 @@ class _PassbookPageState extends State<PassbookPage> {
         children: [
           _DataCell(e.date, width: 100), // Use e.date
           _DataCell(e.time, width: 100), // Use e.time
-          _DataCell(e.description, width: 200), // Use e.description
-          _DataCell("₹${e.previousAmount}", width: 120),
+          _DataCell(e.description, width: 250), // Use e.description
+          _DataCell("₹ ${e.previousAmount}", width: 120),
           _DataCell(
             "${e.type == 'credit' ? '₹' : '-₹'}${e.transactionAmount}", // Use e.type for sign
             width: 120,

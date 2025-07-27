@@ -20,6 +20,7 @@ import 'package:new_sara/game/Sangam/HalfSangamBBoardScreen.dart';
 import '../Helper/TranslationHelper.dart'; // YOUR TranslationHelper
 import '../ulits/Constents.dart';
 import 'DigitBasedBoard/DigitBasedBoardScreen.dart';
+import 'GameItem.dart';
 import 'Jodi/JodiBidScreen.dart';
 import 'Jodi/group_jodi_screen.dart';
 import 'OddEvenBoard/OddEvenBoardScreen.dart';
@@ -29,50 +30,19 @@ import 'SingleDigitBetScreen/SingleDigitBetScreen.dart';
 import 'SingleDigitBetScreen/SingleDigitsBulkScreen.dart';
 import 'TwoDigitPanel/TwoDigitPanel.dart';
 
-// ✅ Model - Modified GameItem
-class GameItem {
-  final int id;
-  final String name; // Original name from API
-  final String type;
-  final String image;
-  final bool sessionSelection;
-  String
-  currentDisplayName; // Display name (initially original, then translated)
-
-  GameItem({
-    required this.id,
-    required this.name,
-    required this.type,
-    required this.image,
-    required this.sessionSelection,
-    String?
-    currentDisplayName, // Make optional in constructor for initial assignment
-  }) : this.currentDisplayName =
-           currentDisplayName ??
-           name; // Default to original name if not provided
-
-  factory GameItem.fromJson(Map<String, dynamic> json) {
-    return GameItem(
-      id: json['id'],
-      name: json['name'],
-      type: json['type'],
-      image: json['image'],
-      sessionSelection: json['sessionSelection'] ?? false,
-      // currentDisplayName is initialized in the constructor after fromJson is called
-    );
-  }
-
-  // Method to update display name
-  void updateDisplayName(String newName) {
-    currentDisplayName = newName;
-  }
-}
-
 // ✅ Main Screen
 class GameMenuScreen extends StatefulWidget {
   final String title;
   final int gameId;
-  const GameMenuScreen({super.key, required this.title, required this.gameId});
+  final bool openSessionStatus;
+  final bool closeSessionStatus;
+  const GameMenuScreen({
+    super.key,
+    required this.title,
+    required this.gameId,
+    required this.openSessionStatus,
+    required this.closeSessionStatus,
+  });
 
   @override
   State<GameMenuScreen> createState() => _GameMenuScreenState();
@@ -121,6 +91,10 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
 
     final cacheKey = '$originalName:$_currentLanguageCode';
     if (_translationCache.containsKey(cacheKey)) {
+      log(
+        'Returning "$originalName" translation from in-memory cache.',
+        name: 'TranslationCache',
+      );
       return _translationCache[cacheKey]!; // Guaranteed non-null
     }
 
@@ -128,6 +102,10 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
     final storedTranslation = storage.read('translation_$cacheKey');
     if (storedTranslation != null && storedTranslation is String) {
       _translationCache[cacheKey] = storedTranslation;
+      log(
+        'Returning "$originalName" translation from GetStorage cache.',
+        name: 'TranslationCache',
+      );
       return storedTranslation;
     }
 
@@ -141,18 +119,22 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
       if (translated.isNotEmpty) {
         _translationCache[cacheKey] = translated;
         storage.write('translation_$cacheKey', translated);
+        log(
+          'Fetched and cached translation for "$originalName": "$translated".',
+          name: 'TranslationFetch',
+        );
         return translated;
       } else {
         log(
           'TranslationHelper returned empty text for "$originalName". Falling back to original.',
-          name: 'GameMenuScreen', // Added logger name
+          name: 'GameMenuScreen.Translation',
         );
         return originalName; // Fallback to original if translation is empty
       }
     } catch (e) {
       log(
         'Error translating "$originalName": $e. Falling back to original name.',
-        name: 'GameMenuScreen', // Added logger name
+        name: 'GameMenuScreen.Translation',
       );
       return originalName; // Fallback to original name on any error
     }
@@ -163,16 +145,17 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
     if (bearerToken == null || bearerToken.isEmpty) {
       log(
         'Error: Access token not found in GetStorage or is empty.',
-        name: 'GameMenuScreen',
+        name: 'GameMenuScreen.Auth',
       );
       throw Exception('Access token not found or is empty');
     }
 
+    log('Fetching game bid types from API...', name: 'GameMenuScreen.API');
     final response = await http.get(
       Uri.parse("${Constant.apiEndpoint}game-bid-type"),
       headers: {
-        'deviceId': 'qwert',
-        'deviceName': 'sm2233',
+        'deviceId': 'qwert', // Consider making these dynamic if needed
+        'deviceName': 'sm2233', // Consider making these dynamic if needed
         'accessStatus': '1',
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $bearerToken',
@@ -184,6 +167,8 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
       if (decoded['status'] == true && decoded['info'] != null) {
         final List data = decoded['info'];
         List<GameItem> gameItems = [];
+
+        log("API Response Status True: ${json.encode(decoded)}");
 
         for (var itemJson in data) {
           GameItem gameItem = GameItem.fromJson(itemJson);
@@ -202,15 +187,19 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
               .catchError((e) {
                 log(
                   'Error setting display name for ${gameItem.name}: $e',
-                  name: 'GameMenuScreen',
+                  name: 'GameMenuScreen.Translation',
                 );
               });
         }
+        log(
+          'Successfully fetched and initialized ${gameItems.length} game items.',
+          name: 'GameMenuScreen.API',
+        );
         return gameItems; // Return items immediately (initially with original names)
       } else {
         log(
           "API Response Status Not True or Info Missing: ${json.encode(decoded)}",
-          name: 'GameMenuScreen',
+          name: 'GameMenuScreen.API',
         );
         throw Exception(
           "No game items found in API response or status is false.",
@@ -219,13 +208,13 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
     } else {
       log(
         "API Error: ${response.statusCode}, ${response.body}",
-        name: 'GameMenuScreen',
+        name: 'GameMenuScreen.API',
       );
       throw Exception("Failed to load game list: ${response.statusCode}");
     }
   }
 
-  // --- New method to show the market closed dialog ---
+  // New method to show the market closed dialog
   Future<void> _showMarketClosedDialog(String gameName) async {
     final translatedTitle = await _getTranslatedName('Market Closed');
     final translatedOk = await _getTranslatedName('OK');
@@ -258,7 +247,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
     );
   }
 
-  // Helper function to build routes dynamically
+  // Helper function to build routes dynamically (not used directly in current tap logic, but good to keep)
   MaterialPageRoute _buildGameRoute(
     Widget screen,
     String parentScreenTranslatedTitle,
@@ -302,6 +291,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
         child: RefreshIndicator(
           color: Colors.amber,
           onRefresh: () async {
+            log('Refreshing game menu data...', name: 'GameMenuScreen.Refresh');
             setState(() {
               _translationCache.clear(); // Clear cache on refresh
               _translatedScreenTitleFuture = _getTranslatedName(
@@ -358,16 +348,17 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                         onTap: () async {
                           log(
                             "Attempting navigation for Game Type: $gameType, Name: ${item.name}, Current Display: ${item.currentDisplayName}",
-                            name: 'GameMenuScreen',
+                            name: 'GameMenuScreen.Tap',
                           );
 
                           // --- CHECK SESSION SELECTION HERE ---
-                          if (!item.sessionSelection) {
+                          if (widget.openSessionStatus == false &&
+                              item.sessionSelection == false) {
                             await _showMarketClosedDialog(
                               item.currentDisplayName,
-                            ); // Await dialog
-                            return; // Stop further execution
-                          }
+                            ); // Await the dialog
+                            return;
+                          } else {}
 
                           // Translate the screen title part of the destination title
                           String parentScreenTranslatedTitle =
@@ -383,6 +374,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                                 gameId: widget.gameId,
                                 gameName: item.name,
                                 gameCategoryType: item.type,
+                                selectionStatus: widget.openSessionStatus,
                               );
                               break;
 
@@ -424,6 +416,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                                 gameId: widget.gameId,
                                 gameType: item.type,
                                 gameName: item.name,
+                                selectionStatus: widget.openSessionStatus,
                               );
                               break;
                             case 'doublePanaBulk':
@@ -522,6 +515,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                                     "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
                                 gameId: widget.gameId,
                                 gameType: item.type,
+                                gameName: item.name,
                               );
                               break;
 
@@ -557,6 +551,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                                     "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
                                 gameId: widget.gameId,
                                 gameType: item.type,
+                                gameName: item.name,
                               );
                               break;
                             case 'fullSangam':
@@ -577,7 +572,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                               );
                               log(
                                 "Unhandled game type: ${item.type}",
-                                name: 'GameMenuScreen',
+                                name: 'GameMenuScreen.Navigation',
                               );
                               break;
                           }
@@ -642,7 +637,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                                       .contain, // Ensure the entire image is visible within the padded circle
                                   errorBuilder: (context, error, stackTrace) =>
                                       const Icon(
-                                        Icons.broken_image_outlined,
+                                        Icons.image_not_supported_outlined,
                                         size: 50,
                                         color: Colors.grey,
                                       ),

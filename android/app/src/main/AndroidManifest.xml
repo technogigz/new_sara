@@ -20,7 +20,7 @@
     <application
         android:label="Sara777"
         android:name="${applicationName}"
-        android:icon="@drawable/sara_icon"
+        android:icon="@mipmap/ic_launcher"
         android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
         android:hardwareAccelerated="true"
         android:enableOnBackInvokedCallback="true">

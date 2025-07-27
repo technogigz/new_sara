@@ -6,26 +6,6 @@ import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
 
 import '../Helper/TranslationHelper.dart';
-import '../game/DigitBasedBoard/DigitBasedBoardScreen.dart';
-import '../game/Jodi/JodiBidScreen.dart';
-import '../game/Jodi/JodiBulkScreen.dart';
-import '../game/Jodi/group_jodi_screen.dart';
-import '../game/OddEvenBoard/OddEvenBoardScreen.dart';
-import '../game/Panna/SinglePanna/SinglePanna.dart';
-import '../game/Panna/SinglePanna/SinglePannaBulk.dart';
-import '../game/PannelGroup/PannelGroup.dart';
-import '../game/RedBracket/RedBracketScreen.dart';
-import '../game/SPDPTPScreen/ChoiceSpDpTpBoardScreen.dart';
-import '../game/SPDPTPScreen/DPMotors.dart';
-import '../game/SPDPTPScreen/SPMotors.dart';
-import '../game/SPDPTPScreen/SpDpTpBoardScreen.dart';
-import '../game/SPDPTPScreen/TPMotorScreen.dart';
-import '../game/Sangam/FullSangamBoardScreen.dart';
-import '../game/Sangam/HalfSangamABoardScreen.dart';
-import '../game/Sangam/HalfSangamBBoardScreen.dart';
-import '../game/SingleDigitBetScreen/SingleDigitBetScreen.dart';
-import '../game/SingleDigitBetScreen/SingleDigitsBulkScreen.dart';
-import '../game/TwoDigitPanel/TwoDigitPanel.dart';
 import '../ulits/Constents.dart';
 
 class KingStarlineBidType {
@@ -466,187 +446,192 @@ class _KingStarlineOptionScreenState extends State<KingStarlineOptionScreen> {
           case 'singledigits':
             // Corrected logic: if digitPannaStatus is true, go to SinglePannaScreen, else SingleDigitBetScreen
 
-            destinationScreen = SingleDigitBetScreen(
-              title: "$parentScreenTitle, ${item.translatedTitle}",
-              gameId: widget.selectedId, // Pass the selected Starline Game ID
-              gameName: item.title,
-              gameCategoryType: item.type,
-            );
+            // destinationScreen = SingleDigitBetScreen(
+            //   title: "$parentScreenTitle, ${item.translatedTitle}",
+            //   gameId: widget.selectedId, // Pass the selected Starline Game ID
+            //   gameName: item.title,
+            //   gameCategoryType: item.type,
+            // );
             break;
-
-          case 'spmotor':
-            destinationScreen = SPMotorsBetScreen(
-              title: "$parentScreenTitle, ${item.translatedTitle}",
-              gameId: widget.selectedId, // Pass the selected Starline Game ID
-              gameName: item.title,
-              gameCategoryType: item.type,
-            );
-            break;
-
-          case 'dpmotor':
-          case 'doublepana': // Assuming 'doublepana' also maps to DPMotorsBetScreen
-            destinationScreen = DPMotorsBetScreen(
-              title: "$parentScreenTitle, ${item.translatedTitle}",
-              gameId: widget.selectedId, // Pass the selected Starline Game ID
-              gameName: item.title,
-              gameCategoryType: item.type,
-            );
-            break;
-
-          case 'triplepana':
-            destinationScreen = TPMotorsBetScreen(
-              title: "$parentScreenTitle, ${item.translatedTitle}",
-              gameId: widget.selectedId, // Pass the selected Starline Game ID
-              gameName: item.title,
-              gameCategoryType: item.type,
-            );
-            break;
-
-          case 'singledigitsbulk':
-            destinationScreen = SingleDigitsBulkScreen(
-              title: "$parentScreenTitle, ${item.translatedTitle}",
-              gameName: item.title,
-              gameType: item.type,
-              gameId: widget.selectedId, // Pass the selected Starline Game ID
-            );
-            break;
-
-          case 'singlepanabulk':
-          case 'doublepanabulk':
-            destinationScreen = SinglePannaBulkBoardScreen(
-              title: "$parentScreenTitle, ${item.translatedTitle}",
-              gameId: widget.selectedId, // Pass the selected Starline Game ID
-              gameType: item.type,
-              gameName: item.title,
-            );
-            break;
-
-          case 'jodi':
-            destinationScreen = JodiBidScreen(
-              title: "$parentScreenTitle, ${item.translatedTitle}",
-              gameType: item.type,
-              gameId: widget.selectedId, // Pass the selected Starline Game ID
-              gameName: item.title,
-            );
-            break;
-
-          case 'panelgroup':
-            destinationScreen = PanelGroupScreen(
-              title: "$parentScreenTitle, ${item.translatedTitle}",
-              gameId: widget.selectedId, // Pass the selected Starline Game ID
-              gameName: item.title,
-              gameCategoryType: item.type,
-            );
-            break;
-
-          case 'groupdigit': // This typically goes to JodiBidScreen or a specific digit-group screen
-          case 'twodigitpanna': // This typically goes to JodiBidScreen if it's a "Jodi-like" input
-            destinationScreen = JodiBidScreen(
-              // Assuming JodiBidScreen can handle these types
-              title: "$parentScreenTitle, ${item.translatedTitle}",
-              gameType: item.type,
-              gameId: widget.selectedId, // Pass the selected Starline Game ID
-              gameName: item.title,
-            );
-            break;
-
-          case 'jodibulk':
-            destinationScreen = JodiBulkScreen(
-              screenTitle: "$parentScreenTitle, ${item.translatedTitle}",
-              gameType: item.type,
-              gameId: widget.selectedId, // Pass the selected Starline Game ID
-              gameName: item.title,
-            );
-            break;
-
-          case 'singlepana':
-            destinationScreen = SinglePannaScreen(
-              title: "$parentScreenTitle, ${item.translatedTitle}",
-              gameType: item.type,
-              gameId: widget.selectedId, // Pass the selected Starline Game ID
-            );
-            break;
-
-          case 'twodigitspanel':
-            destinationScreen = TwoDigitPanelScreen(
-              title: "$parentScreenTitle, ${item.translatedTitle}",
-              gameType: item.type,
-              gameId: widget.selectedId, // Pass the selected Starline Game ID
-            );
-            break;
-
-          case 'groupjodi':
-            destinationScreen = GroupJodiScreen(
-              title: "$parentScreenTitle, ${item.translatedTitle}",
-              gameType: item.type,
-              gameId: widget.selectedId, // Pass the selected Starline Game ID
-            );
-            break;
-
-          case 'digitbasedjodi':
-            destinationScreen = DigitBasedBoardScreen(
-              title: "$parentScreenTitle, ${item.translatedTitle}",
-              gameId: widget.selectedId.toString(), // Ensure gameId is String
-              gameType: item.type,
-              gameName: item.title,
-            );
-            break;
-
-          case 'oddeven':
-            destinationScreen = OddEvenBoardScreen(
-              title: "$parentScreenTitle, ${item.translatedTitle}",
-              gameType: item.type,
-              gameId: widget.selectedId, // Pass the selected Starline Game ID
-            );
-            break;
-
-          case 'choicepannaspdp':
-            destinationScreen = ChoiceSpDpTpBoardScreen(
-              screenTitle: "$parentScreenTitle, ${item.translatedTitle}",
-              gameType: item.type,
-              gameId: widget.selectedId, // Pass the selected Starline Game ID
-            );
-            break;
-
-          case 'spdptp':
-            destinationScreen = SpDpTpBoardScreen(
-              screenTitle: "$parentScreenTitle, ${item.translatedTitle}",
-              gameType: item.type,
-              gameId: widget.selectedId, // Pass the selected Starline Game ID
-            );
-            break;
-
-          case 'redbracket':
-            destinationScreen = RedBracketBoardScreen(
-              screenTitle: "$parentScreenTitle, ${item.translatedTitle}",
-              gameType: item.type,
-              gameId: widget.selectedId, // Pass the selected Starline Game ID
-            );
-            break;
-
-          case 'halfsangama':
-            destinationScreen = HalfSangamABoardScreen(
-              screenTitle: "$parentScreenTitle, ${item.translatedTitle}",
-              gameType: item.type,
-              gameId: widget.selectedId, // Pass the selected Starline Game ID
-            );
-            break;
-
-          case 'halfsangamb':
-            destinationScreen = HalfSangamBBoardScreen(
-              screenTitle: "$parentScreenTitle, ${item.translatedTitle}",
-              gameType: item.type,
-              gameId: widget.selectedId, // Pass the selected Starline Game ID
-            );
-            break;
-
-          case 'fullsangam':
-            destinationScreen = FullSangamBoardScreen(
-              screenTitle: "$parentScreenTitle, ${item.translatedTitle}",
-              gameType: item.type,
-              gameId: widget.selectedId, // Pass the selected Starline Game ID
-            );
-            break;
+          //
+          // case 'spmotor':
+          //   destinationScreen = SPMotorsBetScreen(
+          //     title: "$parentScreenTitle, ${item.translatedTitle}",
+          //     gameId: widget.selectedId, // Pass the selected Starline Game ID
+          //     gameName: item.title,
+          //     gameCategoryType: item.type,
+          //   );
+          //   break;
+          //
+          // case 'dpmotor':
+          // case 'doublepana': // Assuming 'doublepana' also maps to DPMotorsBetScreen
+          //   destinationScreen = DPMotorsBetScreen(
+          //     title: "$parentScreenTitle, ${item.translatedTitle}",
+          //     gameId: widget.selectedId, // Pass the selected Starline Game ID
+          //     gameName: item.title,
+          //     gameCategoryType: item.type,
+          //   );
+          //   break;
+          //
+          // case 'triplepana':
+          //   destinationScreen = TPMotorsBetScreen(
+          //     title: "$parentScreenTitle, ${item.translatedTitle}",
+          //     gameId: widget.selectedId, // Pass the selected Starline Game ID
+          //     gameName: item.title,
+          //     gameCategoryType: item.type,
+          //   );
+          //   break;
+          //
+          // case 'singledigitsbulk':
+          //   destinationScreen = SingleDigitsBulkScreen(
+          //     title: "$parentScreenTitle, ${item.translatedTitle}",
+          //     gameName: item.title,
+          //     gameType: item.type,
+          //     gameId: widget.selectedId, // Pass the selected Starline Game ID
+          //   );
+          //   break;
+          //
+          // case 'singlepanabulk':
+          // case 'doublepanabulk':
+          //   destinationScreen = SinglePannaBulkBoardScreen(
+          //     title: "$parentScreenTitle, ${item.translatedTitle}",
+          //     gameId: widget.selectedId, // Pass the selected Starline Game ID
+          //     gameType: item.type,
+          //     gameName: item.title,
+          //   );
+          //   break;
+          //
+          // case 'jodi':
+          //   destinationScreen = JodiBidScreen(
+          //     title: "$parentScreenTitle, ${item.translatedTitle}",
+          //     gameType: item.type,
+          //     gameId: widget.selectedId, // Pass the selected Starline Game ID
+          //     gameName: item.title,
+          //   );
+          //   break;
+          //
+          // case 'panelgroup':
+          //   destinationScreen = PanelGroupScreen(
+          //     title: "$parentScreenTitle, ${item.translatedTitle}",
+          //     gameId: widget.selectedId, // Pass the selected Starline Game ID
+          //     gameName: item.title,
+          //     gameCategoryType: item.type,
+          //   );
+          //   break;
+          //
+          // case 'groupdigit': // This typically goes to JodiBidScreen or a specific digit-group screen
+          // case 'twodigitpanna': // This typically goes to JodiBidScreen if it's a "Jodi-like" input
+          //   destinationScreen = JodiBidScreen(
+          //     // Assuming JodiBidScreen can handle these types
+          //     title: "$parentScreenTitle, ${item.translatedTitle}",
+          //     gameType: item.type,
+          //     gameId: widget.selectedId, // Pass the selected Starline Game ID
+          //     gameName: item.title,
+          //   );
+          //   break;
+          //
+          // case 'jodibulk':
+          //   destinationScreen = JodiBulkScreen(
+          //     screenTitle: "$parentScreenTitle, ${item.translatedTitle}",
+          //     gameType: item.type,
+          //     gameId: widget.selectedId, // Pass the selected Starline Game ID
+          //     gameName: item.title,
+          //   );
+          //   break;
+          //
+          // case 'singlepana':
+          //   destinationScreen = SinglePannaScreen(
+          //     title: "$parentScreenTitle, ${item.translatedTitle}",
+          //     gameType: item.type,
+          //     gameId: widget.selectedId, // Pass the selected Starline Game ID
+          //   );
+          //   break;
+          //
+          // case 'twodigitspanel':
+          //   destinationScreen = TwoDigitPanelScreen(
+          //     title: "$parentScreenTitle, ${item.translatedTitle}",
+          //     gameType: item.type,
+          //     gameId: widget.selectedId, // Pass the selected Starline Game ID
+          //   );
+          //   break;
+          //
+          // case 'groupjodi':
+          //   destinationScreen = GroupJodiScreen(
+          //     title: "$parentScreenTitle, ${item.translatedTitle}",
+          //     gameType: item.type,
+          //     gameId: widget.selectedId, // Pass the selected Starline Game ID
+          //   );
+          //   break;
+          //
+          // case 'digitbasedjodi':
+          //   destinationScreen = DigitBasedBoardScreen(
+          //     title: "$parentScreenTitle, ${item.translatedTitle}",
+          //     gameId: widget.selectedId.toString(), // Ensure gameId is String
+          //     gameType: item.type,
+          //     gameName: item.title,
+          //   );
+          //   break;
+          //
+          // case 'oddeven':
+          //   destinationScreen = OddEvenBoardScreen(
+          //     title: "$parentScreenTitle, ${item.translatedTitle}",
+          //     gameType: item.type,
+          //     gameId: widget.selectedId, // Pass the selected Starline Game ID
+          //   );
+          //   break;
+          //
+          // case 'choicepannaspdp':
+          //   destinationScreen = ChoiceSpDpTpBoardScreen(
+          //     screenTitle: "$parentScreenTitle, ${item.translatedTitle}",
+          //     gameType: item.type,
+          //     gameId: widget.selectedId,
+          //     gameName:
+          //         widget.title +
+          //         ", " +
+          //         item.title, // Pass the selected Starline Game ID
+          //   );
+          //   break;
+          //
+          // case 'spdptp':
+          //   destinationScreen = SpDpTpBoardScreen(
+          //     screenTitle: "$parentScreenTitle, ${item.translatedTitle}",
+          //     gameType: item.type,
+          //     gameId: widget.selectedId, // Pass the selected Starline Game ID
+          //   );
+          //   break;
+          //
+          // case 'redbracket':
+          //   destinationScreen = RedBracketBoardScreen(
+          //     screenTitle: "$parentScreenTitle, ${item.translatedTitle}",
+          //     gameType: item.type,
+          //     gameId: widget.selectedId, // Pass the selected Starline Game ID
+          //   );
+          //   break;
+          //
+          // case 'halfsangama':
+          //   destinationScreen = HalfSangamABoardScreen(
+          //     screenTitle: "$parentScreenTitle, ${item.translatedTitle}",
+          //     gameType: item.type,
+          //     gameId: widget.selectedId, // Pass the selected Starline Game ID
+          //   );
+          //   break;
+          //
+          // case 'halfsangamb':
+          //   destinationScreen = HalfSangamBBoardScreen(
+          //     screenTitle: "$parentScreenTitle, ${item.translatedTitle}",
+          //     gameType: item.type,
+          //     gameId: widget.selectedId,
+          //     gameName: item.title, // Pass the selected Starline Game ID
+          //   );
+          //   break;
+          //
+          // case 'fullsangam':
+          //   destinationScreen = FullSangamBoardScreen(
+          //     screenTitle: "$parentScreenTitle, ${item.translatedTitle}",
+          //     gameType: item.type,
+          //     gameId: widget.selectedId, // Pass the selected Starline Game ID
+          //   );
+          //   break;
 
           default:
             final String noScreenConfiguredMsg =

@@ -1,30 +1,30 @@
-import 'dart:async'; // For Timer
-import 'dart:convert'; // For jsonEncode, json.decode
-import 'dart:developer'; // For log
+// lib/screens/half_sangam_b_board_screen.dart
+import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // For TextInputFormatter
+import 'package:flutter/services.dart';
 import 'package:get_storage/get_storage.dart';
-import 'package:google_fonts/google_fonts.dart'; // For GoogleFonts
-import 'package:http/http.dart' as http; // For API calls
-import 'package:intl/intl.dart'; // For date formatting
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 
+import '../../BidService.dart';
 import '../../components/AnimatedMessageBar.dart';
-import '../../components/BidConfirmationDialog.dart'; // Import your BidConfirmationDialog
-import '../../components/BidFailureDialog.dart'; // NEW: Assuming you have this
-import '../../components/BidSuccessDialog.dart'; // NEW: Assuming you have this
-import '../../ulits/Constents.dart'; // Import the Constants file for API endpoint
+import '../../components/BidConfirmationDialog.dart';
+import '../../components/BidFailureDialog.dart';
+import '../../components/BidSuccessDialog.dart';
 
 class HalfSangamBBoardScreen extends StatefulWidget {
-  final String screenTitle;
+  final String screenTitle; // e.g., "SRIDEVI NIGHT, HALF SANGAM"
   final String gameType; // This will be "halfSangamB"
   final int gameId;
+  final String gameName; // e.g., "SRIDEVI NIGHT"
 
   const HalfSangamBBoardScreen({
     Key? key,
     required this.screenTitle,
     required this.gameType,
     required this.gameId,
+    required this.gameName,
   }) : super(key: key);
 
   @override
@@ -32,38 +32,140 @@ class HalfSangamBBoardScreen extends StatefulWidget {
 }
 
 class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
-  final TextEditingController _openPannaController = TextEditingController();
-  final TextEditingController _closeDigitController = TextEditingController();
+  final TextEditingController _ankController = TextEditingController();
+  final TextEditingController _pannaController = TextEditingController();
   final TextEditingController _pointsController = TextEditingController();
 
+  // Each map will contain: {'ank': '9', 'panna': '119', 'points': '125'}
   List<Map<String, String>> _bids = [];
   late GetStorage storage = GetStorage();
+  late BidService _bidService;
   late String accessToken;
   late String registerId;
   late String preferredLanguage;
   bool accountStatus = false;
   late int walletBalance;
 
-  // NEW: State to manage API call in progress
   bool _isApiCalling = false;
 
-  // Placeholder for device info. In a real app, these would be dynamic.
   final String _deviceId = 'test_device_id_flutter';
   final String _deviceName = 'test_device_name_flutter';
 
-  // State management for AnimatedMessageBar
   String? _messageToShow;
   bool _isErrorForMessage = false;
-  Key _messageBarKey = UniqueKey(); // Key to force rebuild/re-animation
+  Key _messageBarKey = UniqueKey();
+  Timer? _messageDismissTimer;
+
+  static final List<String> _allPannas = [
+    "100",
+    "110",
+    "112",
+    "113",
+    "114",
+    "115",
+    "116",
+    "117",
+    "118",
+    "119",
+    "122",
+    "133",
+    "144",
+    "155",
+    "166",
+    "177",
+    "188",
+    "199",
+    "200",
+    "220",
+    "223",
+    "224",
+    "225",
+    "226",
+    "227",
+    "228",
+    "229",
+    "233",
+    "244",
+    "255",
+    "266",
+    "277",
+    "288",
+    "299",
+    "300",
+    "330",
+    "334",
+    "335",
+    "336",
+    "337",
+    "338",
+    "339",
+    "344",
+    "355",
+    "366",
+    "377",
+    "388",
+    "399",
+    "400",
+    "440",
+    "445",
+    "446",
+    "447",
+    "448",
+    "449",
+    "455",
+    "466",
+    "477",
+    "488",
+    "499",
+    "500",
+    "550",
+    "556",
+    "557",
+    "558",
+    "559",
+    "566",
+    "577",
+    "588",
+    "599",
+    "600",
+    "660",
+    "667",
+    "668",
+    "669",
+    "677",
+    "688",
+    "699",
+    "700",
+    "770",
+    "778",
+    "779",
+    "788",
+    "799",
+    "800",
+    "880",
+    "889",
+    "899",
+    "900",
+    "990",
+  ];
 
   @override
   void initState() {
     super.initState();
+    _bidService = BidService(storage);
     _loadInitialData();
     _setupStorageListeners();
   }
 
-  // Load initial data from GetStorage
+  @override
+  void dispose() {
+    _ankController.dispose();
+    _pannaController.dispose();
+    _pointsController.dispose();
+    _messageDismissTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _loadInitialData() async {
     accessToken = storage.read('accessToken') ?? '';
     registerId = storage.read('registerId') ?? '';
@@ -71,16 +173,15 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
     preferredLanguage = storage.read('selectedLanguage') ?? 'en';
 
     final dynamic storedWalletBalance = storage.read('walletBalance');
-    if (storedWalletBalance is String) {
-      walletBalance = int.tryParse(storedWalletBalance) ?? 0;
-    } else if (storedWalletBalance is int) {
+    if (storedWalletBalance is int) {
       walletBalance = storedWalletBalance;
+    } else if (storedWalletBalance is String) {
+      walletBalance = int.tryParse(storedWalletBalance) ?? 0;
     } else {
       walletBalance = 0;
     }
   }
 
-  // Set up listeners for GetStorage keys
   void _setupStorageListeners() {
     storage.listenKey('accessToken', (value) {
       if (mounted) setState(() => accessToken = value ?? '');
@@ -97,10 +198,10 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
     storage.listenKey('walletBalance', (value) {
       if (mounted) {
         setState(() {
-          if (value is String) {
-            walletBalance = int.tryParse(value) ?? 0;
-          } else if (value is int) {
+          if (value is int) {
             walletBalance = value;
+          } else if (value is String) {
+            walletBalance = int.tryParse(value) ?? 0;
           } else {
             walletBalance = 0;
           }
@@ -113,30 +214,22 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
     });
   }
 
-  // List of all possible 3-digit pannas for suggestions
-  static final List<String> _allPannas = List.generate(
-    900,
-    (index) => (index + 100).toString(),
-  );
-
-  @override
-  void dispose() {
-    _openPannaController.dispose();
-    _closeDigitController.dispose();
-    _pointsController.dispose();
-    super.dispose();
-  }
-
-  // Helper method to show messages using AnimatedMessageBar
   void _showMessage(String message, {bool isError = false}) {
+    _messageDismissTimer?.cancel();
+
+    if (!mounted) return;
+
     setState(() {
       _messageToShow = message;
       _isErrorForMessage = isError;
-      _messageBarKey = UniqueKey(); // Update key to trigger animation
+      _messageBarKey = UniqueKey();
+    });
+
+    _messageDismissTimer = Timer(const Duration(seconds: 3), () {
+      _clearMessage();
     });
   }
 
-  // Helper method to clear the message bar
   void _clearMessage() {
     if (mounted) {
       setState(() {
@@ -146,100 +239,68 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
   }
 
   void _addBid() {
-    // NEW: Prevent adding bids while API is in progress
     if (_isApiCalling) return;
 
-    _clearMessage(); // Clear any previous messages
-    final openPanna = _openPannaController.text.trim();
-    final closeDigit = _closeDigitController.text.trim();
+    _clearMessage();
+    final ank = _ankController.text.trim();
+    final panna = _pannaController.text.trim();
     final points = _pointsController.text.trim();
 
-    // 1. Validate Open Panna (3 digits, 100-999)
-    if (openPanna.isEmpty ||
-        openPanna.length != 3 ||
-        int.tryParse(openPanna) == null) {
-      _showMessage(
-        'Please enter a 3-digit number for Open Panna.',
-        isError: true,
-      );
-      return;
-    }
-    int? parsedOpenPanna = int.tryParse(openPanna);
-    if (parsedOpenPanna == null ||
-        parsedOpenPanna < 100 ||
-        parsedOpenPanna > 999) {
-      _showMessage('Open Panna must be between 100 and 999.', isError: true);
+    if (ank.isEmpty ||
+        ank.length != 1 ||
+        int.tryParse(ank) == null ||
+        int.parse(ank) < 0 ||
+        int.parse(ank) > 9) {
+      _showMessage('Please enter a single digit for Ank (0-9).', isError: true);
       return;
     }
 
-    // 2. Validate Close Digit (Single Digit, 0-9)
-    if (closeDigit.isEmpty ||
-        closeDigit.length != 1 ||
-        int.tryParse(closeDigit) == null) {
-      _showMessage(
-        'Please enter a single digit for Close Digit (0-9).',
-        isError: true,
-      );
-      return;
-    }
-    int? parsedCloseDigit = int.tryParse(closeDigit);
-    if (parsedCloseDigit == null ||
-        parsedCloseDigit < 0 ||
-        parsedCloseDigit > 9) {
-      _showMessage(
-        'Close Digit must be a single digit between 0 and 9.',
-        isError: true,
-      );
+    if (panna.isEmpty || panna.length != 3 || !_allPannas.contains(panna)) {
+      _showMessage('Please enter a valid 3-digit Panna.', isError: true);
       return;
     }
 
-    // 3. Validate Points (10 to 1000)
     int? parsedPoints = int.tryParse(points);
     if (parsedPoints == null || parsedPoints < 10 || parsedPoints > 1000) {
       _showMessage('Points must be between 10 and 1000.', isError: true);
       return;
     }
 
-    // Construct the Sangam string
-    final sangam = '$openPanna-$closeDigit';
-
     setState(() {
-      // Check if an existing bid with the same Sangam already exists
-      int existingIndex = _bids.indexWhere((bid) => bid['sangam'] == sangam);
+      // For Half Sangam B, the unique combination is Ank and Panna
+      int existingIndex = _bids.indexWhere(
+        (bid) => bid['ank'] == ank && bid['panna'] == panna,
+      );
 
       if (existingIndex != -1) {
-        // If it exists, update the points of the existing bid
         _bids[existingIndex]['points'] =
             (int.parse(_bids[existingIndex]['points']!) + parsedPoints)
                 .toString();
-        _showMessage('Updated points for $sangam.');
+        _showMessage('Updated points for $ank-$panna.');
       } else {
-        // Otherwise, add a new bid
         _bids.add({
-          "sangam": sangam,
+          "ank": ank,
+          "panna": panna,
           "points": points,
-          "openPanna": openPanna,
-          "closeDigit": closeDigit,
-          "type": widget
-              .gameType, // Use widget.gameType for API payload consistency
+          // 'gameTypeCategory' is not directly used in the _bids list for THIS BidService,
+          // but we'll use it to construct the unique key for the map sent to BidService.
+          // For consistency with previous comprehensive service, keeping it internal is fine.
         });
-        _showMessage('Added bid: $sangam with $points points.');
+        _showMessage('Added bid: $ank-$panna with $points points.');
       }
 
-      // Clear controllers after adding/updating
-      _openPannaController.clear();
-      _closeDigitController.clear();
+      _ankController.clear();
+      _pannaController.clear();
       _pointsController.clear();
     });
   }
 
   void _removeBid(int index) {
-    // NEW: Prevent removing bids while API is in progress
     if (_isApiCalling) return;
 
     _clearMessage();
     setState(() {
-      final removedSangam = _bids[index]['sangam'];
+      final removedSangam = '${_bids[index]['ank']}-${_bids[index]['panna']}';
       _bids.removeAt(index);
       _showMessage('Bid for $removedSangam removed from list.');
     });
@@ -248,14 +309,12 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
   int _getTotalPoints() {
     return _bids.fold(
       0,
-      // NEW: Use null-aware operator with default value for safer parsing
       (sum, item) => sum + (int.tryParse(item['points'] ?? '0') ?? 0),
     );
   }
 
   void _showConfirmationDialog() {
     _clearMessage();
-    // NEW: Prevent showing dialog if API is in progress
     if (_isApiCalling) return;
 
     if (_bids.isEmpty) {
@@ -273,17 +332,14 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
       return;
     }
 
-    // Prepare bids list for the dialog
     List<Map<String, String>> bidsForDialog = _bids.map((bid) {
-      // For HalfSangamB, the 'digit' will be the closeDigit and 'pana' will be the openPanna.
       return {
-        "digit": bid['closeDigit']!, // Close Digit goes to 'digit'
-        "pana": bid['openPanna']!, // Open Panna goes to 'pana'
+        "digit": bid['ank']!, // Ank for display
+        "pana": bid['panna']!, // Panna for display
         "points": bid['points']!,
-        "type": bid['type']!, // Use the stored type, which is widget.gameType
-        "sangam": bid['sangam']!, // Keep sangam for display purposes in dialog
-        "jodi":
-            "", // Not applicable for Sangam, but common in bid payloads for consistency
+        "type": widget.screenTitle, // Use screen title as Game Type for dialog
+        "sangam":
+            '${bid['ank']}-${bid['panna']}', // Combined for display in dialog
       };
     }).toList();
 
@@ -293,37 +349,60 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
 
     showDialog(
       context: context,
-      barrierDismissible: false, // User must interact with the dialog
+      barrierDismissible: false,
       builder: (BuildContext dialogContext) {
         return BidConfirmationDialog(
-          gameTitle: widget.screenTitle, // Use screenTitle for gameTitle
+          gameTitle: widget.gameName,
           gameDate: formattedDate,
           bids: bidsForDialog,
-          totalBids: bidsForDialog.length,
+          totalBids: _bids.length,
           totalBidsAmount: totalPoints,
           walletBalanceBeforeDeduction: walletBalance,
           walletBalanceAfterDeduction: (walletBalance - totalPoints).toString(),
-          gameId: widget.gameId.toString(), // Ensure gameId is String
-          gameType: widget
-              .gameType, // Pass the correct gameType (e.g., "halfSangamB")
+          gameId: widget.gameId.toString(),
+          gameType: widget.gameType,
           onConfirm: () async {
-            Navigator.pop(dialogContext); // Dismiss the confirmation dialog
-            // NEW: Set API calling state to true
+            Navigator.pop(dialogContext);
             if (mounted) {
               setState(() {
                 _isApiCalling = true;
               });
             }
-            bool success = await _placeFinalBids();
-            if (success) {
+            final Map<String, dynamic> result = await _placeFinalBids();
+            if (result['status'] == true) {
               if (mounted) {
                 setState(() {
-                  _bids.clear(); // Clear bids on successful submission
+                  _bids.clear();
                 });
-                // No need to call _showMessage here, BidSuccessDialog handles it
+                // Update wallet balance in storage after successful bid
+                final int newBalance =
+                    (result['data']?['wallet_balance'] as num?)?.toInt() ??
+                    (walletBalance - totalPoints);
+                await _bidService.updateWalletBalance(newBalance);
+
+                await showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (BuildContext context) {
+                    return const BidSuccessDialog();
+                  },
+                );
+              }
+            } else {
+              if (mounted) {
+                await showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (BuildContext context) {
+                    return BidFailureDialog(
+                      errorMessage:
+                          result['msg'] ??
+                          "Bid submission failed. Please try again.",
+                    );
+                  },
+                );
               }
             }
-            // NEW: Reset API calling state regardless of success/failure
             if (mounted) {
               setState(() {
                 _isApiCalling = false;
@@ -335,145 +414,40 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
     );
   }
 
-  // Place final bids via API
-  Future<bool> _placeFinalBids() async {
-    String url;
-    // For Sangam, typically it's 'place-bid' but with specific gameType/sessionType
-    if (widget.screenTitle.toLowerCase().contains('jackpot')) {
-      url = '${Constant.apiEndpoint}place-jackpot-bid';
-    } else if (widget.screenTitle.toLowerCase().contains('starline')) {
-      url = '${Constant.apiEndpoint}place-starline-bid';
-    } else {
-      url = '${Constant.apiEndpoint}place-bid'; // General bid placement
+  // Place final bids using BidService, adapting data to its expected format
+  Future<Map<String, dynamic>> _placeFinalBids() async {
+    // Transform _bids list into Map<String, String> bidAmounts
+    // For Half Sangam, the 'digit' key in bidAmounts will be "Ank-Pana"
+    Map<String, String> bidAmountsMap = {};
+    for (var bid in _bids) {
+      final String digitKey = '${bid['ank']}-${bid['panna']}'; // e.g., "9-119"
+      bidAmountsMap[digitKey] = bid['points']!;
     }
 
-    if (accessToken.isEmpty || registerId.isEmpty) {
-      // NEW: Use dedicated dialog for authentication errors
-      if (mounted) {
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext context) {
-            return const BidFailureDialog(
-              errorMessage: 'Authentication error. Please log in again.',
-            );
-          },
-        );
-      }
-      return false;
-    }
+    // Determine selectedGameType for the BidService. This is usually "OPEN" for Half Sangam B
+    final String selectedSessionType = "OPEN";
 
-    final headers = {
-      'deviceId': _deviceId,
-      'deviceName': _deviceName,
-      'accessStatus': accountStatus ? '1' : '0', // Convert bool to '1' or '0'
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $accessToken',
-    };
+    final Map<String, dynamic> result = await _bidService.placeFinalBids(
+      gameName: widget.gameName,
+      accessToken: accessToken,
+      registerId: registerId,
+      deviceId: _deviceId,
+      deviceName: _deviceName,
+      accountStatus: accountStatus,
+      bidAmounts: bidAmountsMap, // Pass the transformed map
+      selectedGameType: selectedSessionType, // Pass the determined session type
+      gameId: widget.gameId,
+      gameType: widget.gameType, // Pass the gameType (e.g., "halfSangamB")
+      totalBidAmount: _getTotalPoints(),
+    );
 
-    final List<Map<String, dynamic>> bidPayload = _bids.map((bid) {
-      return {
-        "sessionType": bid['type']!.toUpperCase(), // e.g., "HALFSANGAMB"
-        "digit": bid['closeDigit']!, // Close Digit for Half Sangam B
-        "pana": bid['openPanna']!, // Open Panna for Half Sangam B
-        "bidAmount": int.tryParse(bid['points'] ?? '0') ?? 0,
-      };
-    }).toList();
-
-    final body = jsonEncode({
-      "registerId": registerId,
-      "gameId": widget.gameId,
-      "bidAmount": _getTotalPoints(),
-      "gameType":
-          widget.gameType, // Use the gameType from the widget's properties
-      "bid": bidPayload,
-    });
-
-    // NEW: Log the cURL and headers here for debugging
-    String curlCommand = 'curl -X POST \\';
-    curlCommand += '\n  ${Uri.parse(url)} \\';
-    headers.forEach((key, value) {
-      curlCommand += '\n  -H "$key: $value" \\';
-    });
-    curlCommand += '\n  -d \'$body\'';
-
-    log('CURL Command for Final Bid Submission:\n$curlCommand');
-    log('Request Headers for Final Bid Submission: $headers');
-    log('Request Body for Final Bid Submission: $body');
-
-    try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: headers,
-        body: body,
-      );
-
-      final Map<String, dynamic> responseBody = json.decode(response.body);
-
-      log('API Response for Final Bid Submission: ${responseBody}');
-
-      // NEW: Handle boolean or string 'status' from API
-      if (response.statusCode == 200 &&
-          (responseBody['status'] == true ||
-              responseBody['status'] == 'true')) {
-        // Update wallet balance in GetStorage and local state on successful bid
-        int currentWallet = walletBalance;
-        int deductedAmount = _getTotalPoints();
-        int newWalletBalance = currentWallet - deductedAmount;
-        // NEW: Store as int in GetStorage if possible
-        await storage.write('walletBalance', newWalletBalance);
-        if (mounted) {
-          setState(() {
-            walletBalance = newWalletBalance; // Update local state
-          });
-          // NEW: Show success dialog
-          await showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (BuildContext context) {
-              return const BidSuccessDialog();
-            },
-          );
-          _clearMessage(); // Clear the message bar after dialog dismissal
-        }
-        return true; // Indicate success
-      } else {
-        String errorMessage = responseBody['msg'] ?? "Unknown error occurred.";
-        // NEW: Show failure dialog
-        if (mounted) {
-          await showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (BuildContext context) {
-              return BidFailureDialog(errorMessage: errorMessage);
-            },
-          );
-        }
-        return false; // Indicate failure
-      }
-    } catch (e) {
-      log('Network error during bid submission: $e');
-      // NEW: Show network error dialog
-      if (mounted) {
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext context) {
-            return const BidFailureDialog(
-              errorMessage:
-                  'Network error. Please check your internet connection.',
-            );
-          },
-        );
-      }
-      return false; // Indicate failure
-    }
+    return result;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5), // Light gray background
+      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
@@ -497,7 +471,7 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
           const SizedBox(width: 6),
           Center(
             child: Text(
-              walletBalance.toString(), // Display actual wallet balance
+              walletBalance.toString(),
               style: GoogleFonts.poppins(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -520,24 +494,24 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildPannaInputRow(
-                      'Enter Open Panna :',
-                      _openPannaController,
-                      hintText: 'e.g., 123',
-                      maxLength: 3,
+                    _buildInputRow(
+                      'Ank',
+                      _ankController,
+                      hintText: 'e.g., 9',
+                      maxLength: 1,
                     ),
                     const SizedBox(height: 16),
-                    _buildInputRow(
-                      'Enter Close Digit :',
-                      _closeDigitController,
-                      hintText: 'e.g., 5',
-                      maxLength: 1,
+                    _buildPannaInputRow(
+                      'Pana',
+                      _pannaController,
+                      hintText: 'e.g., 119',
+                      maxLength: 3,
                     ),
                     const SizedBox(height: 16),
                     _buildInputRow(
                       'Enter Points :',
                       _pointsController,
-                      hintText: 'e.g., 100',
+                      hintText: 'Enter Amount',
                       maxLength: 4,
                     ),
                     const SizedBox(height: 20),
@@ -545,7 +519,6 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
                       width: double.infinity,
                       height: 45,
                       child: ElevatedButton(
-                        // NEW: Disable button while API call is in progress
                         onPressed: _isApiCalling ? null : _addBid,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.amber,
@@ -553,15 +526,15 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
                             borderRadius: BorderRadius.circular(6),
                           ),
                         ),
-                        child:
-                            _isApiCalling // NEW: Show loading indicator
+                        child: _isApiCalling
                             ? const CircularProgressIndicator(
                                 valueColor: AlwaysStoppedAnimation<Color>(
                                   Colors.white,
                                 ),
+                                strokeWidth: 2,
                               )
                             : Text(
-                                "ADD",
+                                "ADD BID",
                                 style: GoogleFonts.poppins(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w600,
@@ -576,7 +549,6 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
               ),
               const Divider(thickness: 1),
 
-              // Table Headers
               if (_bids.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(
@@ -586,33 +558,43 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
                   child: Row(
                     children: [
                       Expanded(
+                        flex: 2,
                         child: Text(
-                          'Sangam',
+                          'Digit',
                           style: GoogleFonts.poppins(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                       Expanded(
+                        flex: 2,
                         child: Text(
-                          'Points',
+                          'Amount',
                           style: GoogleFonts.poppins(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 48), // Space for delete icon
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          'Game Type',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 48),
                     ],
                   ),
                 ),
               if (_bids.isNotEmpty) const Divider(thickness: 1),
 
-              // Dynamic List of Bids
               Expanded(
                 child: _bids.isEmpty
                     ? Center(
                         child: Text(
-                          'No Bids Placed',
+                          'No bids added yet',
                           style: GoogleFonts.poppins(color: Colors.grey),
                         ),
                       )
@@ -620,6 +602,11 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
                         itemCount: _bids.length,
                         itemBuilder: (context, index) {
                           final bid = _bids[index];
+                          final String displayDigit = bid['ank']!;
+                          final String displayPana = bid['panna']!;
+                          final String displaySangam =
+                              '$displayDigit - $displayPana';
+
                           return Container(
                             margin: const EdgeInsets.symmetric(
                               horizontal: 10,
@@ -645,14 +632,23 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
                               child: Row(
                                 children: [
                                   Expanded(
+                                    flex: 2,
                                     child: Text(
-                                      bid['sangam']!,
+                                      displaySangam,
                                       style: GoogleFonts.poppins(),
                                     ),
                                   ),
                                   Expanded(
+                                    flex: 2,
                                     child: Text(
                                       bid['points']!,
+                                      style: GoogleFonts.poppins(),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 3,
+                                    child: Text(
+                                      widget.screenTitle,
                                       style: GoogleFonts.poppins(),
                                     ),
                                   ),
@@ -661,7 +657,6 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
                                       Icons.delete,
                                       color: Colors.red,
                                     ),
-                                    // NEW: Disable delete button while API call is in progress
                                     onPressed: _isApiCalling
                                         ? null
                                         : () => _removeBid(index),
@@ -673,11 +668,9 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
                         },
                       ),
               ),
-              // Bottom Bar (conditionally rendered)
-              if (_bids.isNotEmpty) _buildBottomBar(),
+              _buildBottomBar(),
             ],
           ),
-          // AnimatedMessageBar positioned at the top
           if (_messageToShow != null)
             Positioned(
               top: 0,
@@ -695,7 +688,6 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
     );
   }
 
-  // Helper widget for input rows (standard TextField)
   Widget _buildInputRow(
     String label,
     TextEditingController controller, {
@@ -718,7 +710,8 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
               if (maxLength != null)
                 LengthLimitingTextInputFormatter(maxLength),
             ],
-            onTap: _clearMessage, // Clear message on tap
+            onTap: _clearMessage,
+            enabled: !_isApiCalling,
             decoration: InputDecoration(
               hintText: hintText,
               contentPadding: const EdgeInsets.symmetric(horizontal: 12),
@@ -738,7 +731,7 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
                 Icons.arrow_forward,
                 color: Colors.amber,
                 size: 20,
-              ), // Arrow icon
+              ),
             ),
           ),
         ),
@@ -746,7 +739,6 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
     );
   }
 
-  // Helper widget for Panna input with Autocomplete suggestions (for Open Panna now)
   Widget _buildPannaInputRow(
     String label,
     TextEditingController controller, {
@@ -768,7 +760,6 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
                   FocusNode focusNode,
                   VoidCallback onFieldSubmitted,
                 ) {
-                  // Keep our controller in sync with Autocomplete's internal controller
                   controller.text = textEditingController.text;
                   controller.selection = textEditingController.selection;
 
@@ -781,7 +772,8 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
                       if (maxLength != null)
                         LengthLimitingTextInputFormatter(maxLength),
                     ],
-                    onTap: _clearMessage, // Clear message on tap
+                    onTap: _clearMessage,
+                    enabled: !_isApiCalling,
                     decoration: InputDecoration(
                       hintText: hintText,
                       contentPadding: const EdgeInsets.symmetric(
@@ -803,7 +795,7 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
                         Icons.arrow_forward,
                         color: Colors.amber,
                         size: 20,
-                      ), // Arrow icon
+                      ),
                     ),
                     onSubmitted: (value) => onFieldSubmitted(),
                   );
@@ -812,7 +804,6 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
               if (textEditingValue.text.isEmpty) {
                 return const Iterable<String>.empty();
               }
-              // Filter pannas that start with the entered text
               return _allPannas.where((String option) {
                 return option.startsWith(textEditingValue.text);
               });
@@ -863,7 +854,6 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
     );
   }
 
-  // Helper for bottom bar
   Widget _buildBottomBar() {
     int totalBids = _bids.length;
     int totalPoints = _getTotalPoints();
@@ -888,7 +878,7 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Bids',
+                'Bid',
                 style: GoogleFonts.poppins(
                   fontSize: 14,
                   color: Colors.grey[700],
@@ -907,7 +897,7 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Points',
+                'Total',
                 style: GoogleFonts.poppins(
                   fontSize: 14,
                   color: Colors.grey[700],
@@ -923,20 +913,23 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
             ],
           ),
           ElevatedButton(
-            // NEW: Disable button while API call is in progress
-            onPressed: _isApiCalling ? null : _showConfirmationDialog,
+            onPressed: (_isApiCalling || _bids.isEmpty)
+                ? null
+                : _showConfirmationDialog,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange[700],
+              backgroundColor: (_isApiCalling || _bids.isEmpty)
+                  ? Colors.grey
+                  : Colors.amber,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
               elevation: 3,
             ),
-            child:
-                _isApiCalling // NEW: Show loading indicator
+            child: _isApiCalling
                 ? const CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    strokeWidth: 2,
                   )
                 : Text(
                     'SUBMIT',

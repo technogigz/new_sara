@@ -1,25 +1,23 @@
+// imports
 import 'dart:async';
-import 'dart:convert'; // For jsonEncode and json.decode
-import 'dart:developer' as dev; // Import with prefix to avoid conflict with log
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http; // For making HTTP requests
 import 'package:intl/intl.dart';
 
+import '../../BidService.dart';
 import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
-import '../../components/BidFailureDialog.dart'; // Assuming you have this
-import '../../components/BidSuccessDialog.dart'; // Assuming you have this
-import '../../ulits/Constents.dart'; // Ensure this path is correct for Constant.apiEndpoint
+import '../../components/BidFailureDialog.dart';
+import '../../components/BidSuccessDialog.dart';
 
 class JodiBulkScreen extends StatefulWidget {
   final String screenTitle;
-  final String gameType; // e.g., "jodi", "single"
+  final String gameType;
   final int gameId;
-  final String gameName; // e.g., "KALYAN", "STARLINE MAIN"
+  final String gameName;
 
   const JodiBulkScreen({
     Key? key,
@@ -35,25 +33,23 @@ class JodiBulkScreen extends StatefulWidget {
 
 class _JodiBulkScreenState extends State<JodiBulkScreen> {
   final TextEditingController _pointsController = TextEditingController();
-  final TextEditingController _jodiDigitController =
-      TextEditingController(); // Renamed for clarity
+  final TextEditingController _jodiDigitController = TextEditingController();
+  final GetStorage storage = GetStorage();
+  final BidService bidService = BidService(GetStorage());
+  final _bidService = BidService(GetStorage());
 
   List<Map<String, String>> _bids = [];
-
-  final GetStorage storage = GetStorage();
-
-  String _accessToken = ''; // Use private variable for internal state
-  String _registerId = ''; // Use private variable for internal state
-  bool _accountStatus = false; // Use private variable for internal state
-  String _walletBalance = '0'; // Use private variable for internal state
+  String _accessToken = '';
+  String _registerId = '';
+  bool _accountStatus = false;
+  String _walletBalance = '0';
 
   String? _messageToShow;
   bool _isErrorForMessage = false;
   Key _messageBarKey = UniqueKey();
   Timer? _messageDismissTimer;
-  bool _isSubmitting = false; // New state to track submission in progress
+  bool _isSubmitting = false;
 
-  // Device info (consider getting actual device info if in production)
   final String _deviceId = 'test_device_id_flutter_jodibulk';
   final String _deviceName = 'test_device_name_flutter_jodibulk';
 
@@ -67,7 +63,7 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
   @override
   void dispose() {
     _pointsController.dispose();
-    _jodiDigitController.dispose(); // Use renamed controller
+    _jodiDigitController.dispose();
     _messageDismissTimer?.cancel();
     super.dispose();
   }
@@ -77,78 +73,49 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
     _registerId = storage.read('registerId') ?? '';
     _accountStatus = storage.read('accountStatus') ?? false;
     _walletBalance = storage.read('walletBalance')?.toString() ?? '0';
-    // Ensure the state is updated for UI on initial load
     setState(() {});
   }
 
   void _setupStorageListeners() {
-    // Only update if mounted to prevent calling setState on disposed objects
     storage.listenKey('accessToken', (value) {
-      if (mounted) {
-        setState(() {
-          _accessToken = value ?? '';
-        });
-      }
+      if (mounted) setState(() => _accessToken = value ?? '');
     });
 
     storage.listenKey('registerId', (value) {
-      if (mounted) {
-        setState(() {
-          _registerId = value ?? '';
-        });
-      }
+      if (mounted) setState(() => _registerId = value ?? '');
     });
 
     storage.listenKey('accountStatus', (value) {
-      if (mounted) {
-        setState(() {
-          _accountStatus = value ?? false;
-        });
-      }
+      if (mounted) setState(() => _accountStatus = value ?? false);
     });
 
     storage.listenKey('walletBalance', (value) {
-      if (mounted) {
-        setState(() {
-          _walletBalance = value?.toString() ?? '0';
-        });
-      }
+      if (mounted) setState(() => _walletBalance = value?.toString() ?? '0');
     });
   }
 
   void _showMessage(String message, {bool isError = false}) {
-    // Ensure previous timer is cancelled before setting a new message
     _messageDismissTimer?.cancel();
-
-    if (!mounted) return; // Don't call setState if the widget is not mounted
-
+    if (!mounted) return;
     setState(() {
       _messageToShow = message;
       _isErrorForMessage = isError;
-      _messageBarKey = UniqueKey(); // Force rebuild/re-animation
+      _messageBarKey = UniqueKey();
     });
-
-    _messageDismissTimer = Timer(const Duration(seconds: 3), () {
-      _clearMessage();
-    });
+    _messageDismissTimer = Timer(const Duration(seconds: 3), _clearMessage);
   }
 
   void _clearMessage() {
-    if (mounted) {
-      setState(() {
-        _messageToShow = null;
-      });
-    }
+    if (mounted) setState(() => _messageToShow = null);
   }
 
   void _addBidAutomatically() {
     _clearMessage();
-    if (_isSubmitting) return; // Prevent adding bids during submission
+    if (_isSubmitting) return;
 
     final digit = _jodiDigitController.text.trim();
     final points = _pointsController.text.trim();
 
-    // Validate Jodi digit
     if (digit.length != 2 || int.tryParse(digit) == null) {
       _showMessage(
         'Jodi digit must be exactly 2 numbers (00-99).',
@@ -156,36 +123,25 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
       );
       return;
     }
-    // Check for '00' to '99' range
+
     if (int.parse(digit) < 0 || int.parse(digit) > 99) {
       _showMessage('Jodi must be a number between 00 and 99.', isError: true);
       return;
     }
 
-    // Validate points
     if (points.isEmpty || int.tryParse(points) == null) {
       _showMessage('Please enter valid points.', isError: true);
       return;
     }
 
     final int parsedPoints = int.parse(points);
-
-    if (parsedPoints < 10 || parsedPoints > 1000) {
-      _showMessage('Points must be between 10 and 1000.', isError: true);
-      return;
-    }
-
     final int currentWalletBalance = int.tryParse(_walletBalance) ?? 0;
-    // Check if adding this bid alone exceeds wallet balance
+
     if (parsedPoints > currentWalletBalance) {
-      _showMessage(
-        'Insufficient wallet balance for this single bid amount.',
-        isError: true,
-      );
+      _showMessage('Insufficient wallet balance for this bid.', isError: true);
       return;
     }
 
-    // Check for duplicate Jodi already in the list
     bool alreadyExists = _bids.any(
       (entry) =>
           entry['digit'] == digit && entry['gameType'] == widget.gameType,
@@ -196,11 +152,11 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
         _bids.add({
           "digit": digit,
           "points": points,
-          "gameType": widget.gameType, // Keep widget.gameType as it's passed
-          "type": "Jodi", // Use a more specific type if needed for display
+          "gameType": widget.gameType,
+          "type": "Jodi",
         });
-        _jodiDigitController.clear(); // Clear Jodi digit
-        _pointsController.clear(); // Clear points
+        _jodiDigitController.clear();
+        _pointsController.clear();
         _showMessage('Jodi $digit with $points points added.', isError: false);
       });
     } else {
@@ -212,7 +168,7 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
   }
 
   void _removeBid(int index) {
-    if (_isSubmitting) return; // Prevent removing bids during submission
+    if (_isSubmitting) return;
     setState(() {
       final Map<String, String> removedBid = _bids.removeAt(index);
       _showMessage('Jodi ${removedBid['digit']} removed.', isError: false);
@@ -221,7 +177,6 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
 
   void _showConfirmationDialog() {
     _clearMessage();
-
     if (_bids.isEmpty) {
       _showMessage(
         'Please add at least one bid before submitting.',
@@ -250,16 +205,17 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
         return BidConfirmationDialog(
-          gameTitle:
-              "${widget.gameName} - ${widget.gameType}", // More specific title
+          gameTitle: "${widget.gameName} - ${widget.gameType}",
           gameDate: formattedDate,
-          bids: _bids.map((bid) {
-            return {
-              "digit": bid['digit']!,
-              "points": bid['points']!,
-              "type": bid['type']!, // Use the 'type' field from the bid map
-            };
-          }).toList(),
+          bids: _bids
+              .map(
+                (bid) => {
+                  "digit": bid['digit']!,
+                  "points": bid['points']!,
+                  "type": bid['type']!,
+                },
+              )
+              .toList(),
           totalBids: _bids.length,
           totalBidsAmount: totalPoints,
           walletBalanceBeforeDeduction: currentWalletBalance,
@@ -267,352 +223,51 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
               .toString(),
           gameId: widget.gameId.toString(),
           gameType: widget.gameType,
-          onConfirm: () async {
-            // No need to pop here, the dialog is already popped by its own button handler
-            // Navigator.of(dialogContext).pop(true); // This line is handled by BidConfirmationDialog's internal logic
-
-            setState(() {
-              _isSubmitting = true; // Set submitting state to true
-            });
-
-            bool success = false;
-            try {
-              final lowerGameName = widget.gameName.toLowerCase();
-
-              if (lowerGameName.contains('jackpot')) {
-                success = await _placeJackpotBid();
-              } else if (lowerGameName.contains('starline')) {
-                success = await _placeStarlineBid();
-              } else {
-                success = await _placeGeneralBid();
-              }
-
-              if (success) {
-                // Clear bids only on successful API submission
-                setState(() {
-                  _bids.clear();
-                  // Wallet balance updated in place bid methods
-                });
-                // Success message and dialog are handled within place bid methods
-              }
-              // Error message and dialog are handled within place bid methods
-            } catch (e) {
-              dev.log("🚨 Error during bid confirmation process: $e");
-              _showMessage(
-                "An unexpected error occurred during submission: ${e.toString()}",
-                isError: true,
-              );
-            } finally {
-              if (mounted) {
-                setState(() {
-                  _isSubmitting = false; // Always set to false when done
-                });
-              }
-            }
-          },
+          onConfirm: () => _placeFinalBids(),
         );
       },
     );
   }
 
-  // --- API Methods (Copied/Adapted from JodiBidScreen) ---
-  Future<bool> _placeGeneralBid() async {
-    final url = '${Constant.apiEndpoint}place-bid';
-    if (_accessToken.isEmpty || _registerId.isEmpty) {
-      _showMessage('Authentication error. Please log in again.', isError: true);
-      return false;
-    }
+  Future<bool> _placeFinalBids() async {
+    final result = await _bidService.placeFinalBids(
+      gameName: widget.gameName,
+      accessToken: _accessToken,
+      registerId: _registerId,
+      deviceId: _deviceId,
+      deviceName: _deviceName,
+      accountStatus: _accountStatus,
+      bidAmounts: _bidService.getBidAmounts(_bids),
+      selectedGameType: "OPEN",
+      gameId: widget.gameId,
+      gameType: widget.gameType,
+      totalBidAmount: _getTotalPoints(),
+    );
 
-    final headers = {
-      'deviceId': _deviceId,
-      'deviceName': _deviceName,
-      'accessStatus': _accountStatus ? '1' : '0',
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $_accessToken',
-    };
+    if (!mounted) return false;
 
-    final List<Map<String, dynamic>> bidPayload = _bids.map((bid) {
-      // For Jodi, digit and pana would typically be the same value (the 2-digit Jodi itself)
-      return {
-        "sessionType": "OPEN", // Jodi bids are usually "OPEN"
-        "digit": bid["digit"], // The Jodi number (e.g., "25")
-        "pana":
-            "", // Jodi doesn't typically have a 'pana' field in this context
-        "bidAmount": int.tryParse(bid["points"] ?? '0') ?? 0,
-      };
-    }).toList();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!context.mounted) return;
 
-    final body = {
-      "registerId": _registerId,
-      "gameId": widget.gameId.toString(),
-      "bidAmount": _getTotalPoints(),
-      "gameType": widget.gameType,
-      "bid": bidPayload,
-    };
-
-    dev.log("Sending General Bid Request to: $url");
-    dev.log("Headers: $headers");
-    dev.log("Body: ${jsonEncode(body)}");
-
-    try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: headers,
-        body: jsonEncode(body),
-      );
-
-      final Map<String, dynamic> responseBody = json.decode(response.body);
-
-      if (response.statusCode == 200 && responseBody['status'] == true) {
-        int newWalletBalance =
-            (int.tryParse(_walletBalance) ?? 0) - _getTotalPoints();
-        if (mounted) {
-          setState(() {
-            _walletBalance = newWalletBalance.toString();
-          });
-        }
-        await storage.write('walletBalance', newWalletBalance.toString());
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext dialogContext) => const BidSuccessDialog(),
-        );
-        _showMessage(
-          responseBody['msg'] ?? "General bid placed successfully!",
-          isError: false,
-        );
-        dev.log("✅ General bid placed successfully. Response: $responseBody");
-        return true;
-      } else {
-        String errorMessage =
-            responseBody['msg'] ??
-            "Failed to place general bid. Unknown error.";
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext dialogContext) =>
-              BidFailureDialog(errorMessage: errorMessage),
-        );
-        _showMessage(errorMessage, isError: true);
-        dev.log(
-          "❌ Failed to place general bid. Status: ${response.statusCode}, Body: ${response.body}",
-        );
-        return false;
-      }
-    } catch (e) {
-      showDialog(
+      await showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (BuildContext dialogContext) => BidFailureDialog(
-          errorMessage: "Network error or server unavailable: ${e.toString()}",
-        ),
-      );
-      _showMessage(
-        "Network error or server unavailable: ${e.toString()}",
-        isError: true,
-      );
-      dev.log("🚨 Error placing general bid: $e");
-      return false;
-    }
-  }
-
-  Future<bool> _placeStarlineBid() async {
-    final url = '${Constant.apiEndpoint}place-starline-bid';
-    if (_accessToken.isEmpty || _registerId.isEmpty) {
-      _showMessage('Authentication error. Please log in again.', isError: true);
-      return false;
-    }
-
-    final headers = {
-      'deviceId': _deviceId,
-      'deviceName': _deviceName,
-      'accessStatus': _accountStatus ? '1' : '0',
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $_accessToken',
-    };
-
-    final List<Map<String, dynamic>> bidPayload = _bids.map((bid) {
-      return {
-        "sessionType": "", // Usually empty for Starline Jodi
-        "digit": bid["digit"],
-        "pana": "", // Jodi does not have pana
-        "bidAmount": int.tryParse(bid["points"] ?? '0') ?? 0,
-      };
-    }).toList();
-
-    final body = {
-      "registerId": _registerId,
-      "gameId": widget.gameId.toString(),
-      "bidAmount": _getTotalPoints(),
-      "gameType": widget.gameType,
-      "bid": bidPayload,
-    };
-
-    dev.log("Sending Starline Bid Request to: $url");
-    dev.log("Headers: $headers");
-    dev.log("Body: ${jsonEncode(body)}");
-
-    try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: headers,
-        body: jsonEncode(body),
+        builder: (ctx) => result['status']
+            ? const BidSuccessDialog()
+            : BidFailureDialog(errorMessage: result['msg']),
       );
 
-      final Map<String, dynamic> responseBody = json.decode(response.body);
-
-      if (response.statusCode == 200 && responseBody['status'] == true) {
-        int newWalletBalance =
-            (int.tryParse(_walletBalance) ?? 0) - _getTotalPoints();
-        if (mounted) {
-          setState(() {
-            _walletBalance = newWalletBalance.toString();
-          });
-        }
-        await storage.write('walletBalance', newWalletBalance.toString());
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext dialogContext) => const BidSuccessDialog(),
-        );
-        _showMessage(
-          responseBody['msg'] ?? "Starline bid placed successfully!",
-          isError: false,
-        );
-        dev.log("✅ Starline bid placed successfully. Response: $responseBody");
-        return true;
-      } else {
-        String errorMessage =
-            responseBody['msg'] ??
-            "Failed to place Starline bid. Unknown error.";
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext dialogContext) =>
-              BidFailureDialog(errorMessage: errorMessage),
-        );
-        _showMessage(errorMessage, isError: true);
-        dev.log(
-          "❌ Failed to place Starline bid. Status: ${response.statusCode}, Body: ${response.body}",
-        );
-        return false;
+      if (result['status'] && context.mounted) {
+        final newBalance = _walletBalance - _getTotalPoints();
+        setState(() {
+          _walletBalance = newBalance;
+        });
+        await _bidService.updateWalletBalance(newBalance);
       }
-    } catch (e) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext dialogContext) => BidFailureDialog(
-          errorMessage: "Network error or server unavailable: ${e.toString()}",
-        ),
-      );
-      _showMessage(
-        "Network error or server unavailable: ${e.toString()}",
-        isError: true,
-      );
-      dev.log("🚨 Error placing Starline bid: $e");
-      return false;
-    }
+    });
+
+    return result['status'] == true;
   }
-
-  Future<bool> _placeJackpotBid() async {
-    final url = '${Constant.apiEndpoint}place-jackpot-bid';
-    if (_accessToken.isEmpty || _registerId.isEmpty) {
-      _showMessage('Authentication error. Please log in again.', isError: true);
-      return false;
-    }
-
-    final headers = {
-      'deviceId': _deviceId,
-      'deviceName': _deviceName,
-      'accessStatus': _accountStatus ? '1' : '0',
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $_accessToken',
-    };
-
-    final List<Map<String, dynamic>> bidPayload = _bids.map((bid) {
-      return {
-        "sessionType": "OPEN", // Common for Jackpot Jodi if applicable
-        "digit": bid["digit"],
-        "pana": "", // Jodi does not have pana
-        "bidAmount": int.tryParse(bid["points"] ?? '0') ?? 0,
-      };
-    }).toList();
-
-    final body = {
-      "registerId": _registerId,
-      "gameId": widget.gameId.toString(),
-      "bidAmount": _getTotalPoints(),
-      "gameType": widget.gameType,
-      "bid": bidPayload,
-    };
-
-    dev.log("Sending Jackpot Bid Request to: $url");
-    dev.log("Headers: $headers");
-    dev.log("Body: ${jsonEncode(body)}");
-
-    try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: headers,
-        body: jsonEncode(body),
-      );
-
-      final Map<String, dynamic> responseBody = json.decode(response.body);
-
-      if (response.statusCode == 200 && responseBody['status'] == true) {
-        int newWalletBalance =
-            (int.tryParse(_walletBalance) ?? 0) - _getTotalPoints();
-        if (mounted) {
-          setState(() {
-            _walletBalance = newWalletBalance.toString();
-          });
-        }
-        await storage.write('walletBalance', newWalletBalance.toString());
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext dialogContext) => const BidSuccessDialog(),
-        );
-        _showMessage(
-          responseBody['msg'] ?? "Jackpot bid placed successfully!",
-          isError: false,
-        );
-        dev.log("✅ Jackpot bid placed successfully. Response: $responseBody");
-        return true;
-      } else {
-        String errorMessage =
-            responseBody['msg'] ??
-            "Failed to place Jackpot bid. Unknown error.";
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext dialogContext) =>
-              BidFailureDialog(errorMessage: errorMessage),
-        );
-        _showMessage(errorMessage, isError: true);
-        dev.log(
-          "❌ Failed to place Jackpot bid. Status: ${response.statusCode}, Body: ${response.body}",
-        );
-        return false;
-      }
-    } catch (e) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext dialogContext) => BidFailureDialog(
-          errorMessage: "Network error or server unavailable: ${e.toString()}",
-        ),
-      );
-      _showMessage(
-        "Network error or server unavailable: ${e.toString()}",
-        isError: true,
-      );
-      dev.log("🚨 Error placing Jackpot bid: $e");
-      return false;
-    }
-  }
-
-  // --- End API Methods ---
 
   int _getTotalPoints() {
     return _bids.fold(
@@ -997,4 +652,8 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
       ),
     );
   }
+}
+
+extension on String {
+  operator -(int other) {}
 }

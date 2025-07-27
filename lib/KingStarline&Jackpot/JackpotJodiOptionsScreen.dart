@@ -6,26 +6,6 @@ import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
 
 import '../Helper/TranslationHelper.dart';
-import '../game/DigitBasedBoard/DigitBasedBoardScreen.dart';
-import '../game/Jodi/JodiBidScreen.dart';
-import '../game/Jodi/JodiBulkScreen.dart';
-import '../game/Jodi/group_jodi_screen.dart';
-import '../game/OddEvenBoard/OddEvenBoardScreen.dart';
-import '../game/Panna/SinglePanna/SinglePanna.dart';
-import '../game/Panna/SinglePanna/SinglePannaBulk.dart';
-import '../game/PannelGroup/PannelGroup.dart';
-import '../game/RedBracket/RedBracketScreen.dart';
-import '../game/SPDPTPScreen/ChoiceSpDpTpBoardScreen.dart';
-import '../game/SPDPTPScreen/DPMotors.dart';
-import '../game/SPDPTPScreen/SPMotors.dart';
-import '../game/SPDPTPScreen/SpDpTpBoardScreen.dart';
-import '../game/SPDPTPScreen/TPMotorScreen.dart';
-import '../game/Sangam/FullSangamBoardScreen.dart';
-import '../game/Sangam/HalfSangamABoardScreen.dart';
-import '../game/Sangam/HalfSangamBBoardScreen.dart';
-import '../game/SingleDigitBetScreen/SingleDigitBetScreen.dart';
-import '../game/SingleDigitBetScreen/SingleDigitsBulkScreen.dart';
-import '../game/TwoDigitPanel/TwoDigitPanel.dart';
 
 class JackpotBidType {
   final int id;
@@ -455,278 +435,281 @@ class _JackpotJodiOptionsScreenState extends State<JackpotJodiOptionsScreen> {
 
         // Use item.type.toLowerCase().trim() for robust comparison
         switch (item.type.toLowerCase().trim()) {
-          case 'singledigits':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SingleDigitBetScreen(
-                  title: widget.title + ", " + item.title,
-                  gameId: item.id,
-                  gameName: item.title,
-                  gameCategoryType: item.type,
-                ),
-              ),
-            );
-            break;
-
-          case 'spmotor':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SPMotorsBetScreen(
-                  title: widget.title + ", " + item.title,
-                  gameId: item.id,
-                  gameName: item.title,
-                  gameCategoryType: item.type,
-                ),
-              ),
-            );
-            break;
-
-          case 'dpmotor':
-          case 'doublepana': // Assuming doublepana also goes to DPMotorsBetScreen
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => DPMotorsBetScreen(
-                  title: widget.title + ", " + item.title,
-                  gameId: item.id,
-                  gameName: item.title,
-                  gameCategoryType: item.type,
-                ),
-              ),
-            );
-            break;
-
-          case 'triplepana':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => TPMotorsBetScreen(
-                  title: widget.title + ", " + item.title,
-                  gameId: item.id,
-                  gameName: item.title,
-                  gameCategoryType: item.type,
-                ),
-              ),
-            );
-            break;
-
-          case 'singledigitsbulk':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SingleDigitsBulkScreen(
-                  title: widget.title + ", " + item.title,
-                  gameName: item.title,
-                  gameType: item.type,
-                  gameId: item.id,
-                ),
-              ),
-            );
-            break;
-
-          case 'singlepanabulk':
-          case 'doublepanabulk': // Renamed from 'doublePanaBulk' to match consistency with 'singlePanaBulk'
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SinglePannaBulkBoardScreen(
-                  title: widget.title + ", " + item.title,
-                  gameId: item.id,
-                  gameType: item.type,
-                  gameName: item.title,
-                ),
-              ),
-            );
-            break;
-
-          case 'jodi':
-          case 'groupdigit':
-          case 'twodigitpanna': // This case should be handled by TwoDigitPanelScreen, not JodiBidScreen based on previous code.
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => JodiBidScreen(
-                  title: widget.title + ", " + item.title,
-                  gameType: item.type,
-                  gameId: item.id,
-                  gameName: item.title,
-                ),
-              ),
-            );
-            break;
-          case 'panelgroup': // This also has a dedicated screen
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => PanelGroupScreen(
-                  title: widget.title + ", " + item.title,
-                  gameId: item.id,
-                  gameName: item.title,
-                  gameCategoryType: item.type,
-                ),
-              ),
-            );
-            break;
-
-          case 'jodibulk':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => JodiBulkScreen(
-                  screenTitle: widget.title + ", " + item.title,
-                  gameType: item.type,
-                  gameId: item.id,
-                  gameName: item.title,
-                ),
-              ),
-            );
-            break;
-
-          case 'singlepana':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SinglePannaScreen(
-                  title: widget.title + ", " + item.title,
-                  gameType: item.type,
-                  gameId: item.id,
-                ),
-              ),
-            );
-            break;
-
-          case 'twodigitspanel':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => TwoDigitPanelScreen(
-                  title: widget.title + ", " + item.title,
-                  gameType: item.type,
-                  gameId: item.id,
-                ),
-              ),
-            );
-            break;
-
-          case 'groupjodi':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => GroupJodiScreen(
-                  title: widget.title + ", " + item.title,
-                  gameType: item.type,
-                  gameId: item.id,
-                ),
-              ),
-            );
-            break;
-
-          case 'digitbasedjodi':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => DigitBasedBoardScreen(
-                  title: widget.title + ", " + item.title,
-                  gameId: item.id.toString(), // Ensure String
-                  gameType: item.type,
-                  gameName: item.title,
-                ),
-              ),
-            );
-            break;
-
-          case 'oddeven':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => OddEvenBoardScreen(
-                  title: widget.title + ", " + item.title,
-                  gameType: item.type,
-                  gameId: item.id,
-                ),
-              ),
-            );
-            break;
-
-          case 'choicepannaspdp':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ChoiceSpDpTpBoardScreen(
-                  screenTitle: widget.title + ", " + item.title,
-                  gameId: item.id,
-                  gameType: item.type,
-                ),
-              ),
-            );
-            break;
-
-          case 'spdptp':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SpDpTpBoardScreen(
-                  screenTitle: widget.title + ", " + item.title,
-                  gameId: item.id,
-                  gameType: item.type,
-                ),
-              ),
-            );
-            break;
-
-          case 'redbracket':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => RedBracketBoardScreen(
-                  screenTitle: widget.title + ", " + item.title,
-                  gameId: item.id,
-                  gameType: item.type,
-                ),
-              ),
-            );
-            break;
-
-          case 'halfsangama':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => HalfSangamABoardScreen(
-                  screenTitle: widget.title + ", " + item.title,
-                  gameId: item.id,
-                  gameType: item.type,
-                ),
-              ),
-            );
-            break;
-
-          case 'halfsangamb':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => HalfSangamBBoardScreen(
-                  screenTitle: widget.title + ", " + item.title,
-                  gameId: item.id,
-                  gameType: item.type,
-                ),
-              ),
-            );
-            break;
-
-          case 'fullsangam':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => FullSangamBoardScreen(
-                  screenTitle: widget.title + ", " + item.title,
-                  gameId: item.id,
-                  gameType: item.type,
-                ),
-              ),
-            );
-            break;
+          // case 'singledigits':
+          //   // Navigator.push(
+          //   //   context,
+          //   //   MaterialPageRoute(
+          //   //     // builder: (_) => SingleDigitBetScreen(
+          //   //     //   title: widget.title + ", " + item.title,
+          //   //     //   gameId: item.id,
+          //   //     //   gameName: item.title,
+          //   //     //   gameCategoryType: item.type,
+          //   //     //   selectionStatus: item.selectionStatus,
+          //   //     // ),
+          //   //   ),
+          //   // );
+          //   break;
+          //
+          // case 'spmotor':
+          //   Navigator.push(
+          //     context,
+          //     MaterialPageRoute(
+          //       builder: (_) => SPMotorsBetScreen(
+          //         title: widget.title + ", " + item.title,
+          //         gameId: item.id,
+          //         gameName: item.title,
+          //         gameCategoryType: item.type,
+          //       ),
+          //     ),
+          //   );
+          //   break;
+          //
+          // case 'dpmotor':
+          // case 'doublepana': // Assuming doublepana also goes to DPMotorsBetScreen
+          //   Navigator.push(
+          //     context,
+          //     MaterialPageRoute(
+          //       builder: (_) => DPMotorsBetScreen(
+          //         title: widget.title + ", " + item.title,
+          //         gameId: item.id,
+          //         gameName: item.title,
+          //         gameCategoryType: item.type,
+          //       ),
+          //     ),
+          //   );
+          //   break;
+          //
+          // case 'triplepana':
+          //   Navigator.push(
+          //     context,
+          //     MaterialPageRoute(
+          //       builder: (_) => TPMotorsBetScreen(
+          //         title: widget.title + ", " + item.title,
+          //         gameId: item.id,
+          //         gameName: item.title,
+          //         gameCategoryType: item.type,
+          //       ),
+          //     ),
+          //   );
+          //   break;
+          //
+          // case 'singledigitsbulk':
+          //   Navigator.push(
+          //     context,
+          //     MaterialPageRoute(
+          //       builder: (_) => SingleDigitsBulkScreen(
+          //         title: widget.title + ", " + item.title,
+          //         gameName: item.title,
+          //         gameType: item.type,
+          //         gameId: item.id,
+          //       ),
+          //     ),
+          //   );
+          //   break;
+          //
+          // case 'singlepanabulk':
+          // case 'doublepanabulk': // Renamed from 'doublePanaBulk' to match consistency with 'singlePanaBulk'
+          //   Navigator.push(
+          //     context,
+          //     MaterialPageRoute(
+          //       builder: (_) => SinglePannaBulkBoardScreen(
+          //         title: widget.title + ", " + item.title,
+          //         gameId: item.id,
+          //         gameType: item.type,
+          //         gameName: item.title,
+          //       ),
+          //     ),
+          //   );
+          //   break;
+          //
+          // case 'jodi':
+          // case 'groupdigit':
+          // case 'twodigitpanna': // This case should be handled by TwoDigitPanelScreen, not JodiBidScreen based on previous code.
+          //   Navigator.push(
+          //     context,
+          //     MaterialPageRoute(
+          //       builder: (_) => JodiBidScreen(
+          //         title: widget.title + ", " + item.title,
+          //         gameType: item.type,
+          //         gameId: item.id,
+          //         gameName: item.title,
+          //       ),
+          //     ),
+          //   );
+          //   break;
+          // case 'panelgroup': // This also has a dedicated screen
+          //   Navigator.push(
+          //     context,
+          //     MaterialPageRoute(
+          //       builder: (_) => PanelGroupScreen(
+          //         title: widget.title + ", " + item.title,
+          //         gameId: item.id,
+          //         gameName: item.title,
+          //         gameCategoryType: item.type,
+          //       ),
+          //     ),
+          //   );
+          //   break;
+          //
+          // case 'jodibulk':
+          //   Navigator.push(
+          //     context,
+          //     MaterialPageRoute(
+          //       builder: (_) => JodiBulkScreen(
+          //         screenTitle: widget.title + ", " + item.title,
+          //         gameType: item.type,
+          //         gameId: item.id,
+          //         gameName: item.title,
+          //       ),
+          //     ),
+          //   );
+          //   break;
+          //
+          // case 'singlepana':
+          //   Navigator.push(
+          //     context,
+          //     MaterialPageRoute(
+          //       builder: (_) => SinglePannaScreen(
+          //         title: widget.title + ", " + item.title,
+          //         gameType: item.type,
+          //         gameId: item.id,
+          //       ),
+          //     ),
+          //   );
+          //   break;
+          //
+          // case 'twodigitspanel':
+          //   Navigator.push(
+          //     context,
+          //     MaterialPageRoute(
+          //       builder: (_) => TwoDigitPanelScreen(
+          //         title: widget.title + ", " + item.title,
+          //         gameType: item.type,
+          //         gameId: item.id,
+          //       ),
+          //     ),
+          //   );
+          //   break;
+          //
+          // case 'groupjodi':
+          //   Navigator.push(
+          //     context,
+          //     MaterialPageRoute(
+          //       builder: (_) => GroupJodiScreen(
+          //         title: widget.title + ", " + item.title,
+          //         gameType: item.type,
+          //         gameId: item.id,
+          //       ),
+          //     ),
+          //   );
+          //   break;
+          //
+          // case 'digitbasedjodi':
+          //   Navigator.push(
+          //     context,
+          //     MaterialPageRoute(
+          //       builder: (_) => DigitBasedBoardScreen(
+          //         title: widget.title + ", " + item.title,
+          //         gameId: item.id.toString(), // Ensure String
+          //         gameType: item.type,
+          //         gameName: item.title,
+          //       ),
+          //     ),
+          //   );
+          //   break;
+          //
+          // case 'oddeven':
+          //   Navigator.push(
+          //     context,
+          //     MaterialPageRoute(
+          //       builder: (_) => OddEvenBoardScreen(
+          //         title: widget.title + ", " + item.title,
+          //         gameType: item.type,
+          //         gameId: item.id,
+          //       ),
+          //     ),
+          //   );
+          //   break;
+          //
+          // case 'choicepannaspdp':
+          //   Navigator.push(
+          //     context,
+          //     MaterialPageRoute(
+          //       builder: (_) => ChoiceSpDpTpBoardScreen(
+          //         screenTitle: widget.title + ", " + item.title,
+          //         gameId: item.id,
+          //         gameType: item.type,
+          //         gameName: widget.title + ", " + item.title,
+          //       ),
+          //     ),
+          //   );
+          //   break;
+          //
+          // case 'spdptp':
+          //   Navigator.push(
+          //     context,
+          //     MaterialPageRoute(
+          //       builder: (_) => SpDpTpBoardScreen(
+          //         screenTitle: widget.title + ", " + item.title,
+          //         gameId: item.id,
+          //         gameType: item.type,
+          //       ),
+          //     ),
+          //   );
+          //   break;
+          //
+          // case 'redbracket':
+          //   Navigator.push(
+          //     context,
+          //     MaterialPageRoute(
+          //       builder: (_) => RedBracketBoardScreen(
+          //         screenTitle: widget.title + ", " + item.title,
+          //         gameId: item.id,
+          //         gameType: item.type,
+          //       ),
+          //     ),
+          //   );
+          //   break;
+          //
+          // case 'halfsangama':
+          //   Navigator.push(
+          //     context,
+          //     MaterialPageRoute(
+          //       builder: (_) => HalfSangamABoardScreen(
+          //         screenTitle: widget.title + ", " + item.title,
+          //         gameId: item.id,
+          //         gameType: item.type,
+          //       ),
+          //     ),
+          //   );
+          //   break;
+          //
+          // case 'halfsangamb':
+          //   Navigator.push(
+          //     context,
+          //     MaterialPageRoute(
+          //       builder: (_) => HalfSangamBBoardScreen(
+          //         screenTitle: widget.title + ", " + item.title,
+          //         gameId: item.id,
+          //         gameType: item.type,
+          //         gameName: item.title,
+          //       ),
+          //     ),
+          //   );
+          //   break;
+          //
+          // case 'fullsangam':
+          //   Navigator.push(
+          //     context,
+          //     MaterialPageRoute(
+          //       builder: (_) => FullSangamBoardScreen(
+          //         screenTitle: widget.title + ", " + item.title,
+          //         gameId: item.id,
+          //         gameType: item.type,
+          //       ),
+          //     ),
+          //   );
+          //   break;
 
           default:
             final String noScreenConfiguredMsg =

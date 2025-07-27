@@ -1,25 +1,18 @@
-// JodiBidScreen.dart
-import 'dart:async'; // For Timer (needed for API calls, if you add delays or timeouts)
-import 'dart:convert';
-import 'dart:developer'; // For log
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get_storage/get_storage.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
+import '../../BidService.dart';
 import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
-import '../../components/BidFailureDialog.dart'; // Assuming you have this
-import '../../components/BidSuccessDialog.dart'; // Assuming you have this
-import '../../ulits/Constents.dart'; // Make sure this path is correct
+import '../../components/BidFailureDialog.dart';
+import '../../components/BidSuccessDialog.dart';
 
 class JodiBidScreen extends StatefulWidget {
   final String title;
-  final String gameType; // e.g., "jodi", "single"
+  final String gameType;
   final int gameId;
-  final String gameName; // e.g., "KALYAN", "STARLINE MAIN"
+  final String gameName;
 
   const JodiBidScreen({
     Key? key,
@@ -37,32 +30,34 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
   final TextEditingController digitController = TextEditingController();
   final TextEditingController amountController = TextEditingController();
 
-  Color digitBorderColor = Colors.black;
-  Color amountBorderColor = Colors.black;
-
   List<Map<String, String>> bids = [];
-
   late GetStorage storage;
+  late BidService _bidService;
+
   late String accessToken;
   late String registerId;
-  late int walletBalance; // Using int directly
+  late int walletBalance;
   bool accountStatus = false;
   bool _isWalletLoading = true;
-  bool _isSubmitting = false; // New state to track submission in progress
+  bool _isSubmitting = false;
 
   final String _deviceId = 'test_device_id_flutter';
   final String _deviceName = 'test_device_name_flutter';
 
-  // --- Custom Message Display State ---
   String? _messageToShow;
   bool _isErrorForMessage = false;
-  Key _messageBarKey = UniqueKey(); // Key to force rebuild/re-animation
-  // --- End Custom Message Display State ---
+  Key _messageBarKey = UniqueKey();
+
+  final List<String> allJodiOptions = List.generate(
+    100,
+    (i) => i.toString().padLeft(2, '0'),
+  );
 
   @override
   void initState() {
     super.initState();
     storage = GetStorage();
+    _bidService = BidService(storage);
     _loadInitialData();
     _setupStorageListeners();
   }
@@ -71,78 +66,188 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
     accessToken = storage.read('accessToken') ?? '';
     registerId = storage.read('registerId') ?? '';
     accountStatus = storage.read('accountStatus') ?? false;
-
-    final dynamic storedWalletBalance = storage.read('walletBalance');
-    if (storedWalletBalance is String) {
-      walletBalance = int.tryParse(storedWalletBalance) ?? 0;
-    } else if (storedWalletBalance is int) {
-      walletBalance = storedWalletBalance;
-    } else {
-      walletBalance = 0;
-    }
-
-    setState(() {
-      _isWalletLoading = false;
-    });
+    final sb = storage.read('walletBalance');
+    walletBalance = sb is String
+        ? int.tryParse(sb) ?? 0
+        : sb is int
+        ? sb
+        : 0;
+    setState(() => _isWalletLoading = false);
   }
 
   void _setupStorageListeners() {
-    storage.listenKey('accessToken', (value) {
-      if (mounted) {
-        setState(() {
-          accessToken = value ?? '';
-        });
-      }
-    });
-    storage.listenKey('registerId', (value) {
-      if (mounted) {
-        setState(() {
-          registerId = value ?? '';
-        });
-      }
-    });
-    storage.listenKey('accountStatus', (value) {
-      if (mounted) {
-        setState(() {
-          accountStatus = value ?? false;
-        });
-      }
-    });
     storage.listenKey('walletBalance', (value) {
-      if (mounted) {
-        setState(() {
-          if (value is String) {
-            walletBalance = int.tryParse(value) ?? 0;
-          } else if (value is int) {
-            walletBalance = value;
-          } else {
-            walletBalance = 0;
-          }
-          _isWalletLoading = false;
-        });
-      }
+      setState(() {
+        walletBalance = int.tryParse(value.toString()) ?? 0;
+        _isWalletLoading = false;
+      });
     });
   }
 
-  // --- Custom Message Display Method ---
-  void _showMessage(String message, {bool isError = false}) {
+  void _showMessage(String msg, {bool isError = false}) {
     if (!mounted) return;
     setState(() {
-      _messageToShow = message;
+      _messageToShow = msg;
       _isErrorForMessage = isError;
-      _messageBarKey =
-          UniqueKey(); // Force AnimatedMessageBar to re-initialize and animate
+      _messageBarKey = UniqueKey();
     });
   }
 
   void _clearMessage() {
-    if (mounted) {
-      setState(() {
-        _messageToShow = null;
-      });
-    }
+    if (mounted) setState(() => _messageToShow = null);
   }
-  // --- End Custom Message Display Method ---
+
+  void _addBid() {
+    _clearMessage();
+    if (_isSubmitting) return;
+
+    final jodi = digitController.text.trim();
+    final amount = amountController.text.trim();
+
+    if (jodi.length != 2 || int.tryParse(jodi) == null) {
+      _showMessage('Please enter a valid 2-digit Jodi.', isError: true);
+      return;
+    }
+    final amt = int.tryParse(amount);
+    if (amt == null || amt < 10 || amt > 1000) {
+      _showMessage('Amount must be between 10 and 1000.', isError: true);
+      return;
+    }
+    if (bids.any((b) => b['digit'] == jodi)) {
+      _showMessage('Jodi $jodi already exists.', isError: true);
+      return;
+    }
+
+    setState(() {
+      bids.add({'digit': jodi, 'amount': amount});
+      digitController.clear();
+      amountController.clear();
+      _showMessage('Bid for Jodi $jodi added successfully!');
+    });
+  }
+
+  void _removeBid(int idx) {
+    if (_isSubmitting) return;
+    setState(() {
+      final removed = bids[idx]['digit'];
+      bids.removeAt(idx);
+      _showMessage('Bid for Jodi $removed removed.', isError: false);
+    });
+  }
+
+  int _getTotalPoints() {
+    return bids.fold(0, (sum, b) => sum + (int.tryParse(b['amount']!) ?? 0));
+  }
+
+  Future<void> _submitBidViaService(int total) async {
+    setState(() => _isSubmitting = true);
+    final bidMap = {for (var b in bids) b['digit']!: b['amount']!};
+
+    final result = await _bidService.placeFinalBids(
+      gameName: widget.gameName,
+      accessToken: accessToken,
+      registerId: registerId,
+      deviceId: _deviceId,
+      deviceName: _deviceName,
+      accountStatus: accountStatus,
+      bidAmounts: bidMap,
+      selectedGameType: "OPEN",
+      gameId: widget.gameId,
+      gameType: widget.gameType,
+      totalBidAmount: total,
+    );
+
+    if (result['status'] == true) {
+      final newBal = walletBalance - total;
+      await _bidService.updateWalletBalance(newBal);
+      setState(() {
+        bids.clear();
+        walletBalance = newBal;
+      });
+      showDialog(context: context, builder: (_) => const BidSuccessDialog());
+      _showMessage("Bid placed successfully!");
+    } else {
+      showDialog(
+        context: context,
+        builder: (_) =>
+            BidFailureDialog(errorMessage: result['msg'] ?? "Error"),
+      );
+      _showMessage(result['msg'] ?? "Bid failed.", isError: true);
+    }
+
+    setState(() => _isSubmitting = false);
+  }
+
+  void _showConfirmationDialog(int total) {
+    if (bids.isEmpty) {
+      _showMessage('No bids added yet.', isError: true);
+      return;
+    }
+    if (total > walletBalance) {
+      _showMessage('Insufficient wallet balance.', isError: true);
+      return;
+    }
+
+    final date = DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now());
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => BidConfirmationDialog(
+        gameTitle: "${widget.gameName}, ${widget.gameType}",
+        gameDate: date,
+        bids: bids,
+        totalBids: bids.length,
+        totalBidsAmount: total,
+        walletBalanceBeforeDeduction: walletBalance,
+        walletBalanceAfterDeduction: (walletBalance - total).toString(),
+        gameId: widget.gameId.toString(),
+        gameType: widget.gameType,
+        onConfirm: () => _placeFinalBids(),
+      ),
+    );
+  }
+
+  Future<bool> _placeFinalBids() async {
+    final result = await _bidService.placeFinalBids(
+      gameName: widget.gameName,
+      accessToken: accessToken,
+      registerId: registerId,
+      deviceId: _deviceId,
+      deviceName: _deviceName,
+      accountStatus: accountStatus,
+      bidAmounts: _bidService.getBidAmounts(bids),
+      selectedGameType: "OPEN",
+      gameId: widget.gameId,
+      gameType: widget.gameType,
+      totalBidAmount: _getTotalPoints(),
+    );
+
+    if (!mounted) return false;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!context.mounted) return;
+
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => result['status']
+            ? const BidSuccessDialog()
+            : BidFailureDialog(errorMessage: result['msg']),
+      );
+
+      bids.clear();
+
+      if (result['status'] && context.mounted) {
+        final newBalance = walletBalance - _getTotalPoints();
+        setState(() {
+          walletBalance = newBalance;
+        });
+        await _bidService.updateWalletBalance(newBalance);
+      }
+    });
+
+    return result['status'] == true;
+  }
 
   @override
   void dispose() {
@@ -151,335 +256,9 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
     super.dispose();
   }
 
-  void _addBid() {
-    _clearMessage(); // Clear any previous messages
-    if (_isSubmitting) return; // Prevent adding bids during submission
-
-    String jodi = digitController.text.trim();
-    String amount = amountController.text.trim();
-
-    if (jodi.isEmpty && amount.isEmpty) {
-      _showMessage('Please enter both Jodi and Amount.', isError: true);
-      return;
-    }
-
-    if (jodi.isEmpty) {
-      _showMessage('Please enter Jodi.', isError: true);
-      return;
-    }
-
-    if (amount.isEmpty) {
-      _showMessage('Please enter Amount.', isError: true);
-      return;
-    }
-
-    // Validation for 2-digit Jodi
-    if (jodi.length != 2 || int.tryParse(jodi) == null) {
-      _showMessage('Please enter a valid 2-digit Jodi.', isError: true);
-      return;
-    }
-
-    // Check for '00' to '99' range
-    if (int.parse(jodi) < 0 || int.parse(jodi) > 99) {
-      _showMessage('Jodi must be a number between 00 and 99.', isError: true);
-      return;
-    }
-
-    int? parsedAmount = int.tryParse(amount);
-    if (parsedAmount == null || parsedAmount < 10 || parsedAmount > 1000) {
-      _showMessage('Amount must be between 10 and 1000.', isError: true);
-      return;
-    }
-
-    // Check for duplicate Jodi
-    bool isDuplicate = bids.any((bid) => bid['digit'] == jodi);
-    if (isDuplicate) {
-      _showMessage('Jodi $jodi already exists in the list.', isError: true);
-      return;
-    }
-
-    setState(() {
-      bids.add({
-        'digit': jodi,
-        'amount': amount,
-        'type': widget.gameType, // Use widget.gameType as bid type
-      });
-      digitController.clear();
-      amountController.clear();
-      digitBorderColor = Colors.black;
-      amountBorderColor = Colors.black;
-      _showMessage('Bid for Jodi $jodi added successfully!', isError: false);
-    });
-  }
-
-  void _removeBid(int index) {
-    if (_isSubmitting) return; // Prevent removing bids during submission
-    setState(() {
-      String removedJodi = bids[index]['digit']!;
-      bids.removeAt(index);
-      _showMessage(
-        'Bid for Jodi $removedJodi removed from list.',
-        isError: false,
-      );
-    });
-  }
-
-  Widget _inputRow(String label, Widget field) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-          ),
-          field,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInputField({
-    required TextEditingController controller,
-    required String hint,
-    required Color borderColor,
-    required VoidCallback onTap,
-    List<TextInputFormatter>? inputFormatters,
-  }) {
-    return SizedBox(
-      height: 35,
-      width: 150,
-      child: TextFormField(
-        controller: controller,
-        readOnly: false,
-        onTap: () {
-          onTap(); // Call the passed onTap function
-          _clearMessage(); // Clear message when input field is tapped
-        },
-        cursorColor: Colors.amber,
-        keyboardType: TextInputType.number,
-        style: const TextStyle(fontSize: 14),
-        inputFormatters: inputFormatters,
-        decoration: InputDecoration(
-          hintText: hint,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 0,
-          ),
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
-            borderSide: BorderSide(color: borderColor),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
-            borderSide: BorderSide(color: borderColor),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.amber, width: 2),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAddBidButton() {
-    return SizedBox(
-      height: 35,
-      width: 150,
-      child: ElevatedButton(
-        onPressed: _isSubmitting ? null : _addBid, // Disable when submitting
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _isSubmitting ? Colors.grey : Colors.orange[700],
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          elevation: 0,
-        ),
-        child: const Text(
-          "ADD BID",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTableHeader() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 20, bottom: 8.0, left: 16, right: 16),
-      child: Row(
-        children: const [
-          Expanded(
-            child: Text("Jodi", style: TextStyle(fontWeight: FontWeight.w500)),
-          ),
-          Expanded(
-            child: Text(
-              "Amount",
-              style: TextStyle(fontWeight: FontWeight.w500),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              "Game Type",
-              style: TextStyle(fontWeight: FontWeight.w500),
-            ),
-          ),
-          SizedBox(width: 48),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBidItem(Map<String, String> bid, int index) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                bid['digit']!,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            Expanded(
-              child: Text(
-                bid['amount']!,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            Expanded(
-              child: Text(
-                bid['type']!,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.green[700],
-                ),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: _isSubmitting
-                  ? null
-                  : () => _removeBid(index), // Disable when submitting
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomBar() {
-    int totalBids = bids.length;
-    int totalPoints = bids.fold(
-      0,
-      (sum, item) => sum + (int.tryParse(item['amount'] ?? '0') ?? 0),
-    );
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.3),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: const Offset(0, -3),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Bids',
-                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-              ),
-              Text(
-                '$totalBids',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Points',
-                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-              ),
-              Text(
-                '$totalPoints',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          ElevatedButton(
-            onPressed: _isSubmitting
-                ? null
-                : () {
-                    _showConfirmationDialog(totalPoints);
-                  }, // Disable when submitting
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _isSubmitting ? Colors.grey : Colors.orange[700],
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              elevation: 3,
-            ),
-            child: _isSubmitting
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : const Text(
-                    'SUBMIT',
-                    style: TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final total = _getTotalPoints();
     return Scaffold(
       backgroundColor: const Color(0xfff2f2f2),
       appBar: AppBar(
@@ -523,7 +302,6 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
         ],
       ),
       body: Stack(
-        // Use Stack to overlay the message bar
         children: [
           Column(
             children: [
@@ -540,17 +318,8 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
                       _buildInputField(
                         controller: digitController,
                         hint: "Enter Jodi",
-                        borderColor: digitBorderColor,
-                        onTap: () {
-                          setState(() {
-                            digitBorderColor = Colors.amber;
-                            amountBorderColor = Colors.black;
-                          });
-                        },
-                        inputFormatters: [
-                          LengthLimitingTextInputFormatter(2),
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
+                        borderColor: Colors.amber,
+                        selected: 'digit',
                       ),
                     ),
                     _inputRow(
@@ -558,22 +327,32 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
                       _buildInputField(
                         controller: amountController,
                         hint: "Enter Amount",
-                        borderColor: amountBorderColor,
-                        onTap: () {
-                          setState(() {
-                            amountBorderColor = Colors.amber;
-                            digitBorderColor = Colors.black;
-                          });
-                        },
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
+                        borderColor: Colors.amber,
+                        selected: 'amount',
                       ),
                     ),
                     const SizedBox(height: 10),
                     Align(
                       alignment: Alignment.centerRight,
-                      child: _buildAddBidButton(),
+                      child: ElevatedButton(
+                        onPressed: _isSubmitting ? null : _addBid,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _isSubmitting
+                              ? Colors.grey
+                              : Colors.amber,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          "ADD BID",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -594,443 +373,255 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
                       )
                     : ListView.builder(
                         itemCount: bids.length,
-                        itemBuilder: (context, index) {
-                          return _buildBidItem(bids[index], index);
-                        },
+                        itemBuilder: (_, idx) => _buildBidItem(bids[idx], idx),
                       ),
               ),
               if (bids.isNotEmpty) _buildBottomBar(),
             ],
           ),
-          // --- Custom Message Display Area (AnimatedMessageBar) ---
-          if (_messageToShow != null) // Only render if there's a message
+          if (_messageToShow != null)
             Positioned(
-              top: 0, // Position at the top of the Stack
+              top: 0,
               left: 0,
               right: 0,
               child: AnimatedMessageBar(
-                key: _messageBarKey, // Use key to force re-animation
+                key: _messageBarKey,
                 message: _messageToShow!,
                 isError: _isErrorForMessage,
-                onDismissed:
-                    _clearMessage, // Callback to clear message when animation finishes
+                onDismissed: _clearMessage,
               ),
             ),
-          // --- End Custom Message Display Area ---
         ],
       ),
     );
   }
 
-  // Helper to get bid amount from either 'points' or 'amount' key
-  // This is a robust way to handle potentially different key names from external sources.
-  int _getBidAmount(Map<String, String> bid) {
-    final String? pointsString = bid['points'];
-    final String? amountString = bid['amount'];
-
-    if (pointsString != null && pointsString.isNotEmpty) {
-      return int.tryParse(pointsString) ?? 0;
-    } else if (amountString != null && amountString.isNotEmpty) {
-      return int.tryParse(amountString) ?? 0;
-    }
-    return 0;
+  Widget _inputRow(String label, Widget field) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: field),
+        ],
+      ),
+    );
   }
 
-  // API Calling Logic for General Bids
-  Future<bool> _placeGeneralBid() async {
-    final url = '${Constant.apiEndpoint}place-bid';
-    if (accessToken.isEmpty || registerId.isEmpty) {
-      _showMessage('Authentication error. Please log in again.', isError: true);
-      return false;
-    }
-
-    final headers = {
-      'deviceId': _deviceId,
-      'deviceName': _deviceName,
-      'accessStatus': accountStatus ? '1' : '0', // Use actual account status
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $accessToken',
-    };
-
-    final List<Map<String, dynamic>> bidPayload = bids.map((bid) {
-      // For Jodi, digit and pana would typically be the same value (the 2-digit Jodi itself)
-      // and sessionType is usually "OPEN" for Jodi or derived from the game context.
-      // Assuming 'digit' holds the Jodi string.
-      return {
-        "sessionType": "OPEN", // Jodi bids are usually "OPEN"
-        "digit": bid["digit"], // The Jodi number (e.g., "25")
-        "pana":
-            "", // Jodi doesn't typically have a 'pana' field in this context
-        "bidAmount": _getBidAmount(bid),
-      };
-    }).toList();
-
-    final body = {
-      "registerId": registerId,
-      "gameId": widget.gameId.toString(),
-      "bidAmount": bids.fold(0, (sum, item) => sum + _getBidAmount(item)),
-      "gameType": widget.gameType,
-      "bid": bidPayload,
-    };
-
-    log("Sending General Bid Request to: $url");
-    log("Headers: $headers");
-    log("Body: ${jsonEncode(body)}");
-
-    try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: headers,
-        body: jsonEncode(body),
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String hint,
+    required Color borderColor,
+    required String selected,
+  }) {
+    if (selected == 'digit') {
+      return RawAutocomplete<String>(
+        textEditingController: controller,
+        focusNode: FocusNode(),
+        optionsBuilder: (textEditingValue) {
+          if (textEditingValue.text.isEmpty)
+            return const Iterable<String>.empty();
+          return allJodiOptions.where(
+            (opt) => opt.startsWith(textEditingValue.text),
+          );
+        },
+        fieldViewBuilder: (context, controller, focusNode, _) {
+          return TextField(
+            controller: controller,
+            focusNode: focusNode,
+            keyboardType: TextInputType.number,
+            maxLength: 2,
+            cursorColor: Colors.amber,
+            decoration: InputDecoration(
+              counterText: "",
+              hintText: hint,
+              hintStyle: const TextStyle(color: Colors.grey),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 5,
+              ),
+              border: OutlineInputBorder(
+                borderSide: BorderSide(color: borderColor),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: borderColor, width: 2),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: borderColor),
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+          );
+        },
+        optionsViewBuilder: (context, onSelected, options) {
+          return Align(
+            alignment: Alignment.topLeft,
+            child: Material(
+              elevation: 4,
+              child: SizedBox(
+                height: 200,
+                child: ListView.builder(
+                  itemCount: options.length,
+                  itemBuilder: (context, index) {
+                    final option = options.elementAt(index);
+                    return ListTile(
+                      title: Text(option),
+                      onTap: () => onSelected(option),
+                    );
+                  },
+                ),
+              ),
+            ),
+          );
+        },
+        onSelected: (val) => controller.text = val,
       );
-
-      final Map<String, dynamic> responseBody = jsonDecode(response.body);
-
-      if (response.statusCode == 200 && responseBody['status'] == true) {
-        final int newWalletBalance = walletBalance - _getTotalPoints();
-        if (mounted) {
-          setState(() {
-            walletBalance = newWalletBalance;
-          });
-        }
-        await storage.write('walletBalance', newWalletBalance);
-        // Show success dialog here
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext dialogContext) => const BidSuccessDialog(),
-        );
-        _showMessage(
-          responseBody['msg'] ?? "General bid placed successfully!",
-          isError: false,
-        );
-        log("✅ General bid placed successfully. Response: $responseBody");
-        return true;
-      } else {
-        String errorMessage =
-            responseBody['msg'] ??
-            "Failed to place general bid. Unknown error.";
-        // Show failure dialog here
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext dialogContext) =>
-              BidFailureDialog(errorMessage: errorMessage),
-        );
-        _showMessage(errorMessage, isError: true);
-        log(
-          "❌ Failed to place general bid. Status: ${response.statusCode}, Body: ${response.body}",
-        );
-        return false;
-      }
-    } catch (e) {
-      // Show failure dialog here for network errors
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext dialogContext) => BidFailureDialog(
-          errorMessage: "Network error or server unavailable: ${e.toString()}",
+    } else {
+      return TextField(
+        controller: controller,
+        keyboardType: TextInputType.number,
+        maxLength: 4,
+        cursorColor: Colors.amber,
+        decoration: InputDecoration(
+          counterText: "",
+          hintText: hint,
+          hintStyle: const TextStyle(color: Colors.grey),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 5,
+          ),
+          border: OutlineInputBorder(
+            borderSide: BorderSide(color: borderColor),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: borderColor, width: 2),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: borderColor),
+            borderRadius: BorderRadius.circular(20),
+          ),
         ),
       );
-      _showMessage(
-        "Network error or server unavailable: ${e.toString()}",
-        isError: true,
-      );
-      log("🚨 Error placing general bid: $e");
-      return false;
     }
   }
 
-  // API Calling Logic for Starline Bids
-  Future<bool> _placeStarlineBid() async {
-    final url = '${Constant.apiEndpoint}place-starline-bid';
-    if (accessToken.isEmpty || registerId.isEmpty) {
-      _showMessage('Authentication error. Please log in again.', isError: true);
-      return false;
-    }
-
-    final headers = {
-      'deviceId': _deviceId,
-      'deviceName': _deviceName,
-      'accessStatus': accountStatus ? '1' : '0',
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $accessToken',
-    };
-
-    final List<Map<String, dynamic>> bidPayload = bids.map((bid) {
-      // Starline might not have sessionType (Open/Close) for Jodi, typically
-      // it's just a single entry for the time slot. Confirm with your API docs.
-      // Using "" for sessionType if not applicable for Starline Jodi.
-      return {
-        "sessionType":
-            "", // Usually empty for Starline if not explicitly needed
-        "digit": bid["digit"],
-        "pana": "", // Jodi does not have pana
-        "bidAmount": _getBidAmount(bid),
-      };
-    }).toList();
-
-    final body = {
-      "registerId": registerId,
-      "gameId": widget.gameId.toString(),
-      "bidAmount": bids.fold(0, (sum, item) => sum + _getBidAmount(item)),
-      "gameType": widget.gameType,
-      "bid": bidPayload,
-    };
-
-    log("Sending Starline Bid Request to: $url");
-    log("Headers: $headers");
-    log("Body: ${jsonEncode(body)}");
-
-    try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: headers,
-        body: jsonEncode(body),
-      );
-
-      final Map<String, dynamic> responseBody = jsonDecode(response.body);
-
-      if (response.statusCode == 200 && responseBody['status'] == true) {
-        final int newWalletBalance = walletBalance - _getTotalPoints();
-        if (mounted) {
-          setState(() {
-            walletBalance = newWalletBalance;
-          });
-        }
-        await storage.write('walletBalance', newWalletBalance);
-        // Show success dialog here
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext dialogContext) => const BidSuccessDialog(),
-        );
-        _showMessage(
-          responseBody['msg'] ?? "Starline bid placed successfully!",
-          isError: false,
-        );
-        log("✅ Starline bid placed successfully. Response: $responseBody");
-        return true;
-      } else {
-        String errorMessage =
-            responseBody['msg'] ??
-            "Failed to place Starline bid. Unknown error.";
-        // Show failure dialog here
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext dialogContext) =>
-              BidFailureDialog(errorMessage: errorMessage),
-        );
-        _showMessage(errorMessage, isError: true);
-        log(
-          "❌ Failed to place Starline bid. Status: ${response.statusCode}, Body: ${response.body}",
-        );
-        return false;
-      }
-    } catch (e) {
-      // Show failure dialog here for network errors
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext dialogContext) => BidFailureDialog(
-          errorMessage: "Network error or server unavailable: ${e.toString()}",
-        ),
-      );
-      _showMessage(
-        "Network error or server unavailable: ${e.toString()}",
-        isError: true,
-      );
-      log("🚨 Error placing Starline bid: $e");
-      return false;
-    }
+  Widget _buildTableHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: const [
+          Expanded(
+            child: Text('Digit', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          Expanded(
+            child: Text(
+              'Points',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              'Game Type',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          SizedBox(width: 40), // for delete icon
+        ],
+      ),
+    );
   }
 
-  // API Calling Logic for Jackpot Bids
-  Future<bool> _placeJackpotBid() async {
-    final url = '${Constant.apiEndpoint}place-jackpot-bid';
-    if (accessToken.isEmpty || registerId.isEmpty) {
-      _showMessage('Authentication error. Please log in again.', isError: true);
-      return false;
-    }
-
-    final headers = {
-      'deviceId': _deviceId,
-      'deviceName': _deviceName,
-      'accessStatus': accountStatus ? '1' : '0',
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $accessToken',
-    };
-
-    final List<Map<String, dynamic>> bidPayload = bids.map((bid) {
-      // Jackpot bids might also have specific session types or structure.
-      // Assuming similar structure to general for now.
-      return {
-        "sessionType": "OPEN", // Common for Jackpot if applicable
-        "digit": bid["digit"],
-        "pana": "", // Jodi does not have pana
-        "bidAmount": _getBidAmount(bid),
-      };
-    }).toList();
-
-    final body = {
-      "registerId": registerId,
-      "gameId": widget.gameId.toString(),
-      "bidAmount": bids.fold(0, (sum, item) => sum + _getBidAmount(item)),
-      "gameType": widget.gameType,
-      "bid": bidPayload,
-    };
-
-    log("Sending Jackpot Bid Request to: $url");
-    log("Headers: $headers");
-    log("Body: ${jsonEncode(body)}");
-
-    try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: headers,
-        body: jsonEncode(body),
-      );
-
-      final Map<String, dynamic> responseBody = jsonDecode(response.body);
-
-      if (response.statusCode == 200 && responseBody['status'] == true) {
-        final int newWalletBalance = walletBalance - _getTotalPoints();
-        if (mounted) {
-          setState(() {
-            walletBalance = newWalletBalance;
-          });
-        }
-        await storage.write('walletBalance', newWalletBalance);
-        // Show success dialog here
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext dialogContext) => const BidSuccessDialog(),
-        );
-        _showMessage(
-          responseBody['msg'] ?? "Jackpot bid placed successfully!",
-          isError: false,
-        );
-        log("✅ Jackpot bid placed successfully. Response: $responseBody");
-        return true;
-      } else {
-        String errorMessage =
-            responseBody['msg'] ??
-            "Failed to place Jackpot bid. Unknown error.";
-        // Show failure dialog here
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext dialogContext) =>
-              BidFailureDialog(errorMessage: errorMessage),
-        );
-        _showMessage(errorMessage, isError: true);
-        log(
-          "❌ Failed to place Jackpot bid. Status: ${response.statusCode}, Body: ${response.body}",
-        );
-        return false;
-      }
-    } catch (e) {
-      // Show failure dialog here for network errors
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext dialogContext) => BidFailureDialog(
-          errorMessage: "Network error or server unavailable: ${e.toString()}",
-        ),
-      );
-      _showMessage(
-        "Network error or server unavailable: ${e.toString()}",
-        isError: true,
-      );
-      log("🚨 Error placing Jackpot bid: $e");
-      return false;
-    }
+  Widget _buildBidItem(Map<String, String> bid, int index) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        children: [
+          Expanded(child: Text(bid['digit'] ?? '')),
+          Expanded(child: Text(bid['amount'] ?? '')),
+          Expanded(
+            child: Text(
+              widget.gameType.toUpperCase(),
+              style: const TextStyle(color: Colors.green),
+            ),
+          ), // use gameType from parent
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: Colors.red),
+            onPressed: () => _removeBid(index),
+          ),
+        ],
+      ),
+    );
   }
 
-  // Helper to calculate total points
-  int _getTotalPoints() {
-    return bids.fold(0, (sum, item) => sum + _getBidAmount(item));
-  }
+  Widget _buildBottomBar() {
+    final total = _getTotalPoints();
 
-  void _showConfirmationDialog(int totalPoints) {
-    if (bids.isEmpty) {
-      _showMessage(
-        'No bids added yet. Please add bids before submitting.',
-        isError: true,
-      );
-      return;
-    }
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Total Summary
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Total Bids:\n${bids.length}',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                'Total Amount:\n$total',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              ElevatedButton(
+                onPressed: _isSubmitting
+                    ? null
+                    : () => _showConfirmationDialog(total),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.amber,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                ),
+                child: const Text(
+                  'SUBMIT BID',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
 
-    if (totalPoints > walletBalance) {
-      _showMessage(
-        'Insufficient wallet balance to submit all bids.',
-        isError: true,
-      );
-      return;
-    }
-
-    final String formattedDate = DateFormat(
-      'dd MMM yyyy, hh:mm a',
-    ).format(DateTime.now());
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return BidConfirmationDialog(
-          gameTitle:
-              "${widget.gameName}, ${widget.gameType}", // Removed date here as it's separate
-          gameDate: formattedDate, // Passed separately
-          bids: bids,
-          totalBids: bids.length,
-          totalBidsAmount: totalPoints,
-          walletBalanceBeforeDeduction: walletBalance,
-          walletBalanceAfterDeduction: (walletBalance - totalPoints).toString(),
-          gameId: widget.gameId.toString(),
-          gameType: widget.gameType,
-          onConfirm: () async {
-            // No need to pop here, the dialog is already popped by its own button handler
-            // Navigator.of(dialogContext).pop(true); // <-- REMOVED THIS LINE
-
-            setState(() {
-              _isSubmitting = true; // Set submitting state to true
-            });
-
-            bool success = false;
-            try {
-              final lowerTitle = widget.gameName.toLowerCase();
-
-              if (lowerTitle.contains('jackpot')) {
-                success = await _placeJackpotBid();
-              } else if (lowerTitle.contains('starline')) {
-                success = await _placeStarlineBid();
-              } else {
-                success = await _placeGeneralBid();
-              }
-
-              if (success) {
-                setState(() {
-                  bids.clear(); // Clear bids on successful submission
-                  // Wallet balance is updated inside _place...Bid methods
-                });
-              }
-              // The success/failure message is now handled directly within the API methods via _showMessage and relevant dialogs
-            } catch (e) {
-              log("🚨 Error during bid confirmation process: $e");
-              _showMessage(
-                "An unexpected error occurred during submission: ${e.toString()}",
-                isError: true,
-              );
-            } finally {
-              setState(() {
-                _isSubmitting = false; // Always set to false when done
-              });
-            }
-          },
-        );
-      },
+          const SizedBox(height: 12),
+        ],
+      ),
     );
   }
 }

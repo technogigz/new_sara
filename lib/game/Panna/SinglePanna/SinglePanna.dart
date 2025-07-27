@@ -1,14 +1,11 @@
 import 'dart:async'; // Added for Timer in AnimatedMessageBar logic
-import 'dart:convert';
-import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:new_sara/ulits/Constents.dart'; // Retained your original import path
 
+import '../../../BidService.dart';
 import '../../../components/AnimatedMessageBar.dart';
 import '../../../components/BidConfirmationDialog.dart';
 import '../../../components/BidFailureDialog.dart'; // Import BidFailureDialog
@@ -161,11 +158,15 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
   final TextEditingController amountController = TextEditingController();
   final List<String> gameTypes = ['Open', 'Close'];
   String selectedGameType = 'Close';
+  late String deviceId = "flutter_device"; // Placeholder, get actual value
+  late String deviceName = "Flutter_App"; // Placeholder, get actual value;
+  late bool accountActiveStatus;
 
   List<Map<String, String>> bids = [];
   int walletBalance = 0;
   late String accessToken;
   late String registerId;
+  bool accountStatus = false;
 
   String? _messageToShow;
   bool _isErrorForMessage = false;
@@ -185,6 +186,7 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
     _loadSavedBids();
     digitController.addListener(_onDigitChanged);
 
+    // Add listener for walletBalance
     GetStorage().listenKey('walletBalance', (value) {
       if (mounted) {
         setState(() {
@@ -195,6 +197,33 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
           } else {
             walletBalance = 0;
           }
+        });
+      }
+    });
+
+    // Add listener for accessToken
+    GetStorage().listenKey('accessToken', (value) {
+      if (mounted) {
+        setState(() {
+          accessToken = value ?? '';
+        });
+      }
+    });
+
+    // Add listener for registerId
+    GetStorage().listenKey('registerId', (value) {
+      if (mounted) {
+        setState(() {
+          registerId = value ?? '';
+        });
+      }
+    });
+
+    // Add listener for accountStatus
+    GetStorage().listenKey('accountStatus', (value) {
+      if (mounted) {
+        setState(() {
+          accountStatus = value ?? false;
         });
       }
     });
@@ -494,130 +523,200 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
     );
   }
 
+  // Future<bool> _placeFinalBids() async {
+  //   String url;
+  //   if (widget.gameName.toLowerCase().contains('jackpot')) {
+  //     url = '${Constant.apiEndpoint}place-jackpot-bid';
+  //   } else if (widget.gameName.toLowerCase().contains('starline')) {
+  //     url = '${Constant.apiEndpoint}place-starline-bid';
+  //   } else {
+  //     url = '${Constant.apiEndpoint}place-bid';
+  //   }
+  //
+  //   if (accessToken.isEmpty || registerId.isEmpty) {
+  //     if (mounted) {
+  //       showDialog(
+  //         context: context,
+  //         builder: (BuildContext context) {
+  //           return const BidFailureDialog(
+  //             errorMessage: 'Authentication error. Please log in again.',
+  //           );
+  //         },
+  //       );
+  //     }
+  //     return false;
+  //   }
+  //
+  //   final String deviceId =
+  //       GetStorage().read('deviceId') ?? 'unknown_device_id';
+  //   final String deviceName =
+  //       GetStorage().read('deviceName') ?? 'unknown_device_name';
+  //
+  //   final headers = {
+  //     'deviceId': deviceId,
+  //     'deviceName': deviceName,
+  //     'accessStatus': '1',
+  //     'Content-Type': 'application/json',
+  //     'Authorization': 'Bearer $accessToken',
+  //   };
+  //
+  //   final List<Map<String, dynamic>> bidPayload = bids.map((entry) {
+  //     String sessionType = entry["type"] ?? "CLOSE";
+  //     String digit = entry["digit"] ?? "";
+  //     int bidAmount = int.tryParse(entry["amount"] ?? '0') ?? 0;
+  //
+  //     return {
+  //       "sessionType": sessionType.toUpperCase(),
+  //       "digit": "",
+  //       "pana": digit,
+  //       "bidAmount": bidAmount,
+  //     };
+  //   }).toList();
+  //
+  //   final body = {
+  //     "registerId": registerId,
+  //     "gameId": widget.gameId,
+  //     "bidAmount": _getTotalPoints(),
+  //     "gameType": widget.gameType,
+  //     "bid": bidPayload,
+  //   };
+  //
+  //   String curlCommand = 'curl -X POST \\\n  ${Uri.parse(url)} \\';
+  //   headers.forEach((key, value) {
+  //     curlCommand += '\n  -H "$key: $value" \\';
+  //   });
+  //   curlCommand += '\n  -d \'${jsonEncode(body)}\'';
+  //
+  //   log('CURL Command for Final Bid Submission:\n$curlCommand');
+  //   log('Request Headers for Final Bid Submission: $headers');
+  //   log('Request Body for Final Bid Submission: ${jsonEncode(body)}');
+  //
+  //   try {
+  //     final response = await http.post(
+  //       Uri.parse(url),
+  //       headers: headers,
+  //       body: jsonEncode(body),
+  //     );
+  //
+  //     log('Response Status Code: ${response.statusCode}');
+  //     log('Response Body: ${response.body}');
+  //
+  //     final Map<String, dynamic> responseBody = json.decode(response.body);
+  //
+  //     if (mounted) {
+  //       if (response.statusCode == 200 && responseBody['status'] == true) {
+  //         int currentWallet = walletBalance;
+  //         int deductedAmount = _getTotalPoints();
+  //         int newWalletBalance = currentWallet - deductedAmount;
+  //
+  //         GetStorage().write('walletBalance', newWalletBalance.toString());
+  //         setState(() {
+  //           walletBalance = newWalletBalance;
+  //         });
+  //
+  //         showDialog(
+  //           context: context,
+  //           barrierDismissible: false,
+  //           builder: (BuildContext context) {
+  //             return const BidSuccessDialog();
+  //           },
+  //         );
+  //         return true;
+  //       } else {
+  //         String errorMessage =
+  //             responseBody['msg'] ?? "Unknown error occurred.";
+  //         showDialog(
+  //           context: context,
+  //           builder: (BuildContext context) {
+  //             return BidFailureDialog(errorMessage: errorMessage);
+  //           },
+  //         );
+  //         return false;
+  //       }
+  //     }
+  //     return false;
+  //   } catch (e) {
+  //     log('Network error during bid submission: $e');
+  //     if (mounted) {
+  //       showDialog(
+  //         context: context,
+  //         builder: (BuildContext context) {
+  //           return BidFailureDialog(
+  //             errorMessage: 'Network error: ${e.toString()}',
+  //           );
+  //         },
+  //       );
+  //     }
+  //     return false;
+  //   }
+  // }
+
   Future<bool> _placeFinalBids() async {
-    String url;
-    if (widget.gameName.toLowerCase().contains('jackpot')) {
-      url = '${Constant.apiEndpoint}place-jackpot-bid';
-    } else if (widget.gameName.toLowerCase().contains('starline')) {
-      url = '${Constant.apiEndpoint}place-starline-bid';
-    } else {
-      url = '${Constant.apiEndpoint}place-bid';
-    }
+    final _bidService = BidService(GetStorage());
+    final Map<String, String> bidAmounts = {
+      for (var entry in bids) entry['jodi']!: entry['points'] ?? '0',
+    };
 
     if (accessToken.isEmpty || registerId.isEmpty) {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return const BidFailureDialog(
-              errorMessage: 'Authentication error. Please log in again.',
-            );
-          },
-        );
-      }
+      if (!mounted) return false;
+
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const BidFailureDialog(
+          errorMessage: 'Authentication error. Please log in again.',
+        ),
+      );
       return false;
     }
 
-    final String deviceId =
-        GetStorage().read('deviceId') ?? 'unknown_device_id';
-    final String deviceName =
-        GetStorage().read('deviceName') ?? 'unknown_device_name';
-
-    final headers = {
-      'deviceId': deviceId,
-      'deviceName': deviceName,
-      'accessStatus': '1',
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $accessToken',
-    };
-
-    final List<Map<String, dynamic>> bidPayload = bids.map((entry) {
-      String sessionType = entry["type"] ?? "CLOSE";
-      String digit = entry["digit"] ?? "";
-      int bidAmount = int.tryParse(entry["amount"] ?? '0') ?? 0;
-
-      return {
-        "sessionType": sessionType.toUpperCase(),
-        "digit": "",
-        "pana": digit,
-        "bidAmount": bidAmount,
-      };
-    }).toList();
-
-    final body = {
-      "registerId": registerId,
-      "gameId": widget.gameId,
-      "bidAmount": _getTotalPoints(),
-      "gameType": widget.gameType,
-      "bid": bidPayload,
-    };
-
-    String curlCommand = 'curl -X POST \\\n  ${Uri.parse(url)} \\';
-    headers.forEach((key, value) {
-      curlCommand += '\n  -H "$key: $value" \\';
-    });
-    curlCommand += '\n  -d \'${jsonEncode(body)}\'';
-
-    log('CURL Command for Final Bid Submission:\n$curlCommand');
-    log('Request Headers for Final Bid Submission: $headers');
-    log('Request Body for Final Bid Submission: ${jsonEncode(body)}');
-
     try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: headers,
-        body: jsonEncode(body),
+      final result = await _bidService.placeFinalBids(
+        gameName: widget.title,
+        accessToken: accessToken,
+        registerId: registerId,
+        deviceId: deviceId,
+        deviceName: deviceName,
+        accountStatus: accountActiveStatus,
+        bidAmounts: bidAmounts,
+        selectedGameType: "OPEN",
+        gameId: widget.gameId,
+        gameType: widget.gameType,
+        totalBidAmount: _getTotalPoints(),
       );
 
-      log('Response Status Code: ${response.statusCode}');
-      log('Response Body: ${response.body}');
+      if (!mounted) return false;
 
-      final Map<String, dynamic> responseBody = json.decode(response.body);
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => result['status']
+            ? const BidSuccessDialog()
+            : BidFailureDialog(
+                errorMessage: result['msg'] ?? 'Something went wrong',
+              ),
+      );
 
-      if (mounted) {
-        if (response.statusCode == 200 && responseBody['status'] == true) {
-          int currentWallet = walletBalance;
-          int deductedAmount = _getTotalPoints();
-          int newWalletBalance = currentWallet - deductedAmount;
-
-          GetStorage().write('walletBalance', newWalletBalance.toString());
-          setState(() {
-            walletBalance = newWalletBalance;
-          });
-
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (BuildContext context) {
-              return const BidSuccessDialog();
-            },
-          );
-          return true;
-        } else {
-          String errorMessage =
-              responseBody['msg'] ?? "Unknown error occurred.";
-          showDialog(
-            context: context,
-            builder: (BuildContext context) {
-              return BidFailureDialog(errorMessage: errorMessage);
-            },
-          );
-          return false;
-        }
+      if (result['status'] == true) {
+        final newWalletBalance = walletBalance - _getTotalPoints();
+        setState(() {
+          walletBalance = newWalletBalance;
+        });
+        await _bidService.updateWalletBalance(newWalletBalance);
+        return true;
+      } else {
+        return false;
       }
-      return false;
     } catch (e) {
-      log('Network error during bid submission: $e');
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return BidFailureDialog(
-              errorMessage: 'Network error: ${e.toString()}',
-            );
-          },
-        );
-      }
+      if (!mounted) return false;
+
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const BidFailureDialog(
+          errorMessage: 'An unexpected error occurred.',
+        ),
+      );
       return false;
     }
   }

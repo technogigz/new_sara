@@ -315,32 +315,36 @@ class _HomePageState extends State<HomePage> {
 
                     // Category Buttons if visible
                     if (accountStatus)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _customCategoryButton(
-                            uiStrings["KING STARLINE"] ?? "KING STARLINE",
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => KingStarlineDashboardScreen(),
-                                ),
-                              );
-                            },
-                          ),
+                      SizedBox(
+                        width: double.infinity,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _customCategoryButton(
+                              uiStrings["KING STARLINE"] ?? "KING STARLINE",
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        KingStarlineDashboardScreen(),
+                                  ),
+                                );
+                              },
+                            ),
 
-                          const SizedBox(width: 5),
-                          _customCategoryButton(
-                            uiStrings["King Jackpot"] ?? "King Jackpot",
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => KingJackpotDashboard(),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
+                            const SizedBox(width: 4),
+                            _customCategoryButton(
+                              uiStrings["King Jackpot"] ?? "King Jackpot",
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => KingJackpotDashboard(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
                       ),
 
                     if (accountStatus) const SizedBox(height: 16),
@@ -371,6 +375,8 @@ class _HomePageState extends State<HomePage> {
                         openBidLastTime: game.openTime,
                         closeBidLastTime: game.closeTime,
                         status: game.statusText,
+                        openSessionStatus: game.openSessionStatus,
+                        closeSessionStatus: game.closeSessionStatus,
                         statusColor:
                             game.statusText.toLowerCase().contains("open")
                             ? Colors.green
@@ -478,7 +484,10 @@ class _HomePageState extends State<HomePage> {
     required String status,
     required Color statusColor,
     required bool accountStatus,
-    required id, // true = active, false = inactive/suspended
+    required id,
+    required bool openSessionStatus,
+    required bool
+    closeSessionStatus, // true = active, false = inactive/suspended
   }) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -565,8 +574,12 @@ class _HomePageState extends State<HomePage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) =>
-                              GameMenuScreen(title: "$title", gameId: id),
+                          builder: (_) => GameMenuScreen(
+                            title: "$title",
+                            gameId: id,
+                            openSessionStatus: openSessionStatus,
+                            closeSessionStatus: closeSessionStatus,
+                          ),
                         ),
                       );
                     }

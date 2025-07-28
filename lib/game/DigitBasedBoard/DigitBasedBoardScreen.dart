@@ -426,7 +426,7 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
           walletBalanceAfterDeduction: walletBalanceAfterDeduction,
           onConfirm: () async {
             // Pop the confirmation dialog first
-            Navigator.pop(dialogContext);
+            // Navigator.pop(dialogContext);
 
             if (!mounted) return; // Check if widget is still mounted
 

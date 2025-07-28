@@ -1,19 +1,17 @@
-import 'dart:async'; // For Timer
-import 'dart:convert'; // For jsonEncode, json.decode
-import 'dart:developer'; // For log
+import 'dart:async';
+import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http; // For API calls
-import 'package:intl/intl.dart'; // Import for date formatting
+import 'package:intl/intl.dart';
 
+import '../../BidService.dart';
 import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
 import '../../components/BidFailureDialog.dart';
 import '../../components/BidSuccessDialog.dart';
-import '../../ulits/Constents.dart'; // Import the Constants file for API endpoint
 
 class SPMotorsBetScreen extends StatefulWidget {
   final String title;
@@ -37,11 +35,9 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
   final List<String> gameTypesOptions = ["Open", "Close"];
   late String selectedGameBetType;
 
-  // Renamed digitController to bidController
   final TextEditingController bidController = TextEditingController();
   final TextEditingController pointsController = TextEditingController();
 
-  // --- New State Variables for Suggestions ---
   List<String> digitOptions = [
     "120",
     "123",
@@ -166,7 +162,6 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
   ];
   List<String> filteredDigitOptions = [];
   bool _isDigitSuggestionsVisible = false;
-  // --- End New State Variables ---
 
   List<Map<String, String>> addedEntries = [];
   late GetStorage storage;
@@ -176,34 +171,32 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
   bool accountStatus = false;
   late int walletBalance;
 
+  late BidService _bidService;
+
   final String _deviceId = 'test_device_id_flutter';
   final String _deviceName = 'test_device_name_flutter';
 
   String? _messageToShow;
   bool _isErrorForMessage = false;
   Key _messageBarKey = UniqueKey();
+  Timer? _messageDismissTimer;
 
-  // State variable to track API call status
   bool _isApiCalling = false;
 
   @override
   void initState() {
     super.initState();
-    storage = GetStorage(); // Initialize GetStorage
+    storage = GetStorage();
+    _bidService = BidService(storage);
     _loadInitialData();
     _setupStorageListeners();
 
-    // --- bidController listener ---
     bidController.addListener(_onDigitChanged);
-    // --- End bidController listener ---
-
-    // Initialize selectedGameBetType here
-    selectedGameBetType = gameTypesOptions[0]; // Default to "Open"
+    selectedGameBetType = gameTypesOptions[0];
   }
 
-  // --- New _onDigitChanged method ---
   void _onDigitChanged() {
-    final query = bidController.text.trim(); // Use bidController
+    final query = bidController.text.trim();
     if (query.isNotEmpty) {
       setState(() {
         filteredDigitOptions = digitOptions
@@ -218,7 +211,6 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
       });
     }
   }
-  // --- End New _onDigitChanged method ---
 
   Future<void> _loadInitialData() async {
     accessToken = storage.read('accessToken') ?? '';
@@ -266,19 +258,23 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 
   @override
   void dispose() {
-    // --- bidController.removeListener ---
     bidController.removeListener(_onDigitChanged);
-    // --- End bidController.removeListener ---
-    bidController.dispose(); // Dispose bidController
+    bidController.dispose();
     pointsController.dispose();
+    _messageDismissTimer?.cancel();
     super.dispose();
   }
 
   void _showMessage(String message, {bool isError = false}) {
+    _messageDismissTimer?.cancel();
+    if (!mounted) return;
     setState(() {
       _messageToShow = message;
       _isErrorForMessage = isError;
       _messageBarKey = UniqueKey();
+    });
+    _messageDismissTimer = Timer(const Duration(seconds: 3), () {
+      _clearMessage();
     });
   }
 
@@ -292,23 +288,21 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 
   void _addEntry() {
     _clearMessage();
-    if (_isApiCalling) return; // Prevent adding entries while API is busy
+    if (_isApiCalling) return;
 
-    final digit = bidController.text.trim(); // Use bidController
-    final points = pointsController.text.trim();
+    final digit = bidController.text.trim();
+    final amount = pointsController.text.trim();
 
     if (digit.isEmpty) {
       _showMessage('Please enter a 3-digit number.', isError: true);
       return;
     }
 
-    // Validate for exactly 3 digits
     if (digit.length != 3 || int.tryParse(digit) == null) {
       _showMessage('Please enter a valid 3-digit number.', isError: true);
       return;
     }
 
-    // --- Validate if the digit is in the Single_Pana list ---
     if (!digitOptions.contains(digit)) {
       _showMessage(
         'Invalid 3-digit number. Not in Single Patti list.',
@@ -316,15 +310,14 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
       );
       return;
     }
-    // --- End Validation ---
 
-    if (points.isEmpty) {
+    if (amount.isEmpty) {
       _showMessage('Please enter an Amount.', isError: true);
       return;
     }
 
-    int? parsedPoints = int.tryParse(points);
-    if (parsedPoints == null || parsedPoints < 10 || parsedPoints > 1000) {
+    int? parsedAmount = int.tryParse(amount);
+    if (parsedAmount == null || parsedAmount < 10 || parsedAmount > 1000) {
       _showMessage('Points must be between 10 and 1000.', isError: true);
       return;
     }
@@ -336,8 +329,8 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 
     setState(() {
       if (existingIndex != -1) {
-        final currentPoints = int.parse(addedEntries[existingIndex]['points']!);
-        addedEntries[existingIndex]['points'] = (currentPoints + parsedPoints)
+        final currentAmount = int.parse(addedEntries[existingIndex]['amount']!);
+        addedEntries[existingIndex]['amount'] = (currentAmount + parsedAmount)
             .toString();
         _showMessage(
           'Updated points for Motor Patti: $digit, Type: $selectedGameBetType.',
@@ -345,22 +338,23 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
       } else {
         addedEntries.add({
           "digit": digit,
-          "points": points,
+          "amount": amount,
           "type": selectedGameBetType,
+          "gameType": widget.gameCategoryType,
         });
         _showMessage(
-          'Added bid: Motor Patti $digit, Points $points, Type $selectedGameBetType.',
+          'Added bid: Motor Patti $digit, Points $amount, Type $selectedGameBetType.',
         );
       }
-      bidController.clear(); // Use bidController
+      bidController.clear();
       pointsController.clear();
-      _isDigitSuggestionsVisible = false; // Hide suggestions after adding
+      _isDigitSuggestionsVisible = false;
     });
   }
 
   void _removeEntry(int index) {
     _clearMessage();
-    if (_isApiCalling) return; // Prevent removing entries while API is busy
+    if (_isApiCalling) return;
 
     setState(() {
       final removedEntry = addedEntries[index];
@@ -374,24 +368,40 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
   int _getTotalPoints() {
     return addedEntries.fold(
       0,
-      (sum, item) => sum + (int.tryParse(item['points'] ?? '0') ?? 0),
+      (sum, item) => sum + (int.tryParse(item['amount'] ?? '0') ?? 0),
     );
+  }
+
+  int _getTotalPointsForSelectedGameType() {
+    return addedEntries
+        .where(
+          (entry) =>
+              (entry["type"] ?? "").toUpperCase() ==
+              selectedGameBetType.toUpperCase(),
+        )
+        .fold(
+          0,
+          (sum, item) => sum + (int.tryParse(item['amount'] ?? '0') ?? 0),
+        );
   }
 
   void _showConfirmationDialog() {
     _clearMessage();
-    if (_isApiCalling) return; // Prevent showing dialog if API is busy
+    if (_isApiCalling) return;
 
-    if (addedEntries.isEmpty) {
-      _showMessage('Please add at least one bid.', isError: true);
+    final int totalPointsForCurrentType = _getTotalPointsForSelectedGameType();
+
+    if (totalPointsForCurrentType == 0) {
+      _showMessage(
+        'No bids added for the selected game type to submit.',
+        isError: true,
+      );
       return;
     }
 
-    final int totalPoints = _getTotalPoints();
-
-    if (walletBalance < totalPoints) {
+    if (walletBalance < totalPointsForCurrentType) {
       _showMessage(
-        'Insufficient wallet balance to place this bid.',
+        'Insufficient wallet balance for selected game type.',
         isError: true,
       );
       return;
@@ -401,6 +411,14 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
       'dd MMM yyyy, hh:mm a',
     ).format(DateTime.now());
 
+    final List<Map<String, String>> bidsToShowInDialog = addedEntries
+        .where(
+          (entry) =>
+              (entry["type"] ?? "").toUpperCase() ==
+              selectedGameBetType.toUpperCase(),
+        )
+        .toList();
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -408,33 +426,28 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
         return BidConfirmationDialog(
           gameTitle: widget.gameName,
           gameDate: formattedDate,
-          bids: addedEntries.map((bid) {
+          bids: bidsToShowInDialog.map((bid) {
             return {
               "digit": bid['digit']!,
-              "points": bid['points']!,
-              "type": bid['type']!,
+              "points": bid['amount']!,
+              "type": "${bid['gameType']} (${bid['type']})",
+              "pana": bid['digit']!,
+              "jodi": "",
             };
           }).toList(),
-          totalBids: addedEntries.length,
-          totalBidsAmount: totalPoints,
+          totalBids: bidsToShowInDialog.length,
+          totalBidsAmount: totalPointsForCurrentType,
           walletBalanceBeforeDeduction: walletBalance,
-          walletBalanceAfterDeduction: (walletBalance - totalPoints).toString(),
+          walletBalanceAfterDeduction:
+              (walletBalance - totalPointsForCurrentType).toString(),
           gameId: widget.gameId.toString(),
           gameType: widget.gameCategoryType,
           onConfirm: () async {
-            Navigator.pop(dialogContext);
+            // Navigator.pop(dialogContext);
             setState(() {
-              _isApiCalling = true; // Set API calling state
+              _isApiCalling = true;
             });
-            bool success = await _placeFinalBids();
-            if (success) {
-              // Only clear bids if the API call was successful
-              setState(() {
-                addedEntries.clear();
-              });
-              // The success message/dialog is now handled inside _placeFinalBids
-            }
-            // Ensure API calling state is reset regardless of outcome
+            await _placeFinalBids();
             if (mounted) {
               setState(() {
                 _isApiCalling = false;
@@ -447,125 +460,117 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
   }
 
   Future<bool> _placeFinalBids() async {
-    String url;
-    final gameCategory = widget.gameCategoryType.toLowerCase();
+    final Map<String, String> bidPayload = {};
+    int currentBatchTotalPoints = 0;
 
-    if (gameCategory.contains('jackpot')) {
-      url = '${Constant.apiEndpoint}place-jackpot-bid';
-    } else if (gameCategory.contains('starline')) {
-      url = '${Constant.apiEndpoint}place-starline-bid';
-    } else {
-      url = '${Constant.apiEndpoint}place-bid';
+    for (var entry in addedEntries) {
+      if ((entry["type"] ?? "").toUpperCase() ==
+          selectedGameBetType.toUpperCase()) {
+        String digit = entry["digit"] ?? "";
+        String amount = entry["amount"] ?? "0";
+
+        if (digit.isNotEmpty && int.tryParse(amount) != null) {
+          bidPayload[digit] = amount;
+          currentBatchTotalPoints += int.parse(amount);
+        }
+      }
     }
 
-    // Authentication Check
-    if (accessToken.isEmpty || registerId.isEmpty) {
-      if (mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext context) {
-            return const BidFailureDialog(
-              errorMessage: 'Authentication error. Please log in again.',
-            );
-          },
-        );
-      }
+    log(
+      'bidPayload (Map<String,String>) being sent to BidService: $bidPayload',
+      name: 'SPMotorsBetScreen',
+    );
+    log(
+      'currentBatchTotalPoints: $currentBatchTotalPoints',
+      name: 'SPMotorsBetScreen',
+    );
+
+    if (bidPayload.isEmpty) {
+      if (!mounted) return false;
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const BidFailureDialog(
+          errorMessage: 'No valid bids for the selected game type.',
+        ),
+      );
       return false;
     }
 
-    final headers = {
-      'deviceId': _deviceId,
-      'deviceName': _deviceName,
-      'accessStatus': accountStatus ? '1' : '0',
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $accessToken',
-    };
-
-    final List<Map<String, dynamic>> bidPayload = addedEntries.map((entry) {
-      final String bidDigit = entry['digit'] ?? '';
-      final int bidAmount = int.tryParse(entry['points'] ?? '0') ?? 0;
-
-      return {
-        "sessionType": entry['type']?.toUpperCase() ?? '',
-        "digit": bidDigit, // This will be the 3-digit number for Motor Patti
-        "pana":
-            bidDigit, // For Motor Patti, pana is often the same as the digit
-        "bidAmount": bidAmount,
-      };
-    }).toList();
-
-    final body = jsonEncode({
-      "registerId": registerId,
-      "gameId": widget.gameId,
-      "bidAmount": _getTotalPoints(),
-      "gameType": widget.gameCategoryType,
-      "bid": bidPayload,
-    });
-
-    log('Placing bid to URL: $url');
-    log('Request Headers: $headers');
-    log('Request Body: $body');
+    if (accessToken.isEmpty || registerId.isEmpty) {
+      if (!mounted) return false;
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const BidFailureDialog(
+          errorMessage: 'Authentication error. Please log in again.',
+        ),
+      );
+      return false;
+    }
 
     try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: headers,
-        body: body,
+      final result = await _bidService.placeFinalBids(
+        gameName: widget.gameName,
+        accessToken: accessToken,
+        registerId: registerId,
+        deviceId: _deviceId,
+        deviceName: _deviceName,
+        accountStatus: accountStatus,
+        bidAmounts: bidPayload,
+        selectedGameType: selectedGameBetType,
+        gameId: widget.gameId,
+        gameType: widget.gameCategoryType,
+        totalBidAmount: currentBatchTotalPoints,
       );
 
-      final Map<String, dynamic> responseBody = json.decode(response.body);
-      log('API Response: $responseBody');
+      if (!mounted) return false;
 
-      if (response.statusCode == 200 && responseBody['status'] == true) {
-        int newWalletBalance = walletBalance - _getTotalPoints();
-        // It's generally better to use the wallet balance returned by the API if available and accurate
-        final int apiWalletBalance =
-            (responseBody['data']?['wallet_balance'] as num?)?.toInt() ??
-            newWalletBalance;
+      if (result['status'] == true) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const BidSuccessDialog(),
+        );
 
-        await storage.write('walletBalance', apiWalletBalance.toString());
+        final dynamic updatedBalanceRaw = result['updatedWalletBalance'];
+        final int updatedBalance =
+            int.tryParse(updatedBalanceRaw.toString()) ??
+            (walletBalance - currentBatchTotalPoints);
+        setState(() {
+          walletBalance = updatedBalance;
+        });
+        _bidService.updateWalletBalance(updatedBalance);
 
-        if (mounted) {
-          setState(() {
-            walletBalance = apiWalletBalance;
-          });
-          // Show success dialog ONLY if mounted
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (BuildContext context) {
-              return const BidSuccessDialog();
-            },
+        setState(() {
+          addedEntries.removeWhere(
+            (element) =>
+                (element["type"] ?? "").toUpperCase() ==
+                selectedGameBetType.toUpperCase(),
           );
-        }
+        });
         return true;
       } else {
-        String errorMessage = responseBody['msg'] ?? "Unknown error occurred.";
-        if (mounted) {
-          // Show failure dialog ONLY if mounted
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (BuildContext context) {
-              return BidFailureDialog(errorMessage: errorMessage);
-            },
-          );
-        }
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => BidFailureDialog(
+            errorMessage: result['msg'] ?? 'Something went wrong',
+          ),
+        );
         return false;
       }
     } catch (e) {
-      log('Error during bid submission: $e');
-      if (mounted) {
-        // Show network error dialog ONLY if mounted
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext context) {
-            return BidFailureDialog(errorMessage: 'Error: ${e.toString()}');
-          },
-        );
-      }
+      log('Error during bid placement: $e', name: 'SPMotorsBetScreenBidError');
+      if (!mounted) return false;
+
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const BidFailureDialog(
+          errorMessage: 'An unexpected error occurred during bid submission.',
+        ),
+      );
       return false;
     }
   }
@@ -618,22 +623,14 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
                 ),
                 child: Column(
                   children: [
-                    // Game Type Dropdown
                     _inputRow("Select Game Type:", _buildDropdown()),
                     const SizedBox(height: 12),
-                    // Digit Input Field (now for 3 digits)
-                    _inputRow(
-                      "Enter 3-Digit Number:",
-                      _buildBidInputField(),
-                    ), // Use _buildBidInputField
-                    // --- Added suggestions list conditionally ---
+                    _inputRow("Enter 3-Digit Number:", _buildBidInputField()),
                     if (_isDigitSuggestionsVisible &&
                         filteredDigitOptions.isNotEmpty)
                       Container(
                         margin: const EdgeInsets.only(top: 8),
-                        constraints: const BoxConstraints(
-                          maxHeight: 200,
-                        ), // Limit height
+                        constraints: const BoxConstraints(maxHeight: 200),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(8),
@@ -654,30 +651,21 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
                               title: Text(suggestion),
                               onTap: () {
                                 setState(() {
-                                  bidController.text =
-                                      suggestion; // Use bidController
-                                  _isDigitSuggestionsVisible =
-                                      false; // Hide on selection
-                                  // Move cursor to end of text
-                                  bidController.selection = // Use bidController
-                                  TextSelection.fromPosition(
-                                    TextPosition(
-                                      offset: bidController
-                                          .text
-                                          .length, // Use bidController
-                                    ),
-                                  );
+                                  bidController.text = suggestion;
+                                  _isDigitSuggestionsVisible = false;
+                                  bidController.selection =
+                                      TextSelection.fromPosition(
+                                        TextPosition(
+                                          offset: bidController.text.length,
+                                        ),
+                                      );
                                 });
                               },
                             );
                           },
                         ),
                       ),
-                    // --- End Added suggestions list ---
-                    const SizedBox(
-                      height: 12,
-                    ), // Adjust spacing after digit input
-                    // Points Input Field
+                    const SizedBox(height: 12),
                     _inputRow(
                       "Enter Points:",
                       _buildTextField(
@@ -685,9 +673,7 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
                         "Enter Amount",
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(
-                            4,
-                          ), // Max 4 digits for points
+                          LengthLimitingTextInputFormatter(4),
                         ],
                       ),
                     ),
@@ -702,9 +688,7 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
                             borderRadius: BorderRadius.circular(6),
                           ),
                         ),
-                        onPressed: _isApiCalling
-                            ? null
-                            : _addEntry, // Disable if API is calling
+                        onPressed: _isApiCalling ? null : _addEntry,
                         child: _isApiCalling
                             ? const CircularProgressIndicator(
                                 color: Colors.white,
@@ -724,7 +708,6 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
                 ),
               ),
               const Divider(thickness: 1),
-              // List Headers
               if (addedEntries.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(
@@ -762,7 +745,6 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
                   ),
                 ),
               if (addedEntries.isNotEmpty) const Divider(thickness: 1),
-              // List of Added Entries
               Expanded(
                 child: addedEntries.isEmpty
                     ? const Center(child: Text("No data added yet"))
@@ -785,13 +767,13 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
                                 ),
                                 Expanded(
                                   child: Text(
-                                    entry['points']!,
+                                    entry['amount']!,
                                     style: GoogleFonts.poppins(),
                                   ),
                                 ),
                                 Expanded(
                                   child: Text(
-                                    entry['type']!,
+                                    '${entry['gameType']} (${entry['type']})',
                                     style: GoogleFonts.poppins(),
                                   ),
                                 ),
@@ -802,9 +784,7 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
                                   ),
                                   onPressed: _isApiCalling
                                       ? null
-                                      : () => _removeEntry(
-                                          index,
-                                        ), // Disable if API is calling
+                                      : () => _removeEntry(index),
                                 ),
                               ],
                             ),
@@ -812,11 +792,9 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
                         },
                       ),
               ),
-              // Bottom Summary Bar
               if (addedEntries.isNotEmpty) _buildBottomBar(),
             ],
           ),
-          // Animated Message Bar
           if (_messageToShow != null)
             Positioned(
               top: 0,
@@ -879,7 +857,6 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
             onChanged: _isApiCalling
                 ? null
                 : (String? newValue) {
-                    // Disable if API is calling
                     setState(() {
                       selectedGameBetType = newValue!;
                       _clearMessage();
@@ -899,31 +876,29 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
     );
   }
 
-  // Updated to accept 3-digit input and show suggestions
   Widget _buildBidInputField() {
-    // Renamed from _buildDigitInputField
     return SizedBox(
       width: double.infinity,
       height: 35,
       child: TextFormField(
-        controller: bidController, // Use bidController
+        controller: bidController,
         cursorColor: Colors.amber,
         keyboardType: TextInputType.number,
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: [
-          LengthLimitingTextInputFormatter(3), // Now accepts 3 digits
+          LengthLimitingTextInputFormatter(3),
           FilteringTextInputFormatter.digitsOnly,
         ],
         onTap: () {
           _clearMessage();
-          _onDigitChanged(); // Trigger suggestions on tap if text is present
+          _onDigitChanged();
         },
         onChanged: (value) {
-          _onDigitChanged(); // Filter suggestions as user types
+          _onDigitChanged();
         },
-        enabled: !_isApiCalling, // Disable if API is calling
+        enabled: !_isApiCalling,
         decoration: InputDecoration(
-          hintText: "Enter 3-Digit Number", // Updated hint text
+          hintText: "Enter 3-Digit Number",
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 0,
@@ -962,7 +937,7 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: inputFormatters,
         onTap: _clearMessage,
-        enabled: !_isApiCalling, // Disable if API is calling
+        enabled: !_isApiCalling,
         decoration: InputDecoration(
           hintText: hint,
           contentPadding: const EdgeInsets.symmetric(
@@ -1047,13 +1022,15 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
             ],
           ),
           ElevatedButton(
-            onPressed: _isApiCalling || addedEntries.isEmpty
-                ? null // Disable if API is calling OR no bids
+            onPressed:
+                (_isApiCalling || _getTotalPointsForSelectedGameType() == 0)
+                ? null
                 : _showConfirmationDialog,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _isApiCalling || addedEntries.isEmpty
+              backgroundColor:
+                  (_isApiCalling || _getTotalPointsForSelectedGameType() == 0)
                   ? Colors.grey
-                  : Colors.amber, // Dim if disabled
+                  : Colors.amber,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

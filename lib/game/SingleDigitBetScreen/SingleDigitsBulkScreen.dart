@@ -285,8 +285,8 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
           gameType: widget.gameType,
           onConfirm: () {
             // Dismiss the confirmation dialog before showing success/failure
-            Navigator.pop(dialogContext);
             _placeFinalBids(); // Call the bid placement method
+            // Navigator.pop(dialogContext);
           },
         );
       },

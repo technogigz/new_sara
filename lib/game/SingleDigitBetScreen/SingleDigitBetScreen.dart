@@ -328,9 +328,9 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
           gameId: widget.gameId.toString(),
           gameType: widget.gameCategoryType,
           onConfirm: () async {
-            Navigator.pop(
-              dialogContext,
-            ); // This correctly dismisses the confirmation dialog
+            // Navigator.pop(
+            //   dialogContext,
+            // ); // This correctly dismisses the confirmation dialog
             await _placeFinalBids();
           },
         );

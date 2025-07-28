@@ -419,6 +419,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                                 selectionStatus: widget.openSessionStatus,
                               );
                               break;
+
                             case 'doublePanaBulk':
                             case 'singlePanaBulk':
                               destinationScreen = SinglePannaBulkBoardScreen(
@@ -543,6 +544,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                                     "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
                                 gameId: widget.gameId,
                                 gameType: item.type,
+                                gameName: item.name,
                               );
                               break;
                             case 'halfSangamB':

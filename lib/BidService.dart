@@ -52,7 +52,7 @@ class BidService {
       bidPayloadList.add({
         "sessionType": selectedGameType.toUpperCase(),
         "digit": digit,
-        "pana": "",
+        "pana": digit,
         "bidAmount": int.tryParse(amount) ?? 0,
       });
     });

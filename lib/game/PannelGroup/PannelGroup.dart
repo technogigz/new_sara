@@ -1,29 +1,23 @@
-import 'dart:async'; // For Timer
-import 'dart:convert'; // For jsonEncode, json.decode
-import 'dart:developer'; // For log
+import 'dart:async';
+import 'dart:developer';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // For TextInputFormatter
-import 'package:get_storage/get_storage.dart'; // Required for wallet balance and tokens
-import 'package:google_fonts/google_fonts.dart'; // For GoogleFonts
-import 'package:http/http.dart' as http; // Import for making HTTP requests
-// Marquee is not directly visible in the image, but often used for market names.
-// I'll omit it for simplicity as it's not explicitly requested for this screen's UI.
-// import 'package:marquee/marquee.dart';
-import 'package:intl/intl.dart'; // For date formatting in dialog
+import 'package:flutter/services.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 
-// Assuming these paths are correct for your components
+import '../../BidService.dart'; // Import BidService
 import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
 import '../../components/BidFailureDialog.dart';
 import '../../components/BidSuccessDialog.dart';
-import '../../ulits/Constents.dart'; // Assuming this provides Constant.apiEndpoint
 
 class PanelGroupScreen extends StatefulWidget {
-  final String title; // e.g., "RADHA MORNING"
-  final String gameCategoryType; // e.g., "panelgroup"
+  final String title;
+  final String gameCategoryType;
   final int gameId;
-  final String gameName; // e.g., "Panel Group"
+  final String gameName;
 
   const PanelGroupScreen({
     super.key,
@@ -38,39 +32,39 @@ class PanelGroupScreen extends StatefulWidget {
 }
 
 class _PanelGroupScreenState extends State<PanelGroupScreen> {
-  // Game types options, though not explicitly shown in the image for this screen,
-  // it's a common pattern in betting apps. Assuming "Open" is default.
   final List<String> gameTypesOptions = const ["Open", "Close"];
-  late String selectedGameBetType; // Default to "Open"
+  late String selectedGameBetType;
 
   final TextEditingController digitController = TextEditingController();
   final TextEditingController pointsController = TextEditingController();
 
-  List<Map<String, String>> addedEntries = []; // List to store the added bids
+  // Changed 'points' to 'amount' for consistency with BidService
+  List<Map<String, String>> addedEntries = [];
 
-  // Wallet and user data from GetStorage
-  late int walletBalance; // Changed to int for consistency with GetStorage
+  late int walletBalance;
   final GetStorage _storage = GetStorage();
   late String accessToken;
   late String registerId;
   bool accountStatus = false;
   late String preferredLanguage;
+  late BidService _bidService; // Declare BidService
 
   final String _deviceId = 'test_device_id_flutter';
   final String _deviceName = 'test_device_name_flutter';
 
-  // State management for AnimatedMessageBar
   String? _messageToShow;
   bool _isErrorForMessage = false;
   Key _messageBarKey = UniqueKey();
+  Timer?
+  _messageDismissTimer; // Still keeping this for consistency in message bar dismissal
 
-  // State variable to track API call status
   bool _isApiCalling = false;
 
   @override
   void initState() {
     super.initState();
-    selectedGameBetType = gameTypesOptions[0]; // Default to "Open"
+    selectedGameBetType = gameTypesOptions[0];
+    _bidService = BidService(_storage); // Initialize BidService
     _loadInitialData();
     _setupStorageListeners();
   }
@@ -123,14 +117,20 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
   void dispose() {
     digitController.dispose();
     pointsController.dispose();
+    _messageDismissTimer?.cancel(); // Cancel timer
     super.dispose();
   }
 
   void _showMessage(String message, {bool isError = false}) {
+    _messageDismissTimer?.cancel(); // Cancel any existing timer
+    if (!mounted) return;
     setState(() {
       _messageToShow = message;
       _isErrorForMessage = isError;
-      _messageBarKey = UniqueKey();
+      _messageBarKey = UniqueKey(); // Update key to trigger animation
+    });
+    _messageDismissTimer = Timer(const Duration(seconds: 3), () {
+      _clearMessage();
     });
   }
 
@@ -143,10 +143,12 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
   }
 
   void _addEntry() {
+    _clearMessage();
     if (_isApiCalling) return;
 
     final digit = digitController.text.trim();
-    final points = pointsController.text.trim();
+    final amount = pointsController.text
+        .trim(); // Renamed to 'amount' for consistency
 
     // Validation for Single Digit (0-9)
     if (digit.isEmpty || digit.length != 1 || int.tryParse(digit) == null) {
@@ -154,8 +156,8 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
       return;
     }
 
-    int? parsedPoints = int.tryParse(points);
-    if (parsedPoints == null || parsedPoints < 10 || parsedPoints > 1000) {
+    int? parsedAmount = int.tryParse(amount);
+    if (parsedAmount == null || parsedAmount < 10 || parsedAmount > 1000) {
       _showMessage('Points must be between 10 and 1000.', isError: true);
       return;
     }
@@ -167,20 +169,22 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
 
     setState(() {
       if (existingIndex != -1) {
-        final currentPoints = int.parse(addedEntries[existingIndex]['points']!);
-        addedEntries[existingIndex]['points'] = (currentPoints + parsedPoints)
+        final currentAmount = int.parse(addedEntries[existingIndex]['amount']!);
+        addedEntries[existingIndex]['amount'] = (currentAmount + parsedAmount)
             .toString();
         _showMessage(
-          'Updated points for Digit: $digit, Type: $selectedGameBetType.',
+          'Updated bid for Digit: $digit, Type: $selectedGameBetType.',
         );
       } else {
         addedEntries.add({
           "digit": digit,
-          "points": points,
+          "amount": amount, // Use 'amount' key
           "type": selectedGameBetType,
+          "gameType":
+              widget.gameCategoryType, // Add gameCategoryType to each entry
         });
         _showMessage(
-          'Added bid: Digit $digit, Points $points, Type $selectedGameBetType.',
+          'Added bid: Digit $digit, Points $amount, Type $selectedGameBetType.',
         );
       }
       digitController.clear();
@@ -189,6 +193,7 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
   }
 
   void _removeEntry(int index) {
+    _clearMessage();
     if (_isApiCalling) return;
 
     setState(() {
@@ -201,26 +206,44 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
   }
 
   int _getTotalPoints() {
+    // Calculates total points for ALL added entries
     return addedEntries.fold(
       0,
-      (sum, item) => sum + (int.tryParse(item['points'] ?? '0') ?? 0),
+      (sum, item) =>
+          sum + (int.tryParse(item['amount'] ?? '0') ?? 0), // Use 'amount'
     );
+  }
+
+  int _getTotalPointsForSelectedGameType() {
+    return addedEntries
+        .where(
+          (entry) =>
+              (entry["type"] ?? "").toUpperCase() ==
+              selectedGameBetType.toUpperCase(),
+        )
+        .fold(
+          0,
+          (sum, item) => sum + (int.tryParse(item['amount'] ?? '0') ?? 0),
+        );
   }
 
   void _showConfirmationDialog() {
     _clearMessage();
     if (_isApiCalling) return;
 
-    if (addedEntries.isEmpty) {
-      _showMessage('Please add at least one bid.', isError: true);
+    final int totalPointsForCurrentType = _getTotalPointsForSelectedGameType();
+
+    if (totalPointsForCurrentType == 0) {
+      _showMessage(
+        'No bids added for the selected game type to submit.',
+        isError: true,
+      );
       return;
     }
 
-    final int totalPoints = _getTotalPoints();
-
-    if (walletBalance < totalPoints) {
+    if (walletBalance < totalPointsForCurrentType) {
       _showMessage(
-        'Insufficient wallet balance to place this bid.',
+        'Insufficient wallet balance for selected game type.',
         isError: true,
       );
       return;
@@ -230,6 +253,15 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
       'dd MMM yyyy, hh:mm a',
     ).format(DateTime.now());
 
+    // Filter bids for the dialog to only show those for the currently selected type
+    final List<Map<String, String>> bidsToShowInDialog = addedEntries
+        .where(
+          (entry) =>
+              (entry["type"] ?? "").toUpperCase() ==
+              selectedGameBetType.toUpperCase(),
+        )
+        .toList();
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -237,34 +269,29 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
         return BidConfirmationDialog(
           gameTitle: widget.gameName,
           gameDate: formattedDate,
-          bids: addedEntries.map((bid) {
+          bids: bidsToShowInDialog.map((bid) {
             return {
               "digit": bid['digit']!,
-              "points": bid['points']!,
-              "type": bid['type']!,
-              // For Panel Group, 'pana' might be the same as 'digit' or empty based on API.
-              // Assuming 'digit' for now for consistency with other screens.
-              "pana": bid['digit']!,
-              "jodi": "", // Not applicable for single digit
+              "points": bid['amount']!, // Use 'amount' here
+              "type":
+                  "${bid['gameType']} (${bid['type']})", // Display Game Category Type and Open/Close
+              "pana": bid['digit']!, // For Panel Group, digit is the pana
+              "jodi": "", // Not applicable for single digit bid
             };
           }).toList(),
-          totalBids: addedEntries.length,
-          totalBidsAmount: totalPoints,
+          totalBids: bidsToShowInDialog.length,
+          totalBidsAmount: totalPointsForCurrentType,
           walletBalanceBeforeDeduction: walletBalance,
-          walletBalanceAfterDeduction: (walletBalance - totalPoints).toString(),
+          walletBalanceAfterDeduction:
+              (walletBalance - totalPointsForCurrentType).toString(),
           gameId: widget.gameId.toString(),
           gameType: widget.gameCategoryType,
           onConfirm: () async {
-            Navigator.pop(dialogContext);
+            // Navigator.pop(dialogContext);
             setState(() {
               _isApiCalling = true;
             });
-            bool success = await _placeFinalBids();
-            if (success) {
-              setState(() {
-                addedEntries.clear();
-              });
-            }
+            await _placeFinalBids();
             if (mounted) {
               setState(() {
                 _isApiCalling = false;
@@ -277,122 +304,123 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
   }
 
   Future<bool> _placeFinalBids() async {
-    String url;
-    final gameCategory = widget.gameCategoryType.toLowerCase();
+    final Map<String, String> bidPayload = {};
+    int currentBatchTotalPoints = 0;
 
-    if (gameCategory.contains('jackpot')) {
-      url = '${Constant.apiEndpoint}place-jackpot-bid';
-    } else if (gameCategory.contains('starline')) {
-      url = '${Constant.apiEndpoint}place-starline-bid';
-    } else {
-      url = '${Constant.apiEndpoint}place-bid';
+    // Filter and prepare bids for the currently selected game type
+    for (var entry in addedEntries) {
+      if ((entry["type"] ?? "").toUpperCase() ==
+          selectedGameBetType.toUpperCase()) {
+        String digit = entry["digit"] ?? "";
+        String amount = entry["amount"] ?? "0"; // Use 'amount'
+
+        if (digit.isNotEmpty && int.tryParse(amount) != null) {
+          bidPayload[digit] = amount;
+          currentBatchTotalPoints += int.parse(amount);
+        }
+      }
     }
 
-    if (accessToken.isEmpty || registerId.isEmpty) {
-      if (mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext context) {
-            return const BidFailureDialog(
-              errorMessage: 'Authentication error. Please log in again.',
-            );
-          },
-        );
-      }
+    log(
+      'bidPayload (Map<String,String>) being sent to BidService: $bidPayload',
+      name: 'PanelGroupScreen',
+    );
+    log(
+      'currentBatchTotalPoints: $currentBatchTotalPoints',
+      name: 'PanelGroupScreen',
+    );
+
+    if (bidPayload.isEmpty) {
+      if (!mounted) return false;
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const BidFailureDialog(
+          errorMessage: 'No valid bids for the selected game type.',
+        ),
+      );
       return false;
     }
 
-    final headers = {
-      'deviceId': _deviceId,
-      'deviceName': _deviceName,
-      'accessStatus': accountStatus ? '1' : '0',
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $accessToken',
-    };
+    // Authentication check before calling BidService
+    if (accessToken.isEmpty || registerId.isEmpty) {
+      if (!mounted) return false;
 
-    final List<Map<String, dynamic>> bidPayload = addedEntries.map((entry) {
-      final String bidDigit = entry['digit'] ?? '';
-      final int bidAmount = int.tryParse(entry['points'] ?? '0') ?? 0;
-
-      return {
-        "sessionType": entry['type']?.toUpperCase() ?? '',
-        "digit": bidDigit,
-        "pana":
-            bidDigit, // For single digit, pana is often the same as the digit
-        "bidAmount": bidAmount,
-      };
-    }).toList();
-
-    final body = jsonEncode({
-      "registerId": registerId,
-      "gameId": widget.gameId,
-      "bidAmount": _getTotalPoints(),
-      "gameType": gameCategory,
-      "bid": bidPayload,
-    });
-
-    log('Placing bid to URL: $url');
-    log('Request Headers: $headers');
-    log('Request Body: $body');
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const BidFailureDialog(
+          errorMessage: 'Authentication error. Please log in again.',
+        ),
+      );
+      return false;
+    }
 
     try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: headers,
-        body: body,
+      final result = await _bidService.placeFinalBids(
+        gameName: widget.gameName,
+        accessToken: accessToken,
+        registerId: registerId,
+        deviceId: _deviceId,
+        deviceName: _deviceName,
+        accountStatus: accountStatus,
+        bidAmounts: bidPayload,
+        selectedGameType: selectedGameBetType,
+        gameId: widget.gameId,
+        gameType: widget.gameCategoryType,
+        totalBidAmount: currentBatchTotalPoints,
       );
 
-      final Map<String, dynamic> responseBody = json.decode(response.body);
-      log('API Response: $responseBody');
+      if (!mounted) return false;
 
-      if (response.statusCode == 200 &&
-          (responseBody['status'] == true ||
-              responseBody['status'] == 'true')) {
-        int newWalletBalance = walletBalance - _getTotalPoints();
-        await _storage.write('walletBalance', newWalletBalance);
-
-        if (mounted) {
-          setState(() {
-            walletBalance = newWalletBalance;
-          });
-          await showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (BuildContext context) {
-              return const BidSuccessDialog();
-            },
-          );
-          _clearMessage(); // Clear message after success dialog
-        }
-        return true;
-      } else {
-        String errorMessage = responseBody['msg'] ?? "Unknown error occurred.";
-        if (mounted) {
-          await showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (BuildContext context) {
-              return BidFailureDialog(errorMessage: errorMessage);
-            },
-          );
-        }
-        return false;
-      }
-    } catch (e) {
-      log('Error during bid submission: $e');
-      if (mounted) {
+      if (result['status'] == true) {
         await showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (BuildContext context) {
-            return const BidFailureDialog(
-              errorMessage:
-                  'Network error. Please check your internet connection.',
-            );
-          },
+          builder: (_) => const BidSuccessDialog(),
         );
+
+        final dynamic updatedBalanceRaw = result['updatedWalletBalance'];
+        final int updatedBalance =
+            int.tryParse(updatedBalanceRaw.toString()) ??
+            (walletBalance - currentBatchTotalPoints);
+        setState(() {
+          walletBalance = updatedBalance;
+        });
+        // BidService's placeFinalBids already updates GetStorage,
+        // but calling this ensures any listeners are explicitly notified again.
+        _bidService.updateWalletBalance(updatedBalance);
+
+        // Remove only bids of the currently selected game type after successful submission
+        setState(() {
+          addedEntries.removeWhere(
+            (element) =>
+                (element["type"] ?? "").toUpperCase() ==
+                selectedGameBetType.toUpperCase(),
+          );
+        });
+        return true;
+      } else {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => BidFailureDialog(
+            errorMessage: result['msg'] ?? 'Something went wrong',
+          ),
+        );
+        return false;
       }
+    } catch (e) {
+      log('Error during bid placement: $e', name: 'PanelGroupScreenBidError');
+      if (!mounted) return false;
+
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const BidFailureDialog(
+          errorMessage: 'An unexpected error occurred during bid submission.',
+        ),
+      );
       return false;
     }
   }
@@ -446,6 +474,9 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
                 ),
                 child: Column(
                   children: [
+                    // Game Type Dropdown
+                    _buildInputRow("Select Game Type:", _buildDropdown()),
+                    const SizedBox(height: 12),
                     // Enter Points Row
                     _buildInputRow(
                       "Enter Points:",
@@ -486,9 +517,7 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
                             borderRadius: BorderRadius.circular(6),
                           ),
                         ),
-                        onPressed: _isApiCalling
-                            ? null
-                            : _addEntry, // Disable if API is calling
+                        onPressed: _isApiCalling ? null : _addEntry,
                         child: _isApiCalling
                             ? const CircularProgressIndicator(
                                 color: Colors.white,
@@ -574,14 +603,14 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
                                 Expanded(
                                   flex: 2,
                                   child: Text(
-                                    entry['points']!,
+                                    entry['amount']!, // Use 'amount'
                                     style: GoogleFonts.poppins(),
                                   ),
                                 ),
                                 Expanded(
                                   flex: 3,
                                   child: Text(
-                                    entry['type']!, // This will be "Open" or "Close"
+                                    '${entry['gameType']} (${entry['type']})', // Display Game Category Type and Open/Close
                                     style: GoogleFonts.poppins(),
                                   ),
                                 ),
@@ -592,9 +621,7 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
                                   ),
                                   onPressed: _isApiCalling
                                       ? null
-                                      : () => _removeEntry(
-                                          index,
-                                        ), // Disable if API is calling
+                                      : () => _removeEntry(index),
                                 ),
                               ],
                             ),
@@ -624,18 +651,17 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
     );
   }
 
-  // Helper method for input rows (label + field)
   Widget _buildInputRow(String label, Widget field) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.center, // Center align items
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
           flex: 2,
           child: Text(
             label,
             style: GoogleFonts.poppins(
-              fontSize: 15, // Slightly larger font for labels
+              fontSize: 15,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -646,7 +672,6 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
     );
   }
 
-  // Dropdown for Open/Close (reused from other screens)
   Widget _buildDropdown() {
     return SizedBox(
       width: 150,
@@ -685,15 +710,14 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
     );
   }
 
-  // Generic TextField builder for consistency
   Widget _buildTextField(
     TextEditingController controller,
     String hint, {
     List<TextInputFormatter>? inputFormatters,
   }) {
     return SizedBox(
-      width: double.infinity, // Take full width of the expanded parent
-      height: 40, // Consistent height for text fields
+      width: double.infinity,
+      height: 40,
       child: TextFormField(
         controller: controller,
         cursorColor: Colors.amber,
@@ -711,7 +735,7 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
           filled: true,
           fillColor: Colors.white,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30), // Rounded corners
+            borderRadius: BorderRadius.circular(30),
             borderSide: const BorderSide(color: Colors.black),
           ),
           enabledBorder: OutlineInputBorder(
@@ -727,7 +751,6 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
     );
   }
 
-  // Bottom bar with total bids/points and submit button
   Widget _buildBottomBar() {
     int totalBids = addedEntries.length;
     int totalPoints = _getTotalPoints();
@@ -787,13 +810,15 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
             ],
           ),
           ElevatedButton(
-            onPressed: _isApiCalling
+            onPressed:
+                (_isApiCalling || _getTotalPointsForSelectedGameType() == 0)
                 ? null
-                : _showConfirmationDialog, // Disable if API is calling
+                : _showConfirmationDialog,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _isApiCalling
+              backgroundColor:
+                  (_isApiCalling || _getTotalPointsForSelectedGameType() == 0)
                   ? Colors.grey
-                  : Colors.amber, // Dim if disabled
+                  : Colors.amber,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

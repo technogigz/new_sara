@@ -131,6 +131,7 @@ class _HomePageState extends State<HomePage> {
     });
 
     futureHomeData = fetchDashboardData();
+    _handleRefresh();
     preTranslateUI(); // translate all UI strings
   }
 

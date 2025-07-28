@@ -292,15 +292,10 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
           gameId: widget.gameId.toString(),
           gameType: widget.gameType,
           onConfirm: () async {
-            // Dismiss the confirmation dialog
-            Navigator.pop(dialogContext);
-
-            // *** ADDED DELAY HERE for reliable dialog showing ***
             await Future.delayed(const Duration(milliseconds: 200));
 
             // Provide immediate feedback that submission is starting
             _showMessage('Submitting your bids...', isError: false);
-
             // Then, call _placeFinalBids
             if (mounted) {
               // Ensure widget is still mounted

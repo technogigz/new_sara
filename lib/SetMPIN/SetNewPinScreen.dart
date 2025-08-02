@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:get_storage/get_storage.dart';
@@ -23,6 +24,7 @@ class _SetNewPinScreenState extends State<SetNewPinScreen> {
   final TextEditingController otpController = TextEditingController();
   final TextEditingController pinController = TextEditingController();
   final storage = GetStorage();
+  late final String fcmToken;
 
   late Timer _timer;
   int _secondsRemaining = 4 * 60;
@@ -32,6 +34,8 @@ class _SetNewPinScreenState extends State<SetNewPinScreen> {
   void initState() {
     super.initState();
     _startCountdown();
+    fcmToken = storage.read('fcmToken') ?? '';
+    log("FCM Token: $fcmToken");
   }
 
   void _startCountdown() {
@@ -93,6 +97,7 @@ class _SetNewPinScreenState extends State<SetNewPinScreen> {
       ), // Ensure mobile number is parsed as int if API expects it
       "otp": int.tryParse(otp),
       "security_pin": int.tryParse(newPin),
+      "fcmToken": fcmToken,
     };
 
     try {

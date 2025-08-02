@@ -147,7 +147,7 @@ class _PassbookPageState extends State<PassbookPage> {
             Expanded(
               child: loading
                   ? const Center(
-                      child: CircularProgressIndicator(color: Colors.amber),
+                      child: CircularProgressIndicator(color: Colors.orange),
                     )
                   : SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
@@ -183,15 +183,15 @@ class _PassbookPageState extends State<PassbookPage> {
 
   Widget _buildHeader() {
     return Container(
-      color: Colors.amber,
+      color: Colors.orange,
       child: Row(
         children: const [
-          _HeaderCell("Date", width: 100), // Changed to "Date"
-          _HeaderCell("Time", width: 100), // New "Time" column
-          _HeaderCell("Description", width: 200), // Changed to "Description"
-          _HeaderCell("Prev Amt", width: 120), // Shortened for space
-          _HeaderCell("Txn Amt", width: 120), // Shortened for space
-          _HeaderCell("Cur Amt", width: 120), // Shortened for space
+          _HeaderCell("Date", width: 130), // Changed to "Date"
+          _HeaderCell("Time", width: 130), // New "Time" column
+          _HeaderCell("Description", width: 250), // Changed to "Description"
+          _HeaderCell("Prev Amt", width: 150), // Shortened for space
+          _HeaderCell("Txn Amt", width: 150), // Shortened for space
+          _HeaderCell("Cur Amt", width: 150), // Shortened for space
           // Removed "Remark" column
         ],
       ),
@@ -205,16 +205,16 @@ class _PassbookPageState extends State<PassbookPage> {
       ),
       child: Row(
         children: [
-          _DataCell(e.date, width: 100), // Use e.date
-          _DataCell(e.time, width: 100), // Use e.time
+          _DataCell(e.date, width: 130), // Use e.date
+          _DataCell(e.time, width: 130), // Use e.time
           _DataCell(e.description, width: 250), // Use e.description
-          _DataCell("₹ ${e.previousAmount}", width: 120),
+          _DataCell("₹ ${e.previousAmount}", width: 150),
           _DataCell(
             "${e.type == 'credit' ? '₹' : '-₹'}${e.transactionAmount}", // Use e.type for sign
-            width: 120,
+            width: 150,
             isCredit: e.isCredit,
           ),
-          _DataCell("₹${e.currentAmount}", width: 120),
+          _DataCell("₹${e.currentAmount}", width: 150),
           // Removed _DataCell for remark
         ],
       ),
@@ -259,7 +259,7 @@ class _PassbookPageState extends State<PassbookPage> {
         child: Container(
           height: 45,
           decoration: BoxDecoration(
-            color: enabled ? Colors.amber : Colors.grey,
+            color: enabled ? Colors.orange : Colors.grey,
             borderRadius: BorderRadius.circular(6),
           ),
           child: Center(
@@ -330,7 +330,7 @@ class _DataCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     width: width,
-    height: 50,
+    height: 55,
     padding: const EdgeInsets.all(10),
     decoration: const BoxDecoration(
       color: Colors.white,

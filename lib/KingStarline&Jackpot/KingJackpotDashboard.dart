@@ -112,7 +112,7 @@ class _KingJackpotDashboardState extends State<KingJackpotDashboard> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: RefreshIndicator(
-                  color: Colors.amber,
+                  color: Colors.orange,
                   onRefresh: () async {
                     setState(() {
                       futureGameData = fetchGameData();
@@ -124,7 +124,9 @@ class _KingJackpotDashboardState extends State<KingJackpotDashboard> {
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(
-                          child: CircularProgressIndicator(color: Colors.amber),
+                          child: CircularProgressIndicator(
+                            color: Colors.orange,
+                          ),
                         );
                       } else if (snapshot.hasError) {
                         return Center(
@@ -353,6 +355,8 @@ class _KingJackpotDashboardState extends State<KingJackpotDashboard> {
                       title: "King Jackpot, $time",
                       gameTime: time,
                       gameId: gameid,
+                      digitJodiStatus: false,
+                      sessionSelection: true,
                     ),
                   ),
                 );

@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart'; // For date and time formatting
+import 'package:intl/intl.dart';
+
+import '../../ulits/Constents.dart'; // For date and time formatting
 
 class BidHistoryPage extends StatefulWidget {
   const BidHistoryPage({Key? key}) : super(key: key);
@@ -27,8 +29,7 @@ class _BidHistoryPageState extends State<BidHistoryPage> {
 
   Future<void> fetchEntries() async {
     setState(() => loading = true);
-    const url =
-        'https://sara777.win/api/v1/bet-history'; // API URL for bet history
+    final url = '${Constant.apiEndpoint}bet-history'; // API URL for bet history
     final token = GetStorage().read("accessToken") ?? '';
     String registerId =
         GetStorage().read("registerId") ?? ""; // Example registerId
@@ -111,13 +112,13 @@ class _BidHistoryPageState extends State<BidHistoryPage> {
         return Theme(
           data: ThemeData.light().copyWith(
             colorScheme: ColorScheme.light(
-              primary: Colors.amber, // Header background color
+              primary: Colors.orange, // Header background color
               onPrimary: Colors.white, // Header text color
               onSurface: Colors.black, // Body text color
             ),
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
-                foregroundColor: Colors.amber, // Button text color
+                foregroundColor: Colors.orange, // Button text color
               ),
             ),
           ),
@@ -179,7 +180,7 @@ class _BidHistoryPageState extends State<BidHistoryPage> {
             Expanded(
               child: loading
                   ? const Center(
-                      child: CircularProgressIndicator(color: Colors.amber),
+                      child: CircularProgressIndicator(color: Colors.orange),
                     )
                   : entries.isEmpty
                   ? Center(
@@ -221,7 +222,7 @@ class _BidHistoryPageState extends State<BidHistoryPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
-              color: Colors.amber, // Orange background for header
+              color: Colors.orange, // Orange background for header
               borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
             ),
             child: Row(
@@ -347,7 +348,7 @@ class _BidHistoryPageState extends State<BidHistoryPage> {
         child: Container(
           height: 45,
           decoration: BoxDecoration(
-            color: enabled ? Colors.amber : Colors.grey,
+            color: enabled ? Colors.orange : Colors.grey,
             borderRadius: BorderRadius.circular(6),
           ),
           child: Center(

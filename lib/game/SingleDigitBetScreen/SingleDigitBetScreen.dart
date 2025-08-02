@@ -1,4 +1,5 @@
 import 'dart:async'; // For Timer
+import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -317,7 +318,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
         return BidConfirmationDialog(
-          gameTitle: widget.gameName,
+          gameTitle: widget.title,
           gameDate: formattedDate,
           bids: bidsForConfirmation,
           totalBids: bidsForConfirmation.length,
@@ -365,7 +366,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
     }
 
     final result = await _bidService.placeFinalBids(
-      gameName: widget.gameName,
+      gameName: widget.title,
       accessToken: accessToken,
       registerId: registerId,
       deviceId: _deviceId,
@@ -390,14 +391,17 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!context.mounted) return;
 
-      // This is where the success/failure dialog is shown.
-      // It should await this dialog to be dismissed before continuing.
       await showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => result['status']
-            ? const BidSuccessDialog()
-            : BidFailureDialog(errorMessage: result['msg']),
+        builder: (ctx) {
+          log("resultour  log : $result['status']");
+          if (result['status'] == true) {
+            return const BidSuccessDialog();
+          } else {
+            return BidFailureDialog(errorMessage: result['msg']);
+          }
+        },
       );
 
       if (result['status'] && context.mounted) {
@@ -409,6 +413,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
           );
           digitController.clear();
           pointsController.clear();
+          bidsToSubmit.clear();
         });
         await _bidService.updateWalletBalance(newBalance);
         _showMessage('Bids submitted successfully!');
@@ -438,8 +443,10 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
           ),
         ),
         actions: [
-          const Icon(
-            Icons.account_balance_wallet_outlined,
+          Image.asset(
+            "assets/images/ic_wallet.png",
+            width: 22,
+            height: 22,
             color: Colors.black,
           ),
           const SizedBox(width: 6),
@@ -491,7 +498,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _isApiCalling
                               ? Colors.grey
-                              : Colors.amber,
+                              : Colors.orange,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(6),
                           ),
@@ -707,7 +714,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
           height: 35,
           child: TextFormField(
             controller: digitController,
-            cursorColor: Colors.amber,
+            cursorColor: Colors.orange,
             keyboardType: TextInputType.number,
             style: GoogleFonts.poppins(fontSize: 14),
             inputFormatters: [
@@ -734,7 +741,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(30),
-                borderSide: const BorderSide(color: Colors.amber, width: 2),
+                borderSide: const BorderSide(color: Colors.orange, width: 2),
               ),
             ),
           ),
@@ -789,7 +796,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
       height: 35,
       child: TextFormField(
         controller: controller,
-        cursorColor: Colors.amber,
+        cursorColor: Colors.orange,
         keyboardType: TextInputType.number,
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: inputFormatters,
@@ -813,7 +820,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.amber, width: 2),
+            borderSide: const BorderSide(color: Colors.orange, width: 2),
           ),
         ),
       ),
@@ -885,7 +892,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: (_isApiCalling || addedEntries.isEmpty)
                   ? Colors.grey
-                  : Colors.amber,
+                  : Colors.orange,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

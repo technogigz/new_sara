@@ -67,7 +67,7 @@ class _EnterMobileScreenState extends State<EnterMobileScreen> {
       if (statusCode == 200) {
         final data = jsonDecode(response.body);
         final statusRaw = data['status'];
-        final msg = data['message']?.toString().trim();
+        // final msg = data['message']?.toString().trim(); // This variable is not used
         final bool status = statusRaw.toString().toLowerCase() == "true";
 
         print("API Response: $data");
@@ -116,111 +116,112 @@ class _EnterMobileScreenState extends State<EnterMobileScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: AutofillGroup(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(width: 10, height: 50, color: Colors.amber),
-                    const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'ENTER YOUR MOBILE',
-                          style: GoogleFonts.poppins(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                            height: 1.2,
-                          ),
-                        ),
-
-                        Text(
-                          'NUMBER',
-                          style: GoogleFonts.poppins(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                            height: 1.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 30),
-                Center(
-                  child: Image.asset(
-                    'assets/images/phone_avatar.png',
-                    height: 200,
-                  ),
-                ),
-                const SizedBox(height: 40),
-                TextField(
-                  controller: mobileController,
-                  keyboardType: TextInputType.phone,
-                  autofillHints: const [AutofillHints.telephoneNumber],
-                  maxLength: 10,
-                  cursorColor: Colors.amber,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(10),
-                  ],
-                  onChanged: (value) {
-                    // Sanitize if autofilled full number like "+917007465202"
-                    final digitsOnly = value.replaceAll(RegExp(r'\D'), '');
-                    if (digitsOnly.length > 10) {
-                      final last10 = digitsOnly.substring(
-                        digitsOnly.length - 10,
-                      );
-                      mobileController.text = last10;
-                      mobileController.selection = TextSelection.fromPosition(
-                        TextPosition(offset: last10.length),
-                      );
-                    }
-                  },
-                  decoration: InputDecoration(
-                    counterText: "",
-                    prefixIcon: const Icon(
-                      Icons.phone_outlined,
-                      color: Colors.amber,
-                    ),
-                    hintText: 'Enter your mobile number',
-                    filled: true,
-                    fillColor: Colors.grey[200],
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(32),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 30),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: isLoading ? null : _handleNextPressed,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF9B233),
-                    ),
-                    child: isLoading
-                        ? const CircularProgressIndicator(color: Colors.black)
-                        : const Text(
-                            "NEXT",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
+        // Wrap the Padding with SingleChildScrollView
+        child: SingleChildScrollView(
+          child: AutofillGroup(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(width: 10, height: 50, color: Colors.orange),
+                      const SizedBox(width: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'ENTER YOUR MOBILE',
+                            style: GoogleFonts.poppins(
+                              fontSize: 24,
                               fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                              height: 1.2,
                             ),
                           ),
+                          Text(
+                            'NUMBER',
+                            style: GoogleFonts.poppins(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                              height: 1.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 30),
+                  Center(
+                    child: Image.asset(
+                      'assets/images/phone_avatar.png',
+                      height: 200,
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                  TextField(
+                    controller: mobileController,
+                    keyboardType: TextInputType.phone,
+                    autofillHints: const [AutofillHints.telephoneNumber],
+                    maxLength: 10,
+                    cursorColor: Colors.orange,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ],
+                    onChanged: (value) {
+                      // Sanitize if autofilled full number like "+917007465202"
+                      final digitsOnly = value.replaceAll(RegExp(r'\D'), '');
+                      if (digitsOnly.length > 10) {
+                        final last10 = digitsOnly.substring(
+                          digitsOnly.length - 10,
+                        );
+                        mobileController.text = last10;
+                        mobileController.selection = TextSelection.fromPosition(
+                          TextPosition(offset: last10.length),
+                        );
+                      }
+                    },
+                    decoration: InputDecoration(
+                      counterText: "",
+                      prefixIcon: const Icon(
+                        Icons.phone_outlined,
+                        color: Colors.orange,
+                      ),
+                      hintText: 'Enter your mobile number',
+                      filled: true,
+                      fillColor: Colors.grey[200],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(32),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: isLoading ? null : _handleNextPressed,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF9B233),
+                      ),
+                      child: isLoading
+                          ? const CircularProgressIndicator(color: Colors.black)
+                          : const Text(
+                              "NEXT",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

@@ -379,8 +379,10 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
           ),
         ),
         actions: [
-          const Icon(
-            Icons.account_balance_wallet_outlined,
+          Image.asset(
+            "assets/images/ic_wallet.png",
+            width: 22,
+            height: 22,
             color: Colors.black,
           ),
           const SizedBox(width: 6),
@@ -429,7 +431,7 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
                       child: ElevatedButton(
                         onPressed: _addBid,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.amber,
+                          backgroundColor: Colors.orange,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(6),
                           ),
@@ -574,7 +576,7 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
           width: 150,
           height: 40,
           child: TextField(
-            cursorColor: Colors.amber,
+            cursorColor: Colors.orange,
             controller: controller,
             keyboardType: TextInputType.number,
             inputFormatters: [
@@ -596,11 +598,11 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
               ),
               focusedBorder: const OutlineInputBorder(
                 borderRadius: BorderRadius.all(Radius.circular(20)),
-                borderSide: BorderSide(color: Colors.amber, width: 2),
+                borderSide: BorderSide(color: Colors.orange, width: 2),
               ),
               suffixIcon: const Icon(
                 Icons.arrow_forward,
-                color: Colors.amber,
+                color: Colors.orange,
                 size: 20,
               ),
             ),
@@ -659,11 +661,11 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
                       ),
                       focusedBorder: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(20)),
-                        borderSide: BorderSide(color: Colors.amber, width: 2),
+                        borderSide: BorderSide(color: Colors.orange, width: 2),
                       ),
                       suffixIcon: const Icon(
                         Icons.arrow_forward,
-                        color: Colors.amber,
+                        color: Colors.orange,
                         size: 20,
                       ),
                     ),
@@ -1362,7 +1364,7 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
 //                       child: ElevatedButton(
 //                         onPressed: _addBid,
 //                         style: ElevatedButton.styleFrom(
-//                           backgroundColor: Colors.amber,
+//                           backgroundColor: Colors.orange,
 //                           shape: RoundedRectangleBorder(
 //                             borderRadius: BorderRadius.circular(6),
 //                           ),
@@ -1507,7 +1509,7 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
 //           width: 150,
 //           height: 40,
 //           child: TextField(
-//             cursorColor: Colors.amber,
+//             cursorColor: Colors.orange,
 //             controller: controller,
 //             keyboardType: TextInputType.number,
 //             inputFormatters: [
@@ -1529,11 +1531,11 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
 //               ),
 //               focusedBorder: const OutlineInputBorder(
 //                 borderRadius: BorderRadius.all(Radius.circular(20)),
-//                 borderSide: BorderSide(color: Colors.amber, width: 2),
+//                 borderSide: BorderSide(color: Colors.orange, width: 2),
 //               ),
 //               suffixIcon: const Icon(
 //                 Icons.arrow_forward,
-//                 color: Colors.amber,
+//                 color: Colors.orange,
 //                 size: 20,
 //               ),
 //             ),
@@ -1592,11 +1594,11 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
 //                       ),
 //                       focusedBorder: const OutlineInputBorder(
 //                         borderRadius: BorderRadius.all(Radius.circular(20)),
-//                         borderSide: BorderSide(color: Colors.amber, width: 2),
+//                         borderSide: BorderSide(color: Colors.orange, width: 2),
 //                       ),
 //                       suffixIcon: const Icon(
 //                         Icons.arrow_forward,
-//                         color: Colors.amber,
+//                         color: Colors.orange,
 //                         size: 20,
 //                       ),
 //                     ),

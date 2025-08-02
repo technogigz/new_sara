@@ -39,7 +39,7 @@ class BidSuccessDialog extends StatelessWidget {
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () {
-                  Navigator.of(context).pop();
+                  Navigator.of(context, rootNavigator: true).pop();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,

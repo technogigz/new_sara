@@ -108,6 +108,7 @@ class FundsScreen extends StatelessWidget {
                   item.assetIconPath,
                   width: 36,
                   height: 36,
+                  color: Colors.orange,
                   errorBuilder: (_, __, ___) => const Icon(Icons.error),
                 ),
                 title: Text(
@@ -124,7 +125,7 @@ class FundsScreen extends StatelessWidget {
                   child: const Icon(
                     Icons.arrow_forward_ios,
                     size: 16,
-                    color: Colors.amber,
+                    color: Colors.orange,
                   ),
                 ),
               ),
@@ -207,7 +208,7 @@ class _FundOption {
 //                 trailing: CircleAvatar(
 //                   radius: 14,
 //                   backgroundColor: Colors.grey.shade300,
-//                   child: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.amber),
+//                   child: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.orange),
 //                 ),
 //               ),
 //             ),

@@ -510,8 +510,10 @@ class _TwoDigitPanelScreenState extends State<TwoDigitPanelScreen> {
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
         ),
         actions: [
-          const Icon(
-            Icons.account_balance_wallet_outlined,
+          Image.asset(
+            "assets/images/ic_wallet.png",
+            width: 22,
+            height: 22,
             color: Colors.black,
           ),
           const SizedBox(width: 6),
@@ -586,7 +588,7 @@ class _TwoDigitPanelScreenState extends State<TwoDigitPanelScreen> {
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(30),
                                   borderSide: const BorderSide(
-                                    color: Colors.amber,
+                                    color: Colors.orange,
                                     width: 2,
                                   ),
                                 ),
@@ -625,7 +627,7 @@ class _TwoDigitPanelScreenState extends State<TwoDigitPanelScreen> {
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(30),
                                   borderSide: const BorderSide(
-                                    color: Colors.amber,
+                                    color: Colors.orange,
                                     width: 2,
                                   ),
                                 ),
@@ -638,7 +640,7 @@ class _TwoDigitPanelScreenState extends State<TwoDigitPanelScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: isAnyApiCalling
                                   ? Colors.grey
-                                  : Colors.amber,
+                                  : Colors.orange,
                               minimumSize: const Size(80, 45),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -737,7 +739,7 @@ class _TwoDigitPanelScreenState extends State<TwoDigitPanelScreen> {
                                             IconButton(
                                               icon: const Icon(
                                                 Icons.delete_outline,
-                                                color: Colors.amber,
+                                                color: Colors.orange,
                                               ),
                                               onPressed: isAnyApiCalling
                                                   ? null
@@ -797,7 +799,7 @@ class _TwoDigitPanelScreenState extends State<TwoDigitPanelScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: isAnyApiCalling
                                 ? Colors.grey
-                                : Colors.amber,
+                                : Colors.orange,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 32,
                               vertical: 12,
@@ -1322,7 +1324,7 @@ class _TwoDigitPanelScreenState extends State<TwoDigitPanelScreen> {
 //                                 focusedBorder: OutlineInputBorder(
 //                                   borderRadius: BorderRadius.circular(30),
 //                                   borderSide: const BorderSide(
-//                                     color: Colors.amber,
+//                                     color: Colors.orange,
 //                                     width: 2,
 //                                   ),
 //                                 ),
@@ -1362,7 +1364,7 @@ class _TwoDigitPanelScreenState extends State<TwoDigitPanelScreen> {
 //                                 focusedBorder: OutlineInputBorder(
 //                                   borderRadius: BorderRadius.circular(30),
 //                                   borderSide: const BorderSide(
-//                                     color: Colors.amber,
+//                                     color: Colors.orange,
 //                                     width: 2,
 //                                   ),
 //                                 ),
@@ -1373,7 +1375,7 @@ class _TwoDigitPanelScreenState extends State<TwoDigitPanelScreen> {
 //                           ElevatedButton(
 //                             onPressed: addBid,
 //                             style: ElevatedButton.styleFrom(
-//                               backgroundColor: Colors.amber,
+//                               backgroundColor: Colors.orange,
 //                               minimumSize: const Size(80, 45),
 //                               shape: RoundedRectangleBorder(
 //                                 borderRadius: BorderRadius.circular(12),
@@ -1457,7 +1459,7 @@ class _TwoDigitPanelScreenState extends State<TwoDigitPanelScreen> {
 //                                             IconButton(
 //                                               icon: const Icon(
 //                                                 Icons.delete_outline,
-//                                                 color: Colors.amber,
+//                                                 color: Colors.orange,
 //                                               ),
 //                                               onPressed: () => deleteBid(index),
 //                                             ),
@@ -1504,7 +1506,7 @@ class _TwoDigitPanelScreenState extends State<TwoDigitPanelScreen> {
 //                         ElevatedButton(
 //                           onPressed: _showConfirmationDialog,
 //                           style: ElevatedButton.styleFrom(
-//                             backgroundColor: Colors.amber,
+//                             backgroundColor: Colors.orange,
 //                             padding: const EdgeInsets.symmetric(
 //                               horizontal: 32,
 //                               vertical: 12,

@@ -419,7 +419,7 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
       width: 150,
       child: TextFormField(
         controller: pointsController,
-        cursorColor: Colors.amber,
+        cursorColor: Colors.orange,
         keyboardType: TextInputType.number,
         inputFormatters: [
           FilteringTextInputFormatter.digitsOnly,
@@ -444,12 +444,12 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.amber, width: 2),
+            borderSide: const BorderSide(color: Colors.orange, width: 2),
           ),
         ),
         onTap: () {
           setState(() {
-            textFieldBorderColor = Colors.amber;
+            textFieldBorderColor = Colors.orange;
             _clearMessage();
           });
         },
@@ -499,7 +499,7 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
                 decoration: BoxDecoration(
                   color: _isApiCalling
                       ? Colors.grey
-                      : Colors.amber, // Dim if disabled
+                      : Colors.orange, // Dim if disabled
                   borderRadius: BorderRadius.circular(8),
                   boxShadow: _isApiCalling
                       ? []
@@ -587,10 +587,10 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         Image.asset(
-                          'assets/images/wallet_icon.png',
-                          width: 24,
-                          height: 24,
-                          color: Colors.black, // Ensure icon color is visible
+                          "assets/images/ic_wallet.png",
+                          width: 22,
+                          height: 22,
+                          color: Colors.black,
                         ),
                         const SizedBox(width: 4),
                         _isWalletLoading
@@ -777,7 +777,7 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: (_isApiCalling || bidAmounts.isEmpty)
                           ? Colors.grey
-                          : Colors.amber, // Grey out when disabled
+                          : Colors.orange, // Grey out when disabled
                       padding: const EdgeInsets.symmetric(
                         horizontal: 24, // Consistent padding
                         vertical: 12,

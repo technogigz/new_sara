@@ -148,7 +148,7 @@ class _WithdrawalHistoryPageState extends State<WithdrawalHistoryPage> {
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(
-                child: CircularProgressIndicator(color: Colors.amber),
+                child: CircularProgressIndicator(color: Colors.orange),
               );
             } else if (snapshot.hasError) {
               return Center(

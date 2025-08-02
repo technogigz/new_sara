@@ -60,7 +60,7 @@ class BidScreen extends StatelessWidget {
                 child: Icon(
                   Icons.arrow_forward_ios,
                   size: 16,
-                  color: Colors.amber,
+                  color: Colors.orange,
                 ),
               ),
               onTap: () {

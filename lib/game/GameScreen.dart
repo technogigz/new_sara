@@ -385,6 +385,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                                 gameId: widget.gameId,
                                 gameName: item.name,
                                 gameCategoryType: item.type,
+                                selectionStatus: widget.openSessionStatus,
                               );
                               break;
 
@@ -396,6 +397,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                                 gameId: widget.gameId,
                                 gameName: item.name,
                                 gameCategoryType: item.type,
+                                selectionStatus: widget.openSessionStatus,
                               );
                               break;
 
@@ -406,6 +408,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                                 gameId: widget.gameId,
                                 gameName: item.name,
                                 gameCategoryType: item.type,
+                                selectionStatus: widget.openSessionStatus,
                               );
                               break;
 
@@ -428,6 +431,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                                 gameId: widget.gameId,
                                 gameType: item.type,
                                 gameName: item.name,
+                                selectionStatus: widget.openSessionStatus,
                               );
                               break;
 
@@ -438,6 +442,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                                 gameId: widget.gameId,
                                 gameName: item.name,
                                 gameCategoryType: item.type,
+                                selectionStatus: widget.openSessionStatus,
                               );
                               break;
 
@@ -469,6 +474,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                                     "$parentScreenTranslatedTitle ${item.currentDisplayName}",
                                 gameId: widget.gameId,
                                 gameType: item.type,
+                                selectionStatus: widget.openSessionStatus,
                               );
                               break;
 
@@ -507,6 +513,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                                     "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
                                 gameId: widget.gameId,
                                 gameType: item.type,
+                                selectionStatus: widget.openSessionStatus,
                               );
                               break;
 
@@ -517,6 +524,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                                 gameId: widget.gameId,
                                 gameType: item.type,
                                 gameName: item.name,
+                                selectionStatus: widget.openSessionStatus,
                               );
                               break;
 
@@ -526,6 +534,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                                     "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
                                 gameId: widget.gameId,
                                 gameType: item.type,
+                                openSessionStatus: widget.openSessionStatus,
                               );
                               break;
 

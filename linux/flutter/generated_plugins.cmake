@@ -3,7 +3,9 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  flutter_pay_upi
   url_launcher_linux
+  webview_all_cef
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

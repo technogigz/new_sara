@@ -1,7 +1,10 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
+
+import '../ulits/Constents.dart';
 
 class ChartTableScreen extends StatefulWidget {
   final int gameId;
@@ -33,7 +36,7 @@ class _ChartTableScreenState extends State<ChartTableScreen> {
     ); // Replace with actual token
 
     final response = await http.post(
-      Uri.parse('https://sara777.win/api/v1/table-chart'),
+      Uri.parse('${Constant.apiEndpoint}table-chart'),
       headers: {
         'deviceId': 'qwert',
         'deviceName': 'sm2233',

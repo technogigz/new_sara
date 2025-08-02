@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
@@ -69,11 +70,7 @@ class _GameRateScreenState extends State<GameRateScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
         boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          )
+          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
         ],
       ),
       child: Center(
@@ -124,26 +121,36 @@ class _GameRateScreenState extends State<GameRateScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(child: Container(
-        color: Colors.grey.shade200,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: gameRates == null
-              ? const Center(child: CircularProgressIndicator(color: Colors.amber,))
-              : SingleChildScrollView(
-            child: Column(
-              children: [
-                buildRates(
-                    'Game Win Ratio for All Bids', gameRates!['gameRate']),
-                buildRates('King Starline Game Win Ratio',
-                    gameRates!['starlineGameRate']),
-                buildRates('King Jackpot Win Ratio',
-                    gameRates!['jackpotGameRate']),
-              ],
-            ),
+      body: SafeArea(
+        child: Container(
+          color: Colors.grey.shade200,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: gameRates == null
+                ? const Center(
+                    child: CircularProgressIndicator(color: Colors.orange),
+                  )
+                : SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        buildRates(
+                          'Game Win Ratio for All Bids',
+                          gameRates!['gameRate'],
+                        ),
+                        buildRates(
+                          'King Starline Game Win Ratio',
+                          gameRates!['starlineGameRate'],
+                        ),
+                        buildRates(
+                          'King Jackpot Win Ratio',
+                          gameRates!['jackpotGameRate'],
+                        ),
+                      ],
+                    ),
+                  ),
           ),
         ),
-      )),
+      ),
     );
   }
 }

@@ -131,7 +131,7 @@ class _BankDetailsFragmentState extends State<BankDetailsFragment> {
                   onPressed: submitBankDetails,
                   style: ElevatedButton.styleFrom(
                     elevation: 3,
-                    backgroundColor: Colors.amber,
+                    backgroundColor: Colors.orange,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(15),
@@ -168,12 +168,12 @@ class _BankDetailsFragmentState extends State<BankDetailsFragment> {
       ),
       child: TextFormField(
         controller: controller,
-        cursorColor: Colors.amber,
+        cursorColor: Colors.orange,
         decoration: InputDecoration(
           hintText: hintText,
           prefixIcon: CircleAvatar(
             radius: 16,
-            backgroundColor: Colors.amber,
+            backgroundColor: Colors.orange,
             child: Icon(icon, size: 18, color: Colors.white),
           ),
           contentPadding: const EdgeInsets.symmetric(vertical: 16),

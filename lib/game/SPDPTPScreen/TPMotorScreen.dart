@@ -18,6 +18,7 @@ class TPMotorsBetScreen extends StatefulWidget {
   final String gameCategoryType;
   final int gameId;
   final String gameName;
+  final bool selectionStatus; // This controls the dropdown options
 
   const TPMotorsBetScreen({
     super.key,
@@ -25,6 +26,7 @@ class TPMotorsBetScreen extends StatefulWidget {
     required this.gameId,
     required this.gameName,
     required this.gameCategoryType,
+    required this.selectionStatus,
   });
 
   @override
@@ -32,7 +34,6 @@ class TPMotorsBetScreen extends StatefulWidget {
 }
 
 class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
-  final List<String> gameTypesOptions = const ["Open", "Close"];
   late String selectedGameBetType;
 
   final TextEditingController digitController = TextEditingController();
@@ -82,7 +83,9 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
     _setupStorageListeners();
 
     digitController.addListener(_onDigitChanged);
-    selectedGameBetType = gameTypesOptions[0];
+
+    // Initialize selectedGameBetType based on selectionStatus
+    selectedGameBetType = widget.selectionStatus ? "Open" : "Close";
   }
 
   void _onDigitChanged() {
@@ -443,7 +446,7 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
           gameId: widget.gameId.toString(),
           gameType: widget.gameCategoryType,
           onConfirm: () async {
-            // Navigator.pop(dialogContext);
+            // Navigator.pop(dialogContext); // Dialog is dismissed within _placeFinalBids
             setState(() {
               _isApiCalling = true;
             });
@@ -461,6 +464,18 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Dynamically set available game type options
+    List<String> availableGameTypes = [];
+    if (widget.selectionStatus) {
+      availableGameTypes.add("Open");
+    }
+    availableGameTypes.add("Close"); // Close is always an option
+
+    // Ensure selectedGameBetType is still a valid option if selectionStatus changed
+    if (!availableGameTypes.contains(selectedGameBetType)) {
+      selectedGameBetType = availableGameTypes.first;
+    }
+
     return Scaffold(
       backgroundColor: Colors.grey.shade200,
       appBar: AppBar(
@@ -479,8 +494,10 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
           ),
         ),
         actions: [
-          const Icon(
-            Icons.account_balance_wallet_outlined,
+          Image.asset(
+            "assets/images/ic_wallet.png",
+            width: 22,
+            height: 22,
             color: Colors.black,
           ),
           const SizedBox(width: 6),
@@ -507,7 +524,10 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
                 ),
                 child: Column(
                   children: [
-                    _inputRow("Select Game Type:", _buildDropdown()),
+                    _inputRow(
+                      "Select Game Type:",
+                      _buildDropdown(availableGameTypes),
+                    ),
                     const SizedBox(height: 12),
                     _inputRow(
                       "Enter 3-Digit Triple Panna:",
@@ -570,7 +590,7 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
                       height: 45,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.amber,
+                          backgroundColor: Colors.orange,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(6),
                           ),
@@ -725,7 +745,8 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
     );
   }
 
-  Widget _buildDropdown() {
+  // Modified _buildDropdown to accept available options
+  Widget _buildDropdown(List<String> options) {
     return SizedBox(
       width: 150,
       height: 35,
@@ -749,9 +770,7 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
                       _clearMessage();
                     });
                   },
-            items: gameTypesOptions.map<DropdownMenuItem<String>>((
-              String value,
-            ) {
+            items: options.map<DropdownMenuItem<String>>((String value) {
               return DropdownMenuItem<String>(
                 value: value,
                 child: Text(value, style: GoogleFonts.poppins(fontSize: 14)),
@@ -769,7 +788,7 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
       height: 35,
       child: TextFormField(
         controller: digitController,
-        cursorColor: Colors.amber,
+        cursorColor: Colors.orange,
         keyboardType: TextInputType.number,
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: [
@@ -802,7 +821,7 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.amber, width: 2),
+            borderSide: const BorderSide(color: Colors.orange, width: 2),
           ),
         ),
       ),
@@ -819,7 +838,7 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
       height: 35,
       child: TextFormField(
         controller: controller,
-        cursorColor: Colors.amber,
+        cursorColor: Colors.orange,
         keyboardType: TextInputType.number,
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: inputFormatters,
@@ -843,7 +862,7 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.amber, width: 2),
+            borderSide: const BorderSide(color: Colors.orange, width: 2),
           ),
         ),
       ),
@@ -917,7 +936,7 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
               backgroundColor:
                   (_isApiCalling || _getTotalPointsForSelectedGameType() == 0)
                   ? Colors.grey
-                  : Colors.amber,
+                  : Colors.orange,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -943,28 +962,27 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
   }
 }
 
-// import 'dart:async'; // For Timer
-// import 'dart:convert'; // For jsonEncode, json.decode
-// import 'dart:developer'; // For log
+// import 'dart:async';
+// import 'dart:developer';
 //
 // import 'package:flutter/material.dart';
 // import 'package:flutter/services.dart';
 // import 'package:get_storage/get_storage.dart';
 // import 'package:google_fonts/google_fonts.dart';
-// import 'package:http/http.dart' as http; // For API calls
-// import 'package:intl/intl.dart'; // Import for date formatting
+// import 'package:intl/intl.dart';
 //
+// import '../../BidService.dart'; // Import BidService
 // import '../../components/AnimatedMessageBar.dart';
 // import '../../components/BidConfirmationDialog.dart';
 // import '../../components/BidFailureDialog.dart';
 // import '../../components/BidSuccessDialog.dart';
-// import '../../ulits/Constents.dart'; // Import the Constants file for API endpoint
 //
 // class TPMotorsBetScreen extends StatefulWidget {
 //   final String title;
 //   final String gameCategoryType;
 //   final int gameId;
 //   final String gameName;
+//   final bool selectionStatus;
 //
 //   const TPMotorsBetScreen({
 //     super.key,
@@ -972,6 +990,7 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //     required this.gameId,
 //     required this.gameName,
 //     required this.gameCategoryType,
+//     required this.selectionStatus,
 //   });
 //
 //   @override
@@ -985,7 +1004,6 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //   final TextEditingController digitController = TextEditingController();
 //   final TextEditingController pointsController = TextEditingController();
 //
-//   // --- Triple Patti specific list ---
 //   List<String> triplePanaOptions = [
 //     "111",
 //     "222",
@@ -1001,9 +1019,10 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //   List<String> filteredDigitOptions = [];
 //   bool _isDigitSuggestionsVisible = false;
 //
-//   // --- End Triple Patti specific list ---
 //   List<Map<String, String>> addedEntries = [];
 //   late GetStorage storage;
+//   late BidService _bidService; // Declare BidService
+//
 //   late String accessToken;
 //   late String registerId;
 //   late String preferredLanguage;
@@ -1016,23 +1035,22 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //   String? _messageToShow;
 //   bool _isErrorForMessage = false;
 //   Key _messageBarKey = UniqueKey();
+//   Timer? _messageDismissTimer; // Keep Timer for message bar dismissal
 //
-//   // State variable to track API call status
 //   bool _isApiCalling = false;
 //
 //   @override
 //   void initState() {
 //     super.initState();
 //     storage = GetStorage();
+//     _bidService = BidService(storage); // Initialize BidService
 //     _loadInitialData();
 //     _setupStorageListeners();
 //
-//     // Add listener for digitController
 //     digitController.addListener(_onDigitChanged);
 //     selectedGameBetType = gameTypesOptions[0];
 //   }
 //
-//   // _onDigitChanged method for filtering Triple Patti
 //   void _onDigitChanged() {
 //     final query = digitController.text.trim();
 //     if (query.isNotEmpty) {
@@ -1096,18 +1114,23 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //
 //   @override
 //   void dispose() {
-//     // Remove listener for digitController
 //     digitController.removeListener(_onDigitChanged);
 //     digitController.dispose();
 //     pointsController.dispose();
+//     _messageDismissTimer?.cancel(); // Cancel timer
 //     super.dispose();
 //   }
 //
 //   void _showMessage(String message, {bool isError = false}) {
+//     _messageDismissTimer?.cancel(); // Cancel any existing timer
+//     if (!mounted) return;
 //     setState(() {
 //       _messageToShow = message;
 //       _isErrorForMessage = isError;
-//       _messageBarKey = UniqueKey();
+//       _messageBarKey = UniqueKey(); // Update key to trigger animation
+//     });
+//     _messageDismissTimer = Timer(const Duration(seconds: 3), () {
+//       _clearMessage();
 //     });
 //   }
 //
@@ -1120,35 +1143,24 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //   }
 //
 //   void _addEntry() {
+//     _clearMessage();
 //     if (_isApiCalling) return;
 //
 //     final digit = digitController.text.trim();
 //     final points = pointsController.text.trim();
 //
-//     if (digit.isEmpty) {
-//       _showMessage('Please enter a 3-digit number.', isError: true);
+//     if (digit.isEmpty || digit.length != 3 || int.tryParse(digit) == null) {
+//       _showMessage('Enter a valid 3-digit number.', isError: true);
 //       return;
 //     }
 //
-//     if (digit.length != 3 || int.tryParse(digit) == null) {
-//       _showMessage(
-//         'Please enter a valid 3-digit number (e.g., 123).',
-//         isError: true,
-//       );
-//       return;
-//     }
-//
-//     // Validate if the digit is in the Triple_Pana list
 //     if (!triplePanaOptions.contains(digit)) {
-//       _showMessage(
-//         'Invalid 3-digit number. Not a valid Triple Patti.',
-//         isError: true,
-//       );
+//       _showMessage('Invalid Triple Patti number.', isError: true);
 //       return;
 //     }
 //
 //     if (points.isEmpty) {
-//       _showMessage('Please enter an Amount.', isError: true);
+//       _showMessage('Please enter an amount.', isError: true);
 //       return;
 //     }
 //
@@ -1158,68 +1170,204 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //       return;
 //     }
 //
+//     // Use consistent keys ("digit", "amount", "type", "gameType")
+//     final newEntry = {
+//       "digit": digit,
+//       "amount":
+//           points, // Renamed from "points" to "amount" for consistency with BidService
+//       "type": selectedGameBetType,
+//       "gameType": widget.gameCategoryType,
+//     };
+//
 //     final existingIndex = addedEntries.indexWhere(
-//       (entry) =>
-//           entry['digit'] == digit && entry['type'] == selectedGameBetType,
+//       (e) => e['digit'] == digit && e['type'] == selectedGameBetType,
 //     );
 //
 //     setState(() {
 //       if (existingIndex != -1) {
-//         final currentPoints = int.parse(addedEntries[existingIndex]['points']!);
-//         addedEntries[existingIndex]['points'] = (currentPoints + parsedPoints)
+//         int existing = int.parse(addedEntries[existingIndex]['amount']!);
+//         addedEntries[existingIndex]['amount'] = (existing + parsedPoints)
 //             .toString();
-//         _showMessage(
-//           'Updated points for Triple Patti: $digit, Type: $selectedGameBetType.',
-//         );
+//         _showMessage("Updated bid for $digit.");
 //       } else {
-//         addedEntries.add({
-//           "digit": digit,
-//           "points": points,
-//           "type": selectedGameBetType,
-//         });
-//         _showMessage(
-//           'Added bid: Triple Patti $digit, Points $points, Type $selectedGameBetType.',
-//         );
+//         addedEntries.add(newEntry);
+//         _showMessage("Added bid: $digit - $points points");
 //       }
 //       digitController.clear();
 //       pointsController.clear();
-//       _isDigitSuggestionsVisible = false; // Hide suggestions after adding
+//       _isDigitSuggestionsVisible = false;
 //     });
 //   }
 //
 //   void _removeEntry(int index) {
+//     _clearMessage();
 //     if (_isApiCalling) return;
 //
 //     setState(() {
-//       final removedEntry = addedEntries[index];
+//       final removed = addedEntries[index];
 //       addedEntries.removeAt(index);
-//       _showMessage(
-//         'Removed bid: Triple Patti ${removedEntry['digit']}, Type ${removedEntry['type']}.',
-//       );
+//       _showMessage("Removed bid: ${removed['digit']}");
 //     });
 //   }
 //
 //   int _getTotalPoints() {
+//     // Calculates total points for ALL added entries
 //     return addedEntries.fold(
 //       0,
-//       (sum, item) => sum + (int.tryParse(item['points'] ?? '0') ?? 0),
+//       (sum, item) =>
+//           sum + (int.tryParse(item['amount'] ?? '0') ?? 0), // Use 'amount'
 //     );
+//   }
+//
+//   int _getTotalPointsForSelectedGameType() {
+//     return addedEntries
+//         .where(
+//           (entry) =>
+//               (entry["type"] ?? "").toUpperCase() ==
+//               selectedGameBetType.toUpperCase(),
+//         )
+//         .fold(
+//           0,
+//           (sum, item) => sum + (int.tryParse(item['amount'] ?? '0') ?? 0),
+//         );
+//   }
+//
+//   Future<bool> _placeFinalBids() async {
+//     final Map<String, String> bidPayload = {};
+//     int currentBatchTotalPoints = 0;
+//
+//     // Filter and prepare bids for the currently selected game type
+//     for (var entry in addedEntries) {
+//       if ((entry["type"] ?? "").toUpperCase() ==
+//           selectedGameBetType.toUpperCase()) {
+//         String digit = entry["digit"] ?? "";
+//         String amount = entry["amount"] ?? "0"; // Use 'amount'
+//
+//         if (digit.isNotEmpty && int.tryParse(amount) != null) {
+//           bidPayload[digit] = amount;
+//           currentBatchTotalPoints += int.parse(amount);
+//         }
+//       }
+//     }
+//
+//     log(
+//       'bidPayload (Map<String,String>) being sent to BidService: $bidPayload',
+//       name: 'TPMotorsBetScreen',
+//     );
+//     log(
+//       'currentBatchTotalPoints: $currentBatchTotalPoints',
+//       name: 'TPMotorsBetScreen',
+//     );
+//
+//     if (bidPayload.isEmpty) {
+//       if (!mounted) return false;
+//       await showDialog(
+//         context: context,
+//         barrierDismissible: false,
+//         builder: (_) => const BidFailureDialog(
+//           errorMessage: 'No valid bids for the selected game type.',
+//         ),
+//       );
+//       return false;
+//     }
+//
+//     if (accessToken.isEmpty || registerId.isEmpty) {
+//       if (!mounted) return false;
+//
+//       await showDialog(
+//         context: context,
+//         barrierDismissible: false,
+//         builder: (_) => const BidFailureDialog(
+//           errorMessage: 'Authentication error. Please log in again.',
+//         ),
+//       );
+//       return false;
+//     }
+//
+//     try {
+//       final result = await _bidService.placeFinalBids(
+//         gameName: widget.gameName,
+//         accessToken: accessToken,
+//         registerId: registerId,
+//         deviceId: _deviceId,
+//         deviceName: _deviceName,
+//         accountStatus: accountStatus,
+//         bidAmounts: bidPayload,
+//         selectedGameType: selectedGameBetType,
+//         gameId: widget.gameId,
+//         gameType: widget.gameCategoryType,
+//         totalBidAmount: currentBatchTotalPoints,
+//       );
+//
+//       if (!mounted) return false;
+//
+//       if (result['status'] == true) {
+//         await showDialog(
+//           context: context,
+//           barrierDismissible: false,
+//           builder: (_) => const BidSuccessDialog(),
+//         );
+//
+//         final dynamic updatedBalanceRaw = result['updatedWalletBalance'];
+//         final int updatedBalance =
+//             int.tryParse(updatedBalanceRaw.toString()) ??
+//             (walletBalance - currentBatchTotalPoints);
+//         setState(() {
+//           walletBalance = updatedBalance;
+//         });
+//         _bidService.updateWalletBalance(updatedBalance);
+//
+//         setState(() {
+//           // Remove only bids of the currently selected game type after successful submission
+//           addedEntries.removeWhere(
+//             (element) =>
+//                 (element["type"] ?? "").toUpperCase() ==
+//                 selectedGameBetType.toUpperCase(),
+//           );
+//         });
+//         return true;
+//       } else {
+//         await showDialog(
+//           context: context,
+//           barrierDismissible: false,
+//           builder: (_) => BidFailureDialog(
+//             errorMessage: result['msg'] ?? 'Something went wrong',
+//           ),
+//         );
+//         return false;
+//       }
+//     } catch (e) {
+//       log('Error during bid placement: $e', name: 'TPMotorsBetScreenBidError');
+//       if (!mounted) return false;
+//
+//       await showDialog(
+//         context: context,
+//         barrierDismissible: false,
+//         builder: (_) => const BidFailureDialog(
+//           errorMessage: 'An unexpected error occurred during bid submission.',
+//         ),
+//       );
+//       return false;
+//     }
 //   }
 //
 //   void _showConfirmationDialog() {
 //     _clearMessage();
 //     if (_isApiCalling) return;
 //
-//     if (addedEntries.isEmpty) {
-//       _showMessage('Please add at least one bid.', isError: true);
+//     final int totalPointsForCurrentType = _getTotalPointsForSelectedGameType();
+//
+//     if (totalPointsForCurrentType == 0) {
+//       _showMessage(
+//         "No bids added for the selected game type to submit.",
+//         isError: true,
+//       );
 //       return;
 //     }
 //
-//     final int totalPoints = _getTotalPoints();
-//
-//     if (walletBalance < totalPoints) {
+//     if (walletBalance < totalPointsForCurrentType) {
 //       _showMessage(
-//         'Insufficient wallet balance to place this bid.',
+//         'Insufficient wallet balance for selected game type.',
 //         isError: true,
 //       );
 //       return;
@@ -1229,6 +1377,14 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //       'dd MMM yyyy, hh:mm a',
 //     ).format(DateTime.now());
 //
+//     final List<Map<String, String>> bidsToShowInDialog = addedEntries
+//         .where(
+//           (entry) =>
+//               (entry["type"] ?? "").toUpperCase() ==
+//               selectedGameBetType.toUpperCase(),
+//         )
+//         .toList();
+//
 //     showDialog(
 //       context: context,
 //       barrierDismissible: false,
@@ -1236,31 +1392,28 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //         return BidConfirmationDialog(
 //           gameTitle: widget.gameName,
 //           gameDate: formattedDate,
-//           bids: addedEntries.map((bid) {
+//           bids: bidsToShowInDialog.map((bid) {
 //             return {
 //               "digit": bid['digit']!,
-//               "points": bid['points']!,
-//               "type": bid['type']!,
+//               "points": bid['amount']!, // Use 'amount' here
+//               "type":
+//                   "${bid['gameType']} (${bid['type']})", // Corrected concatenation
 //               "pana": bid['digit']!,
 //             };
 //           }).toList(),
-//           totalBids: addedEntries.length,
-//           totalBidsAmount: totalPoints,
+//           totalBids: bidsToShowInDialog.length,
+//           totalBidsAmount: totalPointsForCurrentType,
 //           walletBalanceBeforeDeduction: walletBalance,
-//           walletBalanceAfterDeduction: (walletBalance - totalPoints).toString(),
+//           walletBalanceAfterDeduction:
+//               (walletBalance - totalPointsForCurrentType).toString(),
 //           gameId: widget.gameId.toString(),
 //           gameType: widget.gameCategoryType,
 //           onConfirm: () async {
-//             Navigator.pop(dialogContext);
+//             // Navigator.pop(dialogContext);
 //             setState(() {
 //               _isApiCalling = true;
 //             });
-//             bool success = await _placeFinalBids();
-//             if (success) {
-//               setState(() {
-//                 addedEntries.clear();
-//               });
-//             }
+//             await _placeFinalBids();
 //             if (mounted) {
 //               setState(() {
 //                 _isApiCalling = false;
@@ -1270,155 +1423,6 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //         );
 //       },
 //     );
-//   }
-//
-//   Future<bool> _placeFinalBids() async {
-//     String url;
-//     final gameCategory = widget.gameCategoryType.toLowerCase();
-//
-//     if (gameCategory.contains('jackpot')) {
-//       url = '${Constant.apiEndpoint}place-jackpot-bid';
-//     } else if (gameCategory.contains('starline')) {
-//       url = '${Constant.apiEndpoint}place-starline-bid';
-//     } else {
-//       url = '${Constant.apiEndpoint}place-bid';
-//     }
-//
-//     // --- Authentication Check ---
-//     // This check is good as it provides an immediate error without an API call.
-//     if (accessToken.isEmpty || registerId.isEmpty) {
-//       if (mounted) {
-//         showDialog(
-//           context: context,
-//           barrierDismissible: false,
-//           builder: (BuildContext context) {
-//             return const BidFailureDialog(
-//               errorMessage: 'Authentication error. Please log in again.',
-//             );
-//           },
-//         );
-//       }
-//       return false; // Return false immediately on auth error
-//     }
-//
-//     final headers = {
-//       'deviceId': _deviceId,
-//       'deviceName': _deviceName,
-//       'accessStatus': accountStatus ? '1' : '0',
-//       'Content-Type': 'application/json',
-//       'Authorization': 'Bearer $accessToken',
-//     };
-//
-//     final List<Map<String, dynamic>> bidPayload = addedEntries.map((entry) {
-//       final String bidDigit = entry['digit'] ?? '';
-//       final int bidAmount = int.tryParse(entry['points'] ?? '0') ?? 0;
-//
-//       return {
-//         "sessionType": entry['type']?.toUpperCase() ?? '',
-//         "digit": bidDigit,
-//         "pana": bidDigit,
-//         "bidAmount": bidAmount,
-//       };
-//     }).toList();
-//
-//     final body = jsonEncode({
-//       "registerId": registerId,
-//       "gameId": widget.gameId,
-//       "bidAmount": _getTotalPoints(),
-//       "gameType": gameCategory,
-//       "bid": bidPayload,
-//     });
-//
-//     log('Placing bid to URL: $url');
-//     log('Request Headers: $headers');
-//     log('Request Body: $body');
-//
-//     try {
-//       final response = await http.post(
-//         Uri.parse(url),
-//         headers: headers,
-//         body: body,
-//       );
-//
-//       final Map<String, dynamic> responseBody = json.decode(response.body);
-//       log('API Response: $responseBody');
-//
-//       // Handle success
-//       if (response.statusCode == 200 &&
-//           (responseBody['status'] == true ||
-//               responseBody['status'] == 'true')) {
-//         // Added string 'true' check for robustness
-//         int newWalletBalance = walletBalance - _getTotalPoints();
-//         await storage.write('walletBalance', newWalletBalance);
-//
-//         if (mounted) {
-//           setState(() {
-//             walletBalance = newWalletBalance;
-//           });
-//           // Show success dialog
-//           await showDialog(
-//             // Use await to ensure dialog is dismissed before continuing
-//             context: context,
-//             barrierDismissible: false,
-//             builder: (BuildContext context) {
-//               return const BidSuccessDialog();
-//             },
-//           );
-//           // After success, it might be good to clear any previous messages
-//           _clearMessage();
-//         }
-//         return true; // Return true on successful bid
-//       }
-//       // Handle API-specific errors (status code 200 but backend 'status' is false)
-//       else if (responseBody['status'] == false ||
-//           responseBody['status'] == 'false') {
-//         String errorMessage =
-//             responseBody['msg'] ?? "An error occurred during the bid process.";
-//         if (mounted) {
-//           await showDialog(
-//             // Use await here too
-//             context: context,
-//             barrierDismissible: false,
-//             builder: (BuildContext context) {
-//               return BidFailureDialog(errorMessage: errorMessage);
-//             },
-//           );
-//         }
-//         return false; // Return false on API-reported failure
-//       }
-//       // Handle other HTTP status codes (e.g., 400, 401, 500)
-//       else {
-//         String errorMessage =
-//             'Server error (${response.statusCode}): ${responseBody['msg'] ?? 'Unknown error'}.';
-//         if (mounted) {
-//           await showDialog(
-//             // Use await here too
-//             context: context,
-//             barrierDismissible: false,
-//             builder: (BuildContext context) {
-//               return BidFailureDialog(errorMessage: errorMessage);
-//             },
-//           );
-//         }
-//         return false; // Return false on generic HTTP error
-//       }
-//     } catch (e) {
-//       log('Error during bid submission: $e');
-//       if (mounted) {
-//         await showDialog(
-//           // Use await here too
-//           context: context,
-//           barrierDismissible: false,
-//           builder: (BuildContext context) {
-//             return const BidFailureDialog(
-//               errorMessage:
-//                   'Network error. Please check your internet connection.',
-//             );
-//           },
-//         );
-//       }
-//       return false; // Return false on network/exception error
-//     } finally {}
 //   }
 //
 //   @override
@@ -1469,22 +1473,17 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //                 ),
 //                 child: Column(
 //                   children: [
-//                     // Game Type Dropdown
 //                     _inputRow("Select Game Type:", _buildDropdown()),
 //                     const SizedBox(height: 12),
-//                     // Digit Input Field with suggestions
 //                     _inputRow(
 //                       "Enter 3-Digit Triple Panna:",
 //                       _buildDigitInputField(),
 //                     ),
-//                     // Added suggestions list conditionally
 //                     if (_isDigitSuggestionsVisible &&
 //                         filteredDigitOptions.isNotEmpty)
 //                       Container(
 //                         margin: const EdgeInsets.only(top: 8),
-//                         constraints: const BoxConstraints(
-//                           maxHeight: 200,
-//                         ), // Limit height
+//                         constraints: const BoxConstraints(maxHeight: 200),
 //                         decoration: BoxDecoration(
 //                           color: Colors.white,
 //                           borderRadius: BorderRadius.circular(8),
@@ -1506,9 +1505,7 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //                               onTap: () {
 //                                 setState(() {
 //                                   digitController.text = suggestion;
-//                                   _isDigitSuggestionsVisible =
-//                                       false; // Hide on selection
-//                                   // Move cursor to end of text
+//                                   _isDigitSuggestionsVisible = false;
 //                                   digitController.selection =
 //                                       TextSelection.fromPosition(
 //                                         TextPosition(
@@ -1521,11 +1518,7 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //                           },
 //                         ),
 //                       ),
-//                     // End Added suggestions list
-//                     const SizedBox(
-//                       height: 12,
-//                     ), // Adjust spacing after digit input
-//                     // Points Input Field
+//                     const SizedBox(height: 12),
 //                     _inputRow(
 //                       "Enter Points:",
 //                       _buildTextField(
@@ -1533,9 +1526,7 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //                         "Enter Amount",
 //                         inputFormatters: [
 //                           FilteringTextInputFormatter.digitsOnly,
-//                           LengthLimitingTextInputFormatter(
-//                             4,
-//                           ), // Max 4 digits for points
+//                           LengthLimitingTextInputFormatter(4),
 //                         ],
 //                       ),
 //                     ),
@@ -1545,14 +1536,12 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //                       height: 45,
 //                       child: ElevatedButton(
 //                         style: ElevatedButton.styleFrom(
-//                           backgroundColor: Colors.amber,
+//                           backgroundColor: Colors.orange,
 //                           shape: RoundedRectangleBorder(
 //                             borderRadius: BorderRadius.circular(6),
 //                           ),
 //                         ),
-//                         onPressed: _isApiCalling
-//                             ? null
-//                             : _addEntry, // Disable if API is calling
+//                         onPressed: _isApiCalling ? null : _addEntry,
 //                         child: _isApiCalling
 //                             ? const CircularProgressIndicator(
 //                                 color: Colors.white,
@@ -1572,7 +1561,6 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //                 ),
 //               ),
 //               const Divider(thickness: 1),
-//               // List Headers
 //               if (addedEntries.isNotEmpty)
 //                 Padding(
 //                   padding: const EdgeInsets.symmetric(
@@ -1610,7 +1598,6 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //                   ),
 //                 ),
 //               if (addedEntries.isNotEmpty) const Divider(thickness: 1),
-//               // List of Added Entries
 //               Expanded(
 //                 child: addedEntries.isEmpty
 //                     ? const Center(child: Text("No data added yet"))
@@ -1633,13 +1620,13 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //                                 ),
 //                                 Expanded(
 //                                   child: Text(
-//                                     entry['points']!,
+//                                     entry['amount']!, // Use 'amount'
 //                                     style: GoogleFonts.poppins(),
 //                                   ),
 //                                 ),
 //                                 Expanded(
 //                                   child: Text(
-//                                     entry['type']!,
+//                                     '${entry['gameType']} (${entry['type']})', // Corrected display
 //                                     style: GoogleFonts.poppins(),
 //                                   ),
 //                                 ),
@@ -1650,9 +1637,7 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //                                   ),
 //                                   onPressed: _isApiCalling
 //                                       ? null
-//                                       : () => _removeEntry(
-//                                           index,
-//                                         ), // Disable if API is calling
+//                                       : () => _removeEntry(index),
 //                                 ),
 //                               ],
 //                             ),
@@ -1660,11 +1645,9 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //                         },
 //                       ),
 //               ),
-//               // Bottom Summary Bar
 //               if (addedEntries.isNotEmpty) _buildBottomBar(),
 //             ],
 //           ),
-//           // Animated Message Bar
 //           if (_messageToShow != null)
 //             Positioned(
 //               top: 0,
@@ -1746,14 +1729,13 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //     );
 //   }
 //
-//   // Updated to accept 3-digit input and show suggestions
 //   Widget _buildDigitInputField() {
 //     return SizedBox(
 //       width: double.infinity,
 //       height: 35,
 //       child: TextFormField(
 //         controller: digitController,
-//         cursorColor: Colors.amber,
+//         cursorColor: Colors.orange,
 //         keyboardType: TextInputType.number,
 //         style: GoogleFonts.poppins(fontSize: 14),
 //         inputFormatters: [
@@ -1762,10 +1744,10 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //         ],
 //         onTap: () {
 //           _clearMessage();
-//           _onDigitChanged(); // Trigger suggestions on tap if text is present
+//           _onDigitChanged();
 //         },
 //         onChanged: (value) {
-//           _onDigitChanged(); // Filter suggestions as user types
+//           _onDigitChanged();
 //         },
 //         enabled: !_isApiCalling,
 //         decoration: InputDecoration(
@@ -1786,7 +1768,7 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //           ),
 //           focusedBorder: OutlineInputBorder(
 //             borderRadius: BorderRadius.circular(30),
-//             borderSide: const BorderSide(color: Colors.amber, width: 2),
+//             borderSide: const BorderSide(color: Colors.orange, width: 2),
 //           ),
 //         ),
 //       ),
@@ -1803,7 +1785,7 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //       height: 35,
 //       child: TextFormField(
 //         controller: controller,
-//         cursorColor: Colors.amber,
+//         cursorColor: Colors.orange,
 //         keyboardType: TextInputType.number,
 //         style: GoogleFonts.poppins(fontSize: 14),
 //         inputFormatters: inputFormatters,
@@ -1827,7 +1809,7 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //           ),
 //           focusedBorder: OutlineInputBorder(
 //             borderRadius: BorderRadius.circular(30),
-//             borderSide: const BorderSide(color: Colors.amber, width: 2),
+//             borderSide: const BorderSide(color: Colors.orange, width: 2),
 //           ),
 //         ),
 //       ),
@@ -1893,13 +1875,15 @@ class _TPMotorsBetScreenState extends State<TPMotorsBetScreen> {
 //             ],
 //           ),
 //           ElevatedButton(
-//             onPressed: _isApiCalling
+//             onPressed:
+//                 (_isApiCalling || _getTotalPointsForSelectedGameType() == 0)
 //                 ? null
-//                 : _showConfirmationDialog, // Disable if API is calling
+//                 : _showConfirmationDialog,
 //             style: ElevatedButton.styleFrom(
-//               backgroundColor: _isApiCalling
+//               backgroundColor:
+//                   (_isApiCalling || _getTotalPointsForSelectedGameType() == 0)
 //                   ? Colors.grey
-//                   : Colors.amber, // Dim if disabled
+//                   : Colors.orange,
 //               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
 //               shape: RoundedRectangleBorder(
 //                 borderRadius: BorderRadius.circular(8),

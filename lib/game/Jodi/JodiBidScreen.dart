@@ -36,9 +36,8 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
 
   late String accessToken;
   late String registerId;
-  late int walletBalance;
+  String walletBalance = '0'; // Changed to String
   bool accountStatus = false;
-  bool _isWalletLoading = true;
   bool _isSubmitting = false;
 
   final String _deviceId = 'test_device_id_flutter';
@@ -58,6 +57,8 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
     super.initState();
     storage = GetStorage();
     _bidService = BidService(storage);
+    // Initialize walletBalance from storage as String
+    walletBalance = storage.read('walletBalance')?.toString() ?? '0';
     _loadInitialData();
     _setupStorageListeners();
   }
@@ -66,21 +67,20 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
     accessToken = storage.read('accessToken') ?? '';
     registerId = storage.read('registerId') ?? '';
     accountStatus = storage.read('accountStatus') ?? false;
-    final sb = storage.read('walletBalance');
-    walletBalance = sb is String
-        ? int.tryParse(sb) ?? 0
-        : sb is int
-        ? sb
-        : 0;
-    setState(() => _isWalletLoading = false);
+    // Load walletBalance from storage as String
+    setState(() {
+      walletBalance = storage.read('walletBalance')?.toString() ?? '0';
+    });
   }
 
   void _setupStorageListeners() {
     storage.listenKey('walletBalance', (value) {
-      setState(() {
-        walletBalance = int.tryParse(value.toString()) ?? 0;
-        _isWalletLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          // Listen and directly assign the string value (or default '0')
+          walletBalance = value?.toString() ?? '0';
+        });
+      }
     });
   }
 
@@ -158,11 +158,16 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
     );
 
     if (result['status'] == true) {
-      final newBal = walletBalance - total;
-      await _bidService.updateWalletBalance(newBal);
+      // Parse current walletBalance to int for calculation
+      final currentWalletBalanceInt = int.tryParse(walletBalance) ?? 0;
+      final newBalInt = currentWalletBalanceInt - total;
+      await _bidService.updateWalletBalance(
+        newBalInt,
+      ); // update GetStorage with int
       setState(() {
         bids.clear();
-        walletBalance = newBal;
+        walletBalance = newBalInt
+            .toString(); // Convert back to String for state
       });
       showDialog(context: context, builder: (_) => const BidSuccessDialog());
       _showMessage("Bid placed successfully!");
@@ -183,12 +188,15 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
       _showMessage('No bids added yet.', isError: true);
       return;
     }
-    if (total > walletBalance) {
+    // Parse walletBalance to int for comparison
+    if (total > (int.tryParse(walletBalance) ?? 0)) {
       _showMessage('Insufficient wallet balance.', isError: true);
       return;
     }
 
     final date = DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now());
+    // No change here, walletBalance is already a String,
+    // (int.tryParse(walletBalance) ?? 0) - total) is calculated as int then converted to string
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -198,8 +206,11 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
         bids: bids,
         totalBids: bids.length,
         totalBidsAmount: total,
-        walletBalanceBeforeDeduction: walletBalance,
-        walletBalanceAfterDeduction: (walletBalance - total).toString(),
+        walletBalanceBeforeDeduction:
+            int.tryParse(walletBalance) ??
+            0, // walletBalance, // Already a String
+        walletBalanceAfterDeduction:
+            ((int.tryParse(walletBalance) ?? 0) - total).toString(),
         gameId: widget.gameId.toString(),
         gameType: widget.gameType,
         onConfirm: () => _placeFinalBids(),
@@ -238,11 +249,16 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
       bids.clear();
 
       if (result['status'] && context.mounted) {
-        final newBalance = walletBalance - _getTotalPoints();
+        // Parse current walletBalance to int for calculation
+        final currentWalletBalanceInt = int.tryParse(walletBalance) ?? 0;
+        final newBalanceInt = currentWalletBalanceInt - _getTotalPoints();
         setState(() {
-          walletBalance = newBalance;
+          walletBalance = newBalanceInt
+              .toString(); // Convert back to String for state
         });
-        await _bidService.updateWalletBalance(newBalance);
+        await _bidService.updateWalletBalance(
+          newBalanceInt,
+        ); // Update GetStorage with int
       }
     });
 
@@ -281,21 +297,18 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
             padding: const EdgeInsets.only(right: 16),
             child: Row(
               children: [
-                const Icon(Icons.account_balance_wallet, color: Colors.black),
+                Image.asset(
+                  "assets/images/ic_wallet.png",
+                  width: 22,
+                  height: 22,
+                  color: Colors.black,
+                ),
                 const SizedBox(width: 4),
-                _isWalletLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.black,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : Text(
-                        "$walletBalance",
-                        style: const TextStyle(color: Colors.black),
-                      ),
+                // walletBalance is already a String, so direct use is fine
+                Text(
+                  walletBalance,
+                  style: const TextStyle(color: Colors.black),
+                ),
               ],
             ),
           ),
@@ -318,7 +331,7 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
                       _buildInputField(
                         controller: digitController,
                         hint: "Enter Jodi",
-                        borderColor: Colors.amber,
+                        borderColor: Colors.orange,
                         selected: 'digit',
                       ),
                     ),
@@ -327,7 +340,7 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
                       _buildInputField(
                         controller: amountController,
                         hint: "Enter Amount",
-                        borderColor: Colors.amber,
+                        borderColor: Colors.orange,
                         selected: 'amount',
                       ),
                     ),
@@ -339,7 +352,7 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _isSubmitting
                               ? Colors.grey
-                              : Colors.amber,
+                              : Colors.orange,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(6),
                           ),
@@ -438,7 +451,7 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
             focusNode: focusNode,
             keyboardType: TextInputType.number,
             maxLength: 2,
-            cursorColor: Colors.amber,
+            cursorColor: Colors.orange,
             decoration: InputDecoration(
               counterText: "",
               hintText: hint,
@@ -490,7 +503,7 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
         controller: controller,
         keyboardType: TextInputType.number,
         maxLength: 4,
-        cursorColor: Colors.amber,
+        cursorColor: Colors.orange,
         decoration: InputDecoration(
           counterText: "",
           hintText: hint,
@@ -599,7 +612,7 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
                     ? null
                     : () => _showConfirmationDialog(total),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.amber,
+                  backgroundColor: Colors.orange,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(6),
                   ),

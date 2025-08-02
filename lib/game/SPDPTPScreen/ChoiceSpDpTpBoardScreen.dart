@@ -20,6 +20,7 @@ class ChoiceSpDpTpBoardScreen extends StatefulWidget {
   final int gameId;
   final String gameType;
   final String gameName;
+  final bool selectionStatus; // This will control the dropdown options
 
   const ChoiceSpDpTpBoardScreen({
     Key? key,
@@ -27,6 +28,7 @@ class ChoiceSpDpTpBoardScreen extends StatefulWidget {
     required this.gameId,
     required this.gameType,
     required this.gameName,
+    required this.selectionStatus,
   }) : super(key: key);
 
   @override
@@ -69,7 +71,12 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedGameTypeOption = 'OPEN';
+    // Set initial dropdown value based on widget.selectionStatus
+    if (widget.selectionStatus) {
+      _selectedGameTypeOption = 'OPEN';
+    } else {
+      _selectedGameTypeOption = 'CLOSE';
+    }
 
     _loadInitialData();
     _setupStorageListeners();
@@ -136,6 +143,14 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
       _isErrorForMessage = isError;
       _messageBarKey = UniqueKey();
     });
+    // Automatically clear the message after a few seconds
+    Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _messageToShow = null;
+        });
+      }
+    });
   }
 
   void _clearMessage() {
@@ -155,7 +170,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
   bool _isValidDpPanna(String panna) {
     if (panna.length != 3) return false;
     List<String> digits = panna.split('');
-    digits.sort();
+    digits.sort(); // Sort to easily check for two same digits
     return (digits[0] == digits[1] && digits[1] != digits[2]) ||
         (digits[0] != digits[1] && digits[1] == digits[2]);
   }
@@ -271,9 +286,9 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
           _middleDigitController.clear();
           _rightDigitController.clear();
           _pointsController.clear();
-          _isSPSelected = false;
-          _isDPSelected = false;
-          _isTPSelected = false;
+          _isSPSelected = false; // Reset checkboxes
+          _isDPSelected = false; // Reset checkboxes
+          _isTPSelected = false; // Reset checkboxes
           _showMessage(
             'Bid added successfully for $gameCategory: $pannaInput.',
           );
@@ -355,7 +370,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
           gameType: widget.gameType,
           onConfirm: () async {
             log('Bids Confirmed for API submission: $bidsForDialog');
-            // Navigator.pop(dialogContext);
+            // Navigator.pop(dialogContext); // Dismiss the confirmation dialog
 
             setState(() {
               _isApiCalling = true;
@@ -385,46 +400,62 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
       bidAmounts[bid['digit']!] = bid['points']!;
     }
 
-    final response = await _bidService.placeFinalBids(
-      gameName: widget.screenTitle,
-      accessToken: accessToken,
-      registerId: registerId,
-      deviceId: _deviceId,
-      deviceName: _deviceName,
-      accountStatus: accountStatus,
-      bidAmounts: bidAmounts,
-      selectedGameType: _selectedGameTypeOption!,
-      gameId: widget.gameId,
-      gameType: widget.gameType,
-      totalBidAmount: _getTotalPoints(),
-    );
+    try {
+      final response = await _bidService.placeFinalBids(
+        gameName: widget.screenTitle,
+        accessToken: accessToken,
+        registerId: registerId,
+        deviceId: _deviceId,
+        deviceName: _deviceName,
+        accountStatus: accountStatus,
+        bidAmounts: bidAmounts,
+        selectedGameType: _selectedGameTypeOption!,
+        gameId: widget.gameId,
+        gameType: widget.gameType,
+        totalBidAmount: _getTotalPoints(),
+      );
 
-    if (response['status'] == true) {
-      int newWalletBalance =
-          (int.tryParse(walletBalance) ?? 0) - _getTotalPoints();
-      await _bidService.updateWalletBalance(newWalletBalance);
+      if (response['status'] == true) {
+        int newWalletBalance =
+            (int.tryParse(walletBalance) ?? 0) - _getTotalPoints();
+        await _bidService.updateWalletBalance(newWalletBalance);
 
-      if (mounted) {
-        setState(() {
-          walletBalance = newWalletBalance.toString();
-        });
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext context) {
-            return const BidSuccessDialog();
-          },
-        );
+        if (mounted) {
+          setState(() {
+            walletBalance = newWalletBalance.toString();
+          });
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (BuildContext context) {
+              return const BidSuccessDialog();
+            },
+          );
+        }
+        return true;
+      } else {
+        String errorMessage = response['msg'] ?? "Unknown error occurred.";
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (BuildContext context) {
+              return BidFailureDialog(errorMessage: errorMessage);
+            },
+          );
+        }
+        return false;
       }
-      return true;
-    } else {
-      String errorMessage = response['msg'] ?? "Unknown error occurred.";
+    } catch (e) {
+      log('Error placing bids: $e', name: 'ChoiceSpDpTpBoardScreen');
       if (mounted) {
         showDialog(
           context: context,
           barrierDismissible: false,
           builder: (BuildContext context) {
-            return BidFailureDialog(errorMessage: errorMessage);
+            return const BidFailureDialog(
+              errorMessage: 'An unexpected error occurred. Please try again.',
+            );
           },
         );
       }
@@ -432,11 +463,100 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
     }
   }
 
+  Widget _buildDigitInputField(String hint, TextEditingController controller) {
+    return TextField(
+      controller: controller,
+      cursorColor: Colors.orange,
+      keyboardType: TextInputType.number,
+      textAlign: TextAlign.center,
+      inputFormatters: [
+        LengthLimitingTextInputFormatter(1),
+        FilteringTextInputFormatter.digitsOnly,
+      ],
+      style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: GoogleFonts.poppins(fontSize: 14, color: Colors.grey),
+        contentPadding: const EdgeInsets.symmetric(vertical: 8.0),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Colors.black54),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Colors.black54),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Colors.orange, width: 2),
+        ),
+      ),
+      onTap: _clearMessage,
+      enabled: !_isApiCalling,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     String marketName = widget.screenTitle.contains(" - ")
         ? widget.screenTitle.split(' - ')[0]
         : widget.screenTitle;
+
+    // Build dropdown items dynamically based on selectionStatus
+    List<DropdownMenuItem<String>> dropdownItems = [];
+    if (widget.selectionStatus) {
+      dropdownItems.add(
+        DropdownMenuItem<String>(
+          value: 'OPEN',
+          child: SizedBox(
+            width: 150,
+            height: 20,
+            child: Marquee(
+              text: '$marketName OPEN',
+              style: GoogleFonts.poppins(fontSize: 14, color: Colors.black87),
+              scrollAxis: Axis.horizontal,
+              blankSpace: 40.0,
+              velocity: 30.0,
+              pauseAfterRound: const Duration(seconds: 2),
+              showFadingOnlyWhenScrolling: true,
+              fadingEdgeStartFraction: 0.1,
+              fadingEdgeEndFraction: 0.1,
+              startPadding: 10.0,
+              accelerationDuration: const Duration(milliseconds: 500),
+              accelerationCurve: Curves.linear,
+              decelerationDuration: const Duration(milliseconds: 500),
+              decelerationCurve: Curves.easeOut,
+            ),
+          ),
+        ),
+      );
+    }
+    // 'CLOSE' option is always added
+    dropdownItems.add(
+      DropdownMenuItem<String>(
+        value: 'CLOSE',
+        child: SizedBox(
+          width: 150,
+          height: 20,
+          child: Marquee(
+            text: '$marketName CLOSE',
+            style: GoogleFonts.poppins(fontSize: 14, color: Colors.black87),
+            scrollAxis: Axis.horizontal,
+            blankSpace: 40.0,
+            velocity: 30.0,
+            pauseAfterRound: const Duration(seconds: 2),
+            showFadingOnlyWhenScrolling: true,
+            fadingEdgeStartFraction: 0.1,
+            fadingEdgeEndFraction: 0.1,
+            startPadding: 10.0,
+            accelerationDuration: const Duration(milliseconds: 500),
+            accelerationCurve: Curves.linear,
+            decelerationDuration: const Duration(milliseconds: 500),
+            decelerationCurve: Curves.easeOut,
+          ),
+        ),
+      ),
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -456,8 +576,10 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
           ),
         ),
         actions: [
-          const Icon(
-            Icons.account_balance_wallet_outlined,
+          Image.asset(
+            "assets/images/ic_wallet.png",
+            width: 22,
+            height: 22,
             color: Colors.black,
           ),
           const SizedBox(width: 6),
@@ -509,7 +631,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                 value: _selectedGameTypeOption,
                                 icon: const Icon(
                                   Icons.keyboard_arrow_down,
-                                  color: Colors.amber,
+                                  color: Colors.orange,
                                 ),
                                 onChanged: _isApiCalling
                                     ? null
@@ -519,46 +641,8 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                           _clearMessage();
                                         });
                                       },
-                                items: const <String>['OPEN', 'CLOSE']
-                                    .map<DropdownMenuItem<String>>((
-                                      String value,
-                                    ) {
-                                      return DropdownMenuItem<String>(
-                                        value: value,
-                                        child: SizedBox(
-                                          width: 150,
-                                          height: 20,
-                                          child: Marquee(
-                                            text: '$marketName $value',
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 14,
-                                              color: Colors.black87,
-                                            ),
-                                            scrollAxis: Axis.horizontal,
-                                            blankSpace: 40.0,
-                                            velocity: 30.0,
-                                            pauseAfterRound: const Duration(
-                                              seconds: 2,
-                                            ),
-                                            showFadingOnlyWhenScrolling: true,
-                                            fadingEdgeStartFraction: 0.1,
-                                            fadingEdgeEndFraction: 0.1,
-                                            startPadding: 10.0,
-                                            accelerationDuration:
-                                                const Duration(
-                                                  milliseconds: 500,
-                                                ),
-                                            accelerationCurve: Curves.linear,
-                                            decelerationDuration:
-                                                const Duration(
-                                                  milliseconds: 500,
-                                                ),
-                                            decelerationCurve: Curves.easeOut,
-                                          ),
-                                        ),
-                                      );
-                                    })
-                                    .toList(),
+                                items:
+                                    dropdownItems, // Use the dynamically built list
                               ),
                             ),
                           ),
@@ -586,7 +670,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                           _clearMessage();
                                         });
                                       },
-                                activeColor: Colors.amber,
+                                activeColor: Colors.orange,
                                 checkColor: Colors.white,
                               ),
                               Text(
@@ -614,7 +698,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                           _clearMessage();
                                         });
                                       },
-                                activeColor: Colors.amber,
+                                activeColor: Colors.orange,
                                 checkColor: Colors.white,
                               ),
                               Text(
@@ -642,7 +726,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                           _clearMessage();
                                         });
                                       },
-                                activeColor: Colors.amber,
+                                activeColor: Colors.orange,
                                 checkColor: Colors.white,
                               ),
                               Text(
@@ -693,7 +777,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                           width: 150,
                           height: 40,
                           child: TextField(
-                            cursorColor: Colors.amber,
+                            cursorColor: Colors.orange,
                             controller: _pointsController,
                             keyboardType: TextInputType.number,
                             inputFormatters: [
@@ -722,7 +806,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(20),
                                 borderSide: const BorderSide(
-                                  color: Colors.amber,
+                                  color: Colors.orange,
                                   width: 2,
                                 ),
                               ),
@@ -742,7 +826,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                         child: ElevatedButton(
                           onPressed: _isApiCalling ? null : _addBid,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.amber,
+                            backgroundColor: Colors.orange,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -802,7 +886,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 48),
+                      const SizedBox(width: 48), // Space for delete icon
                     ],
                   ),
                 ),
@@ -871,21 +955,16 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                   child: Text(
                                     '${bid['gameType']} (${bid['type']})',
                                     style: GoogleFonts.poppins(
-                                      fontSize: 14,
-                                      color: Colors.blueGrey[700],
-                                      fontWeight: FontWeight.w500,
+                                      fontSize: 15,
+                                      color: Colors.green[700],
                                     ),
                                   ),
                                 ),
                                 IconButton(
                                   icon: const Icon(
-                                    Icons.delete_outline,
-                                    color: Colors.redAccent,
+                                    Icons.delete,
+                                    color: Colors.red,
                                   ),
-                                  iconSize: 22,
-                                  splashRadius: 20,
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
                                   onPressed: _isApiCalling
                                       ? null
                                       : () => _removeBid(index),
@@ -916,72 +995,34 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
     );
   }
 
-  Widget _buildDigitInputField(String hint, TextEditingController controller) {
-    return SizedBox(
-      height: 40,
-      child: TextField(
-        cursorColor: Colors.amber,
-        controller: controller,
-        textAlign: TextAlign.center,
-        style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500),
-        keyboardType: TextInputType.number,
-        inputFormatters: [
-          LengthLimitingTextInputFormatter(1),
-          FilteringTextInputFormatter.digitsOnly,
-        ],
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[500]),
-          contentPadding: const EdgeInsets.symmetric(vertical: 8.0),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(20),
-            borderSide: const BorderSide(color: Colors.black54),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(20),
-            borderSide: const BorderSide(color: Colors.black54),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(20),
-            borderSide: const BorderSide(color: Colors.amber, width: 2),
-          ),
-        ),
-        onTap: _clearMessage,
-        enabled: !_isApiCalling,
-      ),
-    );
-  }
-
   Widget _buildBottomBar() {
     int totalBids = _bids.length;
     int totalPoints = _getTotalPoints();
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            spreadRadius: 0,
-            blurRadius: 10,
-            offset: const Offset(0, -2),
+            color: Colors.grey.withOpacity(0.3),
+            spreadRadius: 2,
+            blurRadius: 5,
+            offset: const Offset(0, -3),
           ),
         ],
-        border: Border(top: BorderSide(color: Colors.grey[300]!, width: 0.5)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Total Bids',
+                'Bids',
                 style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  color: Colors.blueGrey[700],
+                  fontSize: 14,
+                  color: Colors.grey[700],
                 ),
               ),
               Text(
@@ -989,20 +1030,18 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                 style: GoogleFonts.poppins(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
                 ),
               ),
             ],
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Total Points',
+                'Points',
                 style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  color: Colors.blueGrey[700],
+                  fontSize: 14,
+                  color: Colors.grey[700],
                 ),
               ),
               Text(
@@ -1010,24 +1049,27 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                 style: GoogleFonts.poppins(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
                 ),
               ),
             ],
           ),
           ElevatedButton(
-            onPressed: _isApiCalling ? null : _showBidConfirmationDialog,
+            onPressed: _isApiCalling || _bids.isEmpty
+                ? null
+                : _showBidConfirmationDialog,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _isApiCalling ? Colors.grey : Colors.amber,
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+              backgroundColor: _isApiCalling || _bids.isEmpty
+                  ? Colors.grey
+                  : Colors.orange,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
-              elevation: 2,
+              elevation: 3,
             ),
             child: _isApiCalling
                 ? const CircularProgressIndicator(
-                    color: Colors.white,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     strokeWidth: 2,
                   )
                 : Text(
@@ -1035,7 +1077,6 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                     style: GoogleFonts.poppins(
                       color: Colors.white,
                       fontSize: 16,
-                      fontWeight: FontWeight.w600,
                     ),
                   ),
           ),
@@ -1045,37 +1086,37 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
   }
 }
 
-// import 'dart:async'; // For Timer
-// import 'dart:convert'; // For jsonEncode, json.decode
-// import 'dart:developer'; // For log
+// // lib/screens/choice_sp_dp_tp_board_screen.dart
+// import 'dart:async';
+// import 'dart:developer';
 //
 // import 'package:flutter/material.dart';
-// import 'package:flutter/services.dart'; // For TextInputFormatter
-// import 'package:get_storage/get_storage.dart'; // Required for wallet balance and tokens
-// import 'package:google_fonts/google_fonts.dart'; // For GoogleFonts
-// import 'package:http/http.dart' as http; // Import for making HTTP requests
-// import 'package:intl/intl.dart'; // For date formatting in dialog
-// import 'package:marquee/marquee.dart'; // For Marquee widget
+// import 'package:flutter/services.dart';
+// import 'package:get_storage/get_storage.dart';
+// import 'package:google_fonts/google_fonts.dart';
+// import 'package:intl/intl.dart';
+// import 'package:marquee/marquee.dart';
+// import 'package:new_sara/components/AnimatedMessageBar.dart';
+// import 'package:new_sara/components/BidConfirmationDialog.dart';
+// import 'package:new_sara/components/BidFailureDialog.dart';
+// import 'package:new_sara/components/BidSuccessDialog.dart';
 //
-// // Assuming these paths are correct for your components
-// import '../../components/AnimatedMessageBar.dart';
-// import '../../components/BidConfirmationDialog.dart';
-// import '../../components/BidFailureDialog.dart'; // Added for potential API failure
-// import '../../components/BidSuccessDialog.dart'; // Added for potential API success
-// import '../../ulits/Constents.dart'; // Assuming this provides Constant.apiEndpoint
+// import '../../BidService.dart';
 //
 // class ChoiceSpDpTpBoardScreen extends StatefulWidget {
 //   final String screenTitle;
-//   final int gameId; // Added to constructor as required
-//   final String gameType; // Added to constructor as required
+//   final int gameId;
+//   final String gameType;
 //   final String gameName;
+//   final bool selectionStatus;
 //
 //   const ChoiceSpDpTpBoardScreen({
 //     Key? key,
 //     required this.screenTitle,
-//     required this.gameId, // Game ID is now required
+//     required this.gameId,
 //     required this.gameType,
-//     required this.gameName, // Game Type is now required
+//     required this.gameName,
+//     required this.selectionStatus,
 //   }) : super(key: key);
 //
 //   @override
@@ -1095,36 +1136,35 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //
 //   String? _selectedGameTypeOption;
 //
-//   List<Map<String, String>> _bids = []; // List to store the added bids
+//   List<Map<String, String>> _bids = [];
 //
-//   // Wallet and user data from GetStorage
 //   late String walletBalance;
 //   final GetStorage _storage = GetStorage();
-//   late String accessToken; // For API calls
-//   late String registerId; // For API calls
-//   bool accountStatus = false; // For API calls
-//   late String
-//   preferredLanguage; // For API calls, though not used in API body directly
+//   late String accessToken;
+//   late String registerId;
+//   bool accountStatus = false;
+//   late String preferredLanguage;
 //
-//   final String _deviceId = 'test_device_id_flutter'; // Example device ID
-//   final String _deviceName = 'test_device_name_flutter'; // Example device Name
+//   final String _deviceId = 'test_device_id_flutter';
+//   final String _deviceName = 'test_device_name_flutter';
 //
-//   // State management for AnimatedMessageBar
+//   late BidService _bidService;
+//
 //   String? _messageToShow;
 //   bool _isErrorForMessage = false;
-//   Key _messageBarKey = UniqueKey(); // Key to force rebuild/re-animation
+//   Key _messageBarKey = UniqueKey();
 //
-//   // State variable to track API call status
-//   bool _isApiCalling = false; // Added to disable UI during API call
+//   bool _isApiCalling = false;
 //
 //   @override
 //   void initState() {
 //     super.initState();
-//     _selectedGameTypeOption = 'OPEN'; // Default to OPEN
+//     _selectedGameTypeOption = 'OPEN';
 //
-//     // Initialize wallet balance and other user data from GetStorage
 //     _loadInitialData();
 //     _setupStorageListeners();
+//
+//     _bidService = BidService(_storage);
 //   }
 //
 //   Future<void> _loadInitialData() async {
@@ -1139,7 +1179,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //     } else if (storedWalletBalance is String) {
 //       walletBalance = storedWalletBalance;
 //     } else {
-//       walletBalance = '0'; // Default if not found or unexpected type
+//       walletBalance = '0';
 //     }
 //   }
 //
@@ -1180,16 +1220,14 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //     super.dispose();
 //   }
 //
-//   // Helper method to show messages using AnimatedMessageBar
 //   void _showMessage(String message, {bool isError = false}) {
 //     setState(() {
 //       _messageToShow = message;
 //       _isErrorForMessage = isError;
-//       _messageBarKey = UniqueKey(); // Update key to trigger animation
+//       _messageBarKey = UniqueKey();
 //     });
 //   }
 //
-//   // Helper method to clear the message bar
 //   void _clearMessage() {
 //     if (mounted) {
 //       setState(() {
@@ -1198,19 +1236,16 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //     }
 //   }
 //
-//   // Helper function to validate Panna types
 //   bool _isValidSpPanna(String panna) {
 //     if (panna.length != 3) return false;
 //     Set<String> uniqueDigits = panna.split('').toSet();
 //     return uniqueDigits.length == 3;
 //   }
 //
-//   // Corrected DP Panna validation
 //   bool _isValidDpPanna(String panna) {
 //     if (panna.length != 3) return false;
 //     List<String> digits = panna.split('');
-//     digits.sort(); // Sort to easily check for two same digits
-//     // DP can be XYY or XXY or YXX. This logic covers that.
+//     digits.sort();
 //     return (digits[0] == digits[1] && digits[1] != digits[2]) ||
 //         (digits[0] != digits[1] && digits[1] == digits[2]);
 //   }
@@ -1221,16 +1256,15 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //   }
 //
 //   void _addBid() {
-//     _clearMessage(); // Clear any previous messages
-//     if (_isApiCalling) return; // Prevent adding bids while API is busy
+//     _clearMessage();
+//     if (_isApiCalling) return;
 //
-//     log("ADD button pressed - entering _addBid"); // Debug print
+//     log("ADD button pressed - entering _addBid");
 //     final leftDigit = _leftDigitController.text.trim();
 //     final middleDigit = _middleDigitController.text.trim();
 //     final rightDigit = _rightDigitController.text.trim();
 //     final points = _pointsController.text.trim();
 //
-//     // 1. Validate individual digits
 //     if (leftDigit.isEmpty || middleDigit.isEmpty || rightDigit.isEmpty) {
 //       _showMessage('Please enter all three digits.', isError: true);
 //       return;
@@ -1250,14 +1284,12 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //
 //     final pannaInput = '$leftDigit$middleDigit$rightDigit';
 //
-//     // 2. Validate points range (10 to 10000)
 //     int? parsedPoints = int.tryParse(points);
 //     if (parsedPoints == null || parsedPoints < 10 || parsedPoints > 10000) {
 //       _showMessage('Points must be between 10 and 10000.', isError: true);
 //       return;
 //     }
 //
-//     // 3. Determine selected game category (SP/DP/TP)
 //     String gameCategory = '';
 //     int selectedCount = 0;
 //     if (_isSPSelected) {
@@ -1282,7 +1314,6 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //       return;
 //     }
 //
-//     // 4. Validate panna input based on selected game category
 //     bool isValidPanna = false;
 //     if (gameCategory == 'SP') {
 //       isValidPanna = _isValidSpPanna(pannaInput);
@@ -1307,20 +1338,17 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //       }
 //     }
 //
-//     // 5. Add bid if all validations pass
 //     if (isValidPanna) {
 //       setState(() {
 //         bool alreadyExists = _bids.any(
 //           (entry) =>
 //               entry['digit'] == pannaInput &&
 //               entry['gameType'] == gameCategory &&
-//               entry['type'] ==
-//                   _selectedGameTypeOption, // Also check type (OPEN/CLOSE)
+//               entry['type'] == _selectedGameTypeOption,
 //         );
 //
 //         if (!alreadyExists) {
 //           log(
-//             // Debug print
 //             "Adding single bid: Digit-$pannaInput, Points-$points, Type-$_selectedGameTypeOption, GameType-$gameCategory",
 //           );
 //           _bids.add({
@@ -1333,7 +1361,6 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //           _middleDigitController.clear();
 //           _rightDigitController.clear();
 //           _pointsController.clear();
-//           // Reset checkboxes after successful add to prevent accidental multiple adds with wrong type
 //           _isSPSelected = false;
 //           _isDPSelected = false;
 //           _isTPSelected = false;
@@ -1351,8 +1378,8 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //   }
 //
 //   void _removeBid(int index) {
-//     _clearMessage(); // Clear any previous messages
-//     if (_isApiCalling) return; // Prevent removing bids while API is busy
+//     _clearMessage();
+//     if (_isApiCalling) return;
 //
 //     setState(() {
 //       final removedBid = _bids.removeAt(index);
@@ -1370,8 +1397,8 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //   }
 //
 //   void _showBidConfirmationDialog() {
-//     _clearMessage(); // Clear any previous messages
-//     if (_isApiCalling) return; // Prevent showing dialog if API is busy
+//     _clearMessage();
+//     if (_isApiCalling) return;
 //
 //     if (_bids.isEmpty) {
 //       _showMessage('Please add bids before submitting.', isError: true);
@@ -1389,12 +1416,11 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //       return;
 //     }
 //
-//     // Filter and map bids to the format expected by BidConfirmationDialog
 //     final List<Map<String, String>> bidsForDialog = _bids.map((bid) {
 //       return {
 //         'digit': bid['digit']!,
 //         'points': bid['points']!,
-//         'type': '${bid['gameType']} (${bid['type']})', // Combine for display
+//         'type': '${bid['gameType']} (${bid['type']})',
 //       };
 //     }).toList();
 //
@@ -1419,21 +1445,19 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //           gameType: widget.gameType,
 //           onConfirm: () async {
 //             log('Bids Confirmed for API submission: $bidsForDialog');
-//             Navigator.pop(dialogContext); // Dismiss the confirmation dialog
+//             // Navigator.pop(dialogContext);
 //
 //             setState(() {
-//               _isApiCalling = true; // Set API calling state
+//               _isApiCalling = true;
 //             });
 //
-//             bool success =
-//                 await _placeFinalBids(); // Call the actual API method
+//             bool success = await _placeFinalBidsWithService();
 //
 //             if (success) {
 //               setState(() {
-//                 _bids.clear(); // Clear bids only on successful submission
+//                 _bids.clear();
 //               });
 //             }
-//             // Ensure API calling state is reset regardless of outcome
 //             if (mounted) {
 //               setState(() {
 //                 _isApiCalling = false;
@@ -1445,125 +1469,52 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //     );
 //   }
 //
-//   Future<bool> _placeFinalBids() async {
-//     String url;
-//     final gameCategory = widget.gameType.toLowerCase();
-//
-//     // Determine the correct API endpoint based on gameType
-//     if (gameCategory.contains('jackpot')) {
-//       url = '${Constant.apiEndpoint}place-jackpot-bid';
-//     } else if (gameCategory.contains('starline')) {
-//       url = '${Constant.apiEndpoint}place-starline-bid';
-//     } else {
-//       // Assuming 'place-bid' for regular games like SP/DP/TP
-//       url = '${Constant.apiEndpoint}place-bid';
+//   Future<bool> _placeFinalBidsWithService() async {
+//     Map<String, String> bidAmounts = {};
+//     for (var bid in _bids) {
+//       bidAmounts[bid['digit']!] = bid['points']!;
 //     }
 //
-//     // --- Authentication Check ---
-//     if (accessToken.isEmpty || registerId.isEmpty) {
+//     final response = await _bidService.placeFinalBids(
+//       gameName: widget.screenTitle,
+//       accessToken: accessToken,
+//       registerId: registerId,
+//       deviceId: _deviceId,
+//       deviceName: _deviceName,
+//       accountStatus: accountStatus,
+//       bidAmounts: bidAmounts,
+//       selectedGameType: _selectedGameTypeOption!,
+//       gameId: widget.gameId,
+//       gameType: widget.gameType,
+//       totalBidAmount: _getTotalPoints(),
+//     );
+//
+//     if (response['status'] == true) {
+//       int newWalletBalance =
+//           (int.tryParse(walletBalance) ?? 0) - _getTotalPoints();
+//       await _bidService.updateWalletBalance(newWalletBalance);
+//
 //       if (mounted) {
+//         setState(() {
+//           walletBalance = newWalletBalance.toString();
+//         });
 //         showDialog(
 //           context: context,
 //           barrierDismissible: false,
 //           builder: (BuildContext context) {
-//             return const BidFailureDialog(
-//               errorMessage: 'Authentication error. Please log in again.',
-//             );
+//             return const BidSuccessDialog();
 //           },
 //         );
 //       }
-//       return false;
-//     }
-//
-//     final headers = {
-//       'deviceId': _deviceId,
-//       'deviceName': _deviceName,
-//       'accessStatus': accountStatus ? '1' : '0', // Convert bool to '1' or '0'
-//       'Content-Type': 'application/json',
-//       'Authorization': 'Bearer $accessToken',
-//     };
-//
-//     final List<Map<String, dynamic>> bidPayload = _bids.map((entry) {
-//       final String bidDigit = entry['digit'] ?? '';
-//       final int bidAmount = int.tryParse(entry['points'] ?? '0') ?? 0;
-//       final String gameTypeCategory = entry['gameType'] ?? ''; // SP/DP/TP
-//
-//       return {
-//         "sessionType": entry['type']?.toUpperCase() ?? '', // OPEN/CLOSE
-//         "digit": bidDigit,
-//         "pana": bidDigit, // For SP/DP/TP, the panna is the digit itself
-//         "jodi":
-//             "", // Assuming jodi is not applicable or an empty string for this game
-//         "gameTypeCategory": gameTypeCategory, // SP, DP, TP
-//         "bidAmount": bidAmount,
-//       };
-//     }).toList();
-//
-//     final body = jsonEncode({
-//       "registerId": registerId,
-//       "gameId": widget.gameId,
-//       "bidAmount": _getTotalPoints(),
-//       "gameType": widget.gameType, // Pass the original gameType from widget
-//       "bid": bidPayload,
-//     });
-//
-//     log('Placing bid to URL: $url');
-//     log('Request Headers: $headers');
-//     log('Request Body: $body');
-//
-//     try {
-//       final response = await http.post(
-//         Uri.parse(url),
-//         headers: headers,
-//         body: body,
-//       );
-//
-//       final Map<String, dynamic> responseBody = json.decode(response.body);
-//       log('API Response: $responseBody');
-//
-//       if (response.statusCode == 200 && responseBody['status'] == true) {
-//         int newWalletBalance =
-//             (int.tryParse(walletBalance) ?? 0) - _getTotalPoints();
-//         await _storage.write('walletBalance', newWalletBalance); // Store as int
-//
-//         if (mounted) {
-//           setState(() {
-//             walletBalance = newWalletBalance.toString(); // Update local state
-//           });
-//           // Show success dialog
-//           showDialog(
-//             context: context,
-//             barrierDismissible: false,
-//             builder: (BuildContext context) {
-//               return const BidSuccessDialog();
-//             },
-//           );
-//         }
-//         return true;
-//       } else {
-//         String errorMessage = responseBody['msg'] ?? "Unknown error occurred.";
-//         if (mounted) {
-//           showDialog(
-//             context: context,
-//             barrierDismissible: false,
-//             builder: (BuildContext context) {
-//               return BidFailureDialog(errorMessage: errorMessage);
-//             },
-//           );
-//         }
-//         return false;
-//       }
-//     } catch (e) {
-//       log('Error during bid submission: $e');
+//       return true;
+//     } else {
+//       String errorMessage = response['msg'] ?? "Unknown error occurred.";
 //       if (mounted) {
 //         showDialog(
 //           context: context,
 //           barrierDismissible: false,
 //           builder: (BuildContext context) {
-//             return const BidFailureDialog(
-//               errorMessage:
-//                   'Network error. Please check your internet connection.',
-//             );
+//             return BidFailureDialog(errorMessage: errorMessage);
 //           },
 //         );
 //       }
@@ -1601,11 +1552,9 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //           ),
 //           const SizedBox(width: 6),
 //           Center(
-//             // Ensure the '5' is vertically centered
 //             child: Text(
-//               walletBalance, // Display wallet balance
+//               walletBalance,
 //               style: GoogleFonts.poppins(
-//                 // Using GoogleFonts for consistency
 //                 fontSize: 16,
 //                 fontWeight: FontWeight.bold,
 //                 color: Colors.black,
@@ -1635,7 +1584,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //                           style: GoogleFonts.poppins(fontSize: 16),
 //                         ),
 //                         SizedBox(
-//                           width: 180, // Increased width for longer text
+//                           width: 180,
 //                           height: 40,
 //                           child: Container(
 //                             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1650,64 +1599,56 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //                                 value: _selectedGameTypeOption,
 //                                 icon: const Icon(
 //                                   Icons.keyboard_arrow_down,
-//                                   color: Colors.amber,
+//                                   color: Colors.orange,
 //                                 ),
-//                                 onChanged:
-//                                     _isApiCalling // Disable if API is calling
+//                                 onChanged: _isApiCalling
 //                                     ? null
 //                                     : (String? newValue) {
 //                                         setState(() {
 //                                           _selectedGameTypeOption = newValue;
-//                                           _clearMessage(); // Clear message on dropdown change
+//                                           _clearMessage();
 //                                         });
 //                                       },
-//                                 items:
-//                                     const <String>[
-//                                           'OPEN',
-//                                           'CLOSE',
-//                                         ] // Added const
-//                                         .map<DropdownMenuItem<String>>((
-//                                           String value,
-//                                         ) {
-//                                           return DropdownMenuItem<String>(
-//                                             value: value,
-//                                             child: SizedBox(
-//                                               width: 150,
-//                                               height: 20,
-//                                               child: Marquee(
-//                                                 text: '$marketName $value',
-//                                                 style: GoogleFonts.poppins(
-//                                                   fontSize: 14,
-//                                                   color: Colors.black87,
-//                                                 ),
-//                                                 scrollAxis: Axis.horizontal,
-//                                                 blankSpace: 40.0,
-//                                                 velocity: 30.0,
-//                                                 pauseAfterRound: const Duration(
-//                                                   seconds: 2,
-//                                                 ),
-//                                                 showFadingOnlyWhenScrolling:
-//                                                     true,
-//                                                 fadingEdgeStartFraction: 0.1,
-//                                                 fadingEdgeEndFraction: 0.1,
-//                                                 startPadding: 10.0,
-//                                                 accelerationDuration:
-//                                                     const Duration(
-//                                                       milliseconds: 500,
-//                                                     ),
-//                                                 accelerationCurve:
-//                                                     Curves.linear,
-//                                                 decelerationDuration:
-//                                                     const Duration(
-//                                                       milliseconds: 500,
-//                                                     ),
-//                                                 decelerationCurve:
-//                                                     Curves.easeOut,
-//                                               ),
+//                                 items: const <String>['OPEN', 'CLOSE']
+//                                     .map<DropdownMenuItem<String>>((
+//                                       String value,
+//                                     ) {
+//                                       return DropdownMenuItem<String>(
+//                                         value: value,
+//                                         child: SizedBox(
+//                                           width: 150,
+//                                           height: 20,
+//                                           child: Marquee(
+//                                             text: '$marketName $value',
+//                                             style: GoogleFonts.poppins(
+//                                               fontSize: 14,
+//                                               color: Colors.black87,
 //                                             ),
-//                                           );
-//                                         })
-//                                         .toList(),
+//                                             scrollAxis: Axis.horizontal,
+//                                             blankSpace: 40.0,
+//                                             velocity: 30.0,
+//                                             pauseAfterRound: const Duration(
+//                                               seconds: 2,
+//                                             ),
+//                                             showFadingOnlyWhenScrolling: true,
+//                                             fadingEdgeStartFraction: 0.1,
+//                                             fadingEdgeEndFraction: 0.1,
+//                                             startPadding: 10.0,
+//                                             accelerationDuration:
+//                                                 const Duration(
+//                                                   milliseconds: 500,
+//                                                 ),
+//                                             accelerationCurve: Curves.linear,
+//                                             decelerationDuration:
+//                                                 const Duration(
+//                                                   milliseconds: 500,
+//                                                 ),
+//                                             decelerationCurve: Curves.easeOut,
+//                                           ),
+//                                         ),
+//                                       );
+//                                     })
+//                                     .toList(),
 //                               ),
 //                             ),
 //                           ),
@@ -1723,8 +1664,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //                             children: [
 //                               Checkbox(
 //                                 value: _isSPSelected,
-//                                 onChanged:
-//                                     _isApiCalling // Disable if API is calling
+//                                 onChanged: _isApiCalling
 //                                     ? null
 //                                     : (bool? value) {
 //                                         setState(() {
@@ -1733,10 +1673,10 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //                                             _isDPSelected = false;
 //                                             _isTPSelected = false;
 //                                           }
-//                                           _clearMessage(); // Clear message on checkbox change
+//                                           _clearMessage();
 //                                         });
 //                                       },
-//                                 activeColor: Colors.amber,
+//                                 activeColor: Colors.orange,
 //                                 checkColor: Colors.white,
 //                               ),
 //                               Text(
@@ -1752,8 +1692,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //                             children: [
 //                               Checkbox(
 //                                 value: _isDPSelected,
-//                                 onChanged:
-//                                     _isApiCalling // Disable if API is calling
+//                                 onChanged: _isApiCalling
 //                                     ? null
 //                                     : (bool? value) {
 //                                         setState(() {
@@ -1762,10 +1701,10 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //                                             _isSPSelected = false;
 //                                             _isTPSelected = false;
 //                                           }
-//                                           _clearMessage(); // Clear message on checkbox change
+//                                           _clearMessage();
 //                                         });
 //                                       },
-//                                 activeColor: Colors.amber,
+//                                 activeColor: Colors.orange,
 //                                 checkColor: Colors.white,
 //                               ),
 //                               Text(
@@ -1781,8 +1720,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //                             children: [
 //                               Checkbox(
 //                                 value: _isTPSelected,
-//                                 onChanged:
-//                                     _isApiCalling // Disable if API is calling
+//                                 onChanged: _isApiCalling
 //                                     ? null
 //                                     : (bool? value) {
 //                                         setState(() {
@@ -1791,10 +1729,10 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //                                             _isSPSelected = false;
 //                                             _isDPSelected = false;
 //                                           }
-//                                           _clearMessage(); // Clear message on checkbox change
+//                                           _clearMessage();
 //                                         });
 //                                       },
-//                                 activeColor: Colors.amber,
+//                                 activeColor: Colors.orange,
 //                                 checkColor: Colors.white,
 //                               ),
 //                               Text(
@@ -1812,21 +1750,21 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //                       children: [
 //                         Expanded(
 //                           child: _buildDigitInputField(
-//                             'Digit 1', // Changed hint for clarity
+//                             'Digit 1',
 //                             _leftDigitController,
 //                           ),
 //                         ),
 //                         const SizedBox(width: 8),
 //                         Expanded(
 //                           child: _buildDigitInputField(
-//                             'Digit 2', // Changed hint for clarity
+//                             'Digit 2',
 //                             _middleDigitController,
 //                           ),
 //                         ),
 //                         const SizedBox(width: 8),
 //                         Expanded(
 //                           child: _buildDigitInputField(
-//                             'Digit 3', // Changed hint for clarity
+//                             'Digit 3',
 //                             _rightDigitController,
 //                           ),
 //                         ),
@@ -1835,34 +1773,30 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //                     const SizedBox(height: 16),
 //                     Row(
 //                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                       crossAxisAlignment:
-//                           CrossAxisAlignment.center, // Align items vertically
+//                       crossAxisAlignment: CrossAxisAlignment.center,
 //                       children: [
 //                         Text(
 //                           'Enter Points:',
 //                           style: GoogleFonts.poppins(fontSize: 16),
 //                         ),
 //                         SizedBox(
-//                           width: 150, // Keep width consistent
-//                           height: 40, // Keep height consistent
+//                           width: 150,
+//                           height: 40,
 //                           child: TextField(
-//                             cursorColor: Colors.amber,
+//                             cursorColor: Colors.orange,
 //                             controller: _pointsController,
 //                             keyboardType: TextInputType.number,
 //                             inputFormatters: [
 //                               FilteringTextInputFormatter.digitsOnly,
-//                               LengthLimitingTextInputFormatter(
-//                                 5,
-//                               ), // Max 5 digits for up to 10000
+//                               LengthLimitingTextInputFormatter(5),
 //                             ],
 //                             decoration: InputDecoration(
-//                               // Apply consistent styling
-//                               hintText: 'Amount', // Simpler hint
+//                               hintText: 'Amount',
 //                               hintStyle: GoogleFonts.poppins(fontSize: 14),
 //                               contentPadding: const EdgeInsets.symmetric(
 //                                 horizontal: 12.0,
 //                                 vertical: 8.0,
-//                               ), // Adjust padding
+//                               ),
 //                               border: OutlineInputBorder(
 //                                 borderRadius: BorderRadius.circular(20),
 //                                 borderSide: const BorderSide(
@@ -1878,35 +1812,29 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //                               focusedBorder: OutlineInputBorder(
 //                                 borderRadius: BorderRadius.circular(20),
 //                                 borderSide: const BorderSide(
-//                                   color: Colors.amber,
+//                                   color: Colors.orange,
 //                                   width: 2,
 //                                 ),
 //                               ),
 //                             ),
-//                             onTap:
-//                                 _clearMessage, // Clear message on text field tap
-//                             enabled:
-//                                 !_isApiCalling, // Disable if API is calling
+//                             onTap: _clearMessage,
+//                             enabled: !_isApiCalling,
 //                           ),
 //                         ),
 //                       ],
 //                     ),
-//                     const SizedBox(height: 20), // Increased spacing
+//                     const SizedBox(height: 20),
 //                     Align(
 //                       alignment: Alignment.centerRight,
 //                       child: SizedBox(
 //                         width: 150,
 //                         height: 45,
 //                         child: ElevatedButton(
-//                           onPressed: _isApiCalling
-//                               ? null
-//                               : _addBid, // Disable if API is calling
+//                           onPressed: _isApiCalling ? null : _addBid,
 //                           style: ElevatedButton.styleFrom(
-//                             backgroundColor: Colors.amber,
+//                             backgroundColor: Colors.orange,
 //                             shape: RoundedRectangleBorder(
-//                               borderRadius: BorderRadius.circular(
-//                                 8,
-//                               ), // Slightly rounded corners
+//                               borderRadius: BorderRadius.circular(8),
 //                             ),
 //                             elevation: 2,
 //                           ),
@@ -1916,7 +1844,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //                                   strokeWidth: 2,
 //                                 )
 //                               : Text(
-//                                   "ADD", // More descriptive text
+//                                   "ADD",
 //                                   textAlign: TextAlign.center,
 //                                   style: GoogleFonts.poppins(
 //                                     color: Colors.white,
@@ -1927,23 +1855,18 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //                         ),
 //                       ),
 //                     ),
-//                     const SizedBox(height: 10), // Spacing before divider
+//                     const SizedBox(height: 10),
 //                   ],
 //                 ),
 //               ),
 //               const Divider(thickness: 1, height: 1),
 //               if (_bids.isNotEmpty)
 //                 Padding(
-//                   padding: const EdgeInsets.fromLTRB(
-//                     16.0,
-//                     8.0,
-//                     16.0,
-//                     0,
-//                   ), // Adjust padding
+//                   padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 0),
 //                   child: Row(
 //                     children: [
 //                       Expanded(
-//                         flex: 2, // Give more space to digit
+//                         flex: 2,
 //                         child: Text(
 //                           'Panna',
 //                           style: GoogleFonts.poppins(
@@ -1952,7 +1875,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //                         ),
 //                       ),
 //                       Expanded(
-//                         flex: 2, // Amount
+//                         flex: 2,
 //                         child: Text(
 //                           'Amount',
 //                           style: GoogleFonts.poppins(
@@ -1961,7 +1884,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //                         ),
 //                       ),
 //                       Expanded(
-//                         flex: 3, // Game Type (SP/DP/TP) + (OPEN/CLOSE)
+//                         flex: 3,
 //                         child: Text(
 //                           'Type',
 //                           style: GoogleFonts.poppins(
@@ -1969,7 +1892,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //                           ),
 //                         ),
 //                       ),
-//                       const SizedBox(width: 48), // Space for delete icon
+//                       const SizedBox(width: 48),
 //                     ],
 //                   ),
 //                 ),
@@ -1980,7 +1903,6 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //                   endIndent: 16,
 //                   height: 10,
 //                 ),
-//
 //               Expanded(
 //                 child: _bids.isEmpty
 //                     ? Center(
@@ -1993,10 +1915,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //                         ),
 //                       )
 //                     : ListView.builder(
-//                         padding: const EdgeInsets.only(
-//                           top: 0,
-//                           bottom: 8.0,
-//                         ), // Adjust padding
+//                         padding: const EdgeInsets.only(top: 0, bottom: 8.0),
 //                         itemCount: _bids.length,
 //                         itemBuilder: (context, index) {
 //                           final bid = _bids[index];
@@ -2043,8 +1962,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //                                     '${bid['gameType']} (${bid['type']})',
 //                                     style: GoogleFonts.poppins(
 //                                       fontSize: 14,
-//                                       color: Colors
-//                                           .blueGrey[700], // More subtle color
+//                                       color: Colors.blueGrey[700],
 //                                       fontWeight: FontWeight.w500,
 //                                     ),
 //                                   ),
@@ -2056,15 +1974,11 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //                                   ),
 //                                   iconSize: 22,
 //                                   splashRadius: 20,
-//                                   padding:
-//                                       EdgeInsets.zero, // Remove extra padding
-//                                   constraints:
-//                                       const BoxConstraints(), // Remove extra constraints
+//                                   padding: EdgeInsets.zero,
+//                                   constraints: const BoxConstraints(),
 //                                   onPressed: _isApiCalling
 //                                       ? null
-//                                       : () => _removeBid(
-//                                           index,
-//                                         ), // Disable if API is calling
+//                                       : () => _removeBid(index),
 //                                 ),
 //                               ],
 //                             ),
@@ -2075,7 +1989,6 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //               if (_bids.isNotEmpty) _buildBottomBar(),
 //             ],
 //           ),
-//           // AnimatedMessageBar positioned at the top
 //           if (_messageToShow != null)
 //             Positioned(
 //               top: 0,
@@ -2097,9 +2010,9 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //     return SizedBox(
 //       height: 40,
 //       child: TextField(
-//         cursorColor: Colors.amber,
+//         cursorColor: Colors.orange,
 //         controller: controller,
-//         textAlign: TextAlign.center, // Center the input digit
+//         textAlign: TextAlign.center,
 //         style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500),
 //         keyboardType: TextInputType.number,
 //         inputFormatters: [
@@ -2109,9 +2022,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //         decoration: InputDecoration(
 //           hintText: hint,
 //           hintStyle: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[500]),
-//           contentPadding: const EdgeInsets.symmetric(
-//             vertical: 8.0,
-//           ), // Adjusted padding
+//           contentPadding: const EdgeInsets.symmetric(vertical: 8.0),
 //           border: OutlineInputBorder(
 //             borderRadius: BorderRadius.circular(20),
 //             borderSide: const BorderSide(color: Colors.black54),
@@ -2122,11 +2033,11 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //           ),
 //           focusedBorder: OutlineInputBorder(
 //             borderRadius: BorderRadius.circular(20),
-//             borderSide: const BorderSide(color: Colors.amber, width: 2),
+//             borderSide: const BorderSide(color: Colors.orange, width: 2),
 //           ),
 //         ),
-//         onTap: _clearMessage, // Clear message on text field tap
-//         enabled: !_isApiCalling, // Disable if API is calling
+//         onTap: _clearMessage,
+//         enabled: !_isApiCalling,
 //       ),
 //     );
 //   }
@@ -2136,23 +2047,18 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //     int totalPoints = _getTotalPoints();
 //
 //     return Container(
-//       padding: const EdgeInsets.symmetric(
-//         horizontal: 20,
-//         vertical: 12,
-//       ), // Adjusted padding
+//       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
 //       decoration: BoxDecoration(
-//         color: Colors.white, // Changed to white for better contrast with shadow
+//         color: Colors.white,
 //         boxShadow: [
 //           BoxShadow(
-//             color: Colors.black.withOpacity(0.1), // Softer shadow
+//             color: Colors.black.withOpacity(0.1),
 //             spreadRadius: 0,
 //             blurRadius: 10,
 //             offset: const Offset(0, -2),
 //           ),
 //         ],
-//         border: Border(
-//           top: BorderSide(color: Colors.grey[300]!, width: 0.5),
-//         ), // Subtle top border
+//         border: Border(top: BorderSide(color: Colors.grey[300]!, width: 0.5)),
 //       ),
 //       child: Row(
 //         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2200,13 +2106,9 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
 //             ],
 //           ),
 //           ElevatedButton(
-//             onPressed: _isApiCalling
-//                 ? null
-//                 : _showBidConfirmationDialog, // Disable if API is calling
+//             onPressed: _isApiCalling ? null : _showBidConfirmationDialog,
 //             style: ElevatedButton.styleFrom(
-//               backgroundColor: _isApiCalling
-//                   ? Colors.grey
-//                   : Colors.amber, // Dim if disabled
+//               backgroundColor: _isApiCalling ? Colors.grey : Colors.orange,
 //               padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
 //               shape: RoundedRectangleBorder(
 //                 borderRadius: BorderRadius.circular(8),

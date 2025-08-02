@@ -506,8 +506,10 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
             padding: const EdgeInsets.only(right: 16.0),
             child: Row(
               children: [
-                const Icon(
-                  Icons.account_balance_wallet,
+                Image.asset(
+                  "assets/images/ic_wallet.png",
+                  width: 22,
+                  height: 22,
                   color: Colors.black,
                 ), // Using Material Icon
                 const SizedBox(width: 4),
@@ -582,7 +584,7 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: _isSubmitting
                                   ? Colors.grey
-                                  : Colors.amber, // Grey out when disabled
+                                  : Colors.orange, // Grey out when disabled
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
@@ -706,7 +708,7 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
         border: Border.all(color: Colors.grey[300]!),
       ),
       child: TextField(
-        cursorColor: Colors.amber,
+        cursorColor: Colors.orange,
         controller: controller,
         keyboardType: TextInputType.number,
         inputFormatters: [
@@ -728,7 +730,7 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
           suffixIcon: Container(
             margin: const EdgeInsets.all(8),
             decoration: const BoxDecoration(
-              color: Colors.amber,
+              color: Colors.orange,
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -750,7 +752,7 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
         border: Border.all(color: Colors.grey[300]!),
       ),
       child: TextField(
-        cursorColor: Colors.amber,
+        cursorColor: Colors.orange,
         controller: controller,
         keyboardType: TextInputType.number,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -769,7 +771,7 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
           suffixIcon: Container(
             margin: const EdgeInsets.all(8),
             decoration: const BoxDecoration(
-              color: Colors.amber,
+              color: Colors.orange,
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -931,7 +933,7 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: (_isSubmitting || _entries.isEmpty)
                   ? Colors.grey
-                  : Colors.amber,
+                  : Colors.orange,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -1563,7 +1565,7 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
 //                               ),
 //                             ),
 //                             style: ElevatedButton.styleFrom(
-//                               backgroundColor: Colors.amber,
+//                               backgroundColor: Colors.orange,
 //                               padding: const EdgeInsets.symmetric(vertical: 12),
 //                               shape: RoundedRectangleBorder(
 //                                 borderRadius: BorderRadius.circular(8),
@@ -1665,7 +1667,7 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
 //         border: Border.all(color: Colors.grey[300]!),
 //       ),
 //       child: TextField(
-//         cursorColor: Colors.amber,
+//         cursorColor: Colors.orange,
 //         controller: controller,
 //         keyboardType: TextInputType.number,
 //         inputFormatters: [
@@ -1684,7 +1686,7 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
 //           suffixIcon: Container(
 //             margin: const EdgeInsets.all(8),
 //             decoration: const BoxDecoration(
-//               color: Colors.amber,
+//               color: Colors.orange,
 //               shape: BoxShape.circle,
 //             ),
 //             child: const Icon(
@@ -1706,7 +1708,7 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
 //         border: Border.all(color: Colors.grey[300]!),
 //       ),
 //       child: TextField(
-//         cursorColor: Colors.amber,
+//         cursorColor: Colors.orange,
 //         controller: controller,
 //         keyboardType: TextInputType.number,
 //         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -1721,7 +1723,7 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
 //           suffixIcon: Container(
 //             margin: const EdgeInsets.all(8),
 //             decoration: const BoxDecoration(
-//               color: Colors.amber,
+//               color: Colors.orange,
 //               shape: BoxShape.circle,
 //             ),
 //             child: const Icon(
@@ -1871,7 +1873,7 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
 //               style: TextStyle(color: Colors.white, fontSize: 16),
 //             ),
 //             style: ElevatedButton.styleFrom(
-//               backgroundColor: Colors.amber,
+//               backgroundColor: Colors.orange,
 //               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
 //               shape: RoundedRectangleBorder(
 //                 borderRadius: BorderRadius.circular(8),

@@ -22,7 +22,7 @@ class AppName extends StatelessWidget {
         alignment: Alignment.centerLeft,
         children: [
           // Orange Circle behind "S"
-          CircleAvatar(radius: circleRadius, backgroundColor: Colors.amber),
+          CircleAvatar(radius: circleRadius, backgroundColor: Colors.orange),
 
           // Sara777 Text with Overline
           Padding(
@@ -53,7 +53,7 @@ class AppName extends StatelessWidget {
                       style: TextStyle(
                         fontSize: fontSize,
                         fontWeight: FontWeight.w600,
-                        color: Colors.amber,
+                        color: Colors.orange,
                       ),
                     ),
                   ],

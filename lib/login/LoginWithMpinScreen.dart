@@ -301,7 +301,7 @@ class _LoginWithMpinScreenState extends State<LoginWithMpinScreen> {
                   controller: mpinController,
                   obscureText: true,
                   keyboardType: TextInputType.number,
-                  cursorColor: Colors.amber,
+                  cursorColor: Colors.orange,
                   decoration: InputDecoration(
                     hintText: "Login with mPIN",
                     filled: true,

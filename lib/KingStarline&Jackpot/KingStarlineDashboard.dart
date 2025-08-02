@@ -263,21 +263,25 @@ class _KingStarlineDashboardScreenState
           Divider(height: 1, thickness: 1, color: Colors.grey[200]),
           const SizedBox(height: 5),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 5.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 5.0,
+            ), // Horizontal padding of 5.0 on each side
             child: Column(
               children: [
                 Row(
+                  // This is likely the problematic Row
                   children: [
                     _buildInfoCard('Single Digit', '10-100'),
-                    const SizedBox(width: 5),
+                    const SizedBox(width: 5), // Fixed width of 5
                     _buildInfoCard('Double Pana', '10-3200'),
                   ],
                 ),
                 const SizedBox(height: 5),
                 Row(
+                  // This one too, potentially
                   children: [
                     _buildInfoCard('Single Pana', '10-1600'),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 10), // Fixed width of 10
                     _buildInfoCard('Triple Pana', '10-10000'),
                   ],
                 ),
@@ -340,21 +344,26 @@ class _KingStarlineDashboardScreenState
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey[700],
+              Flexible(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[700],
+                  ),
                 ),
               ),
               const SizedBox(height: 4, width: 5),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.amber,
+
+              Flexible(
+                child: Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.amber,
+                  ),
                 ),
               ),
             ],
@@ -464,8 +473,10 @@ class _KingStarlineDashboardScreenState
                           builder: (context) => KingStarlineOptionScreen(
                             gameTime: time,
                             title: "King Starline",
-                            selectedId:
+                            starlineGameId:
                                 id, // <--- Correctly passing the `id` here
+                            paanaStatus: bool.fromEnvironment(status),
+                            registeredId: _storage.read("registerId"),
                           ),
                         ),
                       );

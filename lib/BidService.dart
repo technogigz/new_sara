@@ -26,10 +26,13 @@ class BidService {
     String apiUrl;
     if (gameName.toLowerCase().contains('jackpot')) {
       apiUrl = '${Constant.apiEndpoint}place-jackpot-bid';
+      log("Jackpot API URL: $apiUrl, \n $gameName");
     } else if (gameName.toLowerCase().contains('starline')) {
       apiUrl = '${Constant.apiEndpoint}place-starline-bid';
+      log("Starline API URL: $apiUrl, \n $gameName");
     } else {
       apiUrl = '${Constant.apiEndpoint}place-bid';
+      log("Default API URL: $apiUrl, \n $gameName");
     }
 
     if (accessToken.isEmpty || registerId.isEmpty) {

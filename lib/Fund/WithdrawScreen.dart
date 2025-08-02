@@ -83,11 +83,11 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
       fillColor: Colors.white,
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.amber),
+        borderSide: const BorderSide(color: Colors.orange),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.amber, width: 2),
+        borderSide: const BorderSide(color: Colors.orange, width: 2),
       ),
     );
   }
@@ -135,7 +135,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                 });
               }
             },
-            activeColor: Colors.amber,
+            activeColor: Colors.orange,
           ),
         ),
       ),
@@ -153,7 +153,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
       builder: (context, snapshot) {
         return TextField(
           controller: controller,
-          cursorColor: Colors.amber,
+          cursorColor: Colors.orange,
           keyboardType: keyboardType,
           decoration: _buildInputDecoration(snapshot.data ?? hint),
         );
@@ -450,13 +450,13 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                         children: [
                           Image.asset(
                             "assets/images/ic_wallet.png",
-                            color: Colors.amber,
+                            color: Colors.orange,
                             height: 50,
                             width: 50,
                             errorBuilder: (context, error, stackTrace) {
                               return Icon(
                                 Icons.account_balance_wallet,
-                                color: Colors.amber,
+                                color: Colors.orange,
                                 size: 50,
                               );
                             },
@@ -470,7 +470,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                                 style: GoogleFonts.poppins(
                                   fontSize: 24,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.amber,
+                                  color: Colors.orange,
                                 ),
                               ),
                               FutureBuilder<String>(
@@ -525,7 +525,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                   return ElevatedButton(
                     onPressed: _performWithdrawal, // Direct call
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber,
+                      backgroundColor: Colors.orange,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -707,7 +707,7 @@ class WithdrawalMethod {
 //                 });
 //               }
 //             },
-//             activeColor: Colors.amber,
+//             activeColor: Colors.orange,
 //           ),
 //         ),
 //       ),
@@ -721,7 +721,7 @@ class WithdrawalMethod {
 //       builder: (context, snapshot) {
 //         return TextField(
 //           controller: amountController,
-//           cursorColor: Colors.amber,
+//           cursorColor: Colors.orange,
 //           keyboardType: TextInputType.number,
 //           decoration: InputDecoration(
 //             hintText: snapshot.data ?? "Enter Amount",
@@ -729,11 +729,11 @@ class WithdrawalMethod {
 //             fillColor: Colors.white,
 //             enabledBorder: OutlineInputBorder(
 //               borderRadius: BorderRadius.circular(12),
-//               borderSide: const BorderSide(color: Colors.amber),
+//               borderSide: const BorderSide(color: Colors.orange),
 //             ),
 //             focusedBorder: OutlineInputBorder(
 //               borderRadius: BorderRadius.circular(12),
-//               borderSide: const BorderSide(color: Colors.amber, width: 2),
+//               borderSide: const BorderSide(color: Colors.orange, width: 2),
 //             ),
 //           ),
 //         );
@@ -748,7 +748,7 @@ class WithdrawalMethod {
 //       builder: (context, snapshot) {
 //         return TextField(
 //           controller: paymentNumberController,
-//           cursorColor: Colors.amber,
+//           cursorColor: Colors.orange,
 //           keyboardType: TextInputType.text, // Changed to text for UPI ID
 //           decoration: InputDecoration(
 //             hintText: snapshot.data ?? hint,
@@ -756,11 +756,11 @@ class WithdrawalMethod {
 //             fillColor: Colors.white,
 //             enabledBorder: OutlineInputBorder(
 //               borderRadius: BorderRadius.circular(12),
-//               borderSide: const BorderSide(color: Colors.amber),
+//               borderSide: const BorderSide(color: Colors.orange),
 //             ),
 //             focusedBorder: OutlineInputBorder(
 //               borderRadius: BorderRadius.circular(12),
-//               borderSide: const BorderSide(color: Colors.amber, width: 2),
+//               borderSide: const BorderSide(color: Colors.orange, width: 2),
 //             ),
 //           ),
 //         );
@@ -779,7 +779,7 @@ class WithdrawalMethod {
 //       builder: (context, snapshot) {
 //         return TextField(
 //           controller: controller,
-//           cursorColor: Colors.amber,
+//           cursorColor: Colors.orange,
 //           keyboardType: keyboardType,
 //           decoration: InputDecoration(
 //             hintText: snapshot.data ?? hint,
@@ -787,11 +787,11 @@ class WithdrawalMethod {
 //             fillColor: Colors.white,
 //             enabledBorder: OutlineInputBorder(
 //               borderRadius: BorderRadius.circular(12),
-//               borderSide: const BorderSide(color: Colors.amber),
+//               borderSide: const BorderSide(color: Colors.orange),
 //             ),
 //             focusedBorder: OutlineInputBorder(
 //               borderRadius: BorderRadius.circular(12),
-//               borderSide: const BorderSide(color: Colors.amber, width: 2),
+//               borderSide: const BorderSide(color: Colors.orange, width: 2),
 //             ),
 //           ),
 //         );
@@ -1077,13 +1077,13 @@ class WithdrawalMethod {
 //                         children: [
 //                           Image.asset(
 //                             "assets/images/ic_wallet.png", // Ensure this asset path is correct
-//                             color: Colors.amber,
+//                             color: Colors.orange,
 //                             height: 50,
 //                             width: 50,
 //                             errorBuilder: (context, error, stackTrace) {
 //                               return const Icon(
 //                                 Icons.account_balance_wallet,
-//                                 color: Colors.amber,
+//                                 color: Colors.orange,
 //                                 size: 50,
 //                               );
 //                             },
@@ -1097,7 +1097,7 @@ class WithdrawalMethod {
 //                                 style: const TextStyle(
 //                                   fontSize: 20,
 //                                   fontWeight: FontWeight.bold,
-//                                   color: Colors.amber,
+//                                   color: Colors.orange,
 //                                 ),
 //                               ),
 //                               FutureBuilder<String>(
@@ -1152,7 +1152,7 @@ class WithdrawalMethod {
 //                   return ElevatedButton(
 //                     onPressed: _handleSubmit,
 //                     style: ElevatedButton.styleFrom(
-//                       backgroundColor: Colors.amber,
+//                       backgroundColor: Colors.orange,
 //                       padding: const EdgeInsets.symmetric(vertical: 16),
 //                       shape: RoundedRectangleBorder(
 //                         borderRadius: BorderRadius.circular(10),

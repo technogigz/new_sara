@@ -25,6 +25,7 @@ class SinglePannaBulkBoardScreen extends StatefulWidget {
   final int gameId; // ID of the game
   final String gameName; // Name of the game (e.g., "KALYAN", "STARLINE MAIN")
   final String gameType; // Type of the game (e.g., "singlePana")
+  final bool selectionStatus;
 
   const SinglePannaBulkBoardScreen({
     Key? key,
@@ -32,6 +33,7 @@ class SinglePannaBulkBoardScreen extends StatefulWidget {
     required this.gameId,
     required this.gameName,
     required this.gameType,
+    required this.selectionStatus,
   }) : super(key: key);
 
   @override
@@ -76,12 +78,24 @@ class _SinglePannaBulkBoardScreenState
       UniqueKey(); // Key to force re-animation of the message bar
   // --- End AnimatedMessageBar State Management ---
 
+  // ****** ADDED STATE VARIABLE for the Dropdown ******
+  late String selectedGameType;
+
   @override
   void initState() {
     super.initState();
     storage = GetStorage(); // Initialize GetStorage
     _loadInitialData(); // Load user data and wallet balance
     _setupStorageListeners(); // Set up listeners for storage changes
+
+    // ****** INITIALIZE selectedGameType ******
+    if (widget.selectionStatus) {
+      selectedGameType = 'Open'; // Default to 'Open' if selectionStatus allows
+      _selectedPattiDayType = PattiDayType.open;
+    } else {
+      selectedGameType = 'Close'; // Default to 'Close'
+      _selectedPattiDayType = PattiDayType.close;
+    }
   }
 
   // Asynchronously loads initial user data and wallet balance from GetStorage
@@ -151,17 +165,15 @@ class _SinglePannaBulkBoardScreenState
   }
 
   // --- AnimatedMessageBar Helper Methods ---
-  // Displays a message using the custom AnimatedMessageBar
   void _showMessage(String message, {bool isError = false}) {
-    if (!mounted) return; // Only update state if the widget is mounted
+    if (!mounted) return;
     setState(() {
       _messageToShow = message;
       _isErrorForMessage = isError;
-      _messageBarKey = UniqueKey(); // Assign new key to trigger animation
+      _messageBarKey = UniqueKey();
     });
   }
 
-  // Clears the displayed message
   void _clearMessage() {
     if (mounted) {
       setState(() {
@@ -171,16 +183,15 @@ class _SinglePannaBulkBoardScreenState
   }
   // --- End AnimatedMessageBar Helper Methods ---
 
-  // Handles pressing a number button on the custom number pad
   Future<void> _onNumberPressed(String digit) async {
-    _clearMessage(); // Clear any previous messages
-    if (_isApiCalling) return; // Prevent multiple API calls at once
+    _clearMessage();
+    if (_isApiCalling) return;
 
     final points = _pointsController.text.trim();
+    // requestSessionType now correctly uses the synced _selectedPattiDayType
     final String requestSessionType =
         _selectedPattiDayType == PattiDayType.close ? 'close' : 'open';
 
-    // Input validation
     if (points.isEmpty) {
       _showMessage('Please enter points to place a bid.', isError: true);
       return;
@@ -192,8 +203,6 @@ class _SinglePannaBulkBoardScreenState
       return;
     }
 
-    // Wallet balance check is primarily done before final submission,
-    // but a quick check here prevents unnecessary API calls
     if (parsedPoints > _walletBalance && _walletBalance != 0) {
       _showMessage(
         'Insufficient wallet balance to add this bid.',
@@ -203,10 +212,9 @@ class _SinglePannaBulkBoardScreenState
     }
 
     setState(() {
-      _isApiCalling = true; // Set API calling state to true
+      _isApiCalling = true;
     });
 
-    // Construct API URL and headers
     final url = Uri.parse('${Constant.apiEndpoint}single-pana-bulk');
     final headers = {
       'deviceId': _deviceId,
@@ -216,7 +224,6 @@ class _SinglePannaBulkBoardScreenState
       'Authorization': 'Bearer $_accessToken',
     };
 
-    // Construct request body for the bulk API call
     final body = jsonEncode({
       "game_id": widget.gameId,
       "register_id": _registerId,
@@ -240,12 +247,8 @@ class _SinglePannaBulkBoardScreenState
               final String amount = item['amount'].toString();
               String bidDisplayType;
               final String? apiSessionType = item['sessionType']?.toString();
-              // IMPORTANT: Assuming the 'single-pana-bulk' API returns a 'digit'
-              // field for each pana in the 'info' array. If not, you need to
-              // derive the single digit from the pana (e.g., sum of digits % 10).
               final String derivedSingleDigit =
-                  item['digit']?.toString() ??
-                  _deriveSingleDigitFromPana(pana); // Fallback to derivation
+                  item['digit']?.toString() ?? _deriveSingleDigitFromPana(pana);
 
               if (apiSessionType != null && apiSessionType.isNotEmpty) {
                 bidDisplayType = apiSessionType;
@@ -253,12 +256,10 @@ class _SinglePannaBulkBoardScreenState
                 bidDisplayType = requestSessionType;
               }
 
-              // Store the full pana as the key, and the derived single digit
               _bids[pana] = {
                 "points": amount,
                 "dayType": bidDisplayType.toLowerCase(),
-                "singleDigit":
-                    derivedSingleDigit, // Store the single digit for later submission
+                "singleDigit": derivedSingleDigit,
               };
             }
           });
@@ -282,14 +283,13 @@ class _SinglePannaBulkBoardScreenState
       _showMessage('Network error: $e', isError: true);
     } finally {
       setState(() {
-        _isApiCalling = false; // Reset API calling state
+        _isApiCalling = false;
       });
     }
   }
 
-  // Helper function to derive single digit from pana (e.g., "127" -> "0")
   String _deriveSingleDigitFromPana(String pana) {
-    if (pana.length != 3) return ""; // Or handle error appropriately
+    if (pana.length != 3) return "";
     try {
       int sum = 0;
       for (int i = 0; i < pana.length; i++) {
@@ -301,31 +301,28 @@ class _SinglePannaBulkBoardScreenState
         "Error deriving single digit from pana '$pana': $e",
         name: 'PanaDerivationError',
       );
-      return ""; // Return empty or handle as error
+      return "";
     }
   }
 
-  // Removes a bid from the local list
   void _removeBid(String pana) {
     _clearMessage();
-    if (_isApiCalling) return; // Prevent removing during API submission
+    if (_isApiCalling) return;
     setState(() {
       _bids.remove(pana);
     });
     _showMessage('Bid for Pana $pana removed from list.');
   }
 
-  // Calculates the total points for all bids in the list
   int _getTotalPoints() {
     return _bids.values
         .map((bid) => int.tryParse(bid['points'] ?? '0') ?? 0)
         .fold(0, (sum, points) => sum + points);
   }
 
-  // Shows the confirmation dialog and then initiates final bid submission
   void _showConfirmationDialogAndSubmitBids() {
-    _clearMessage(); // Clear any existing messages
-    if (_isApiCalling) return; // Prevent multiple submissions
+    _clearMessage();
+    if (_isApiCalling) return;
 
     if (_bids.isEmpty) {
       _showMessage(
@@ -345,15 +342,13 @@ class _SinglePannaBulkBoardScreenState
       return;
     }
 
-    // Prepare bids data for the confirmation dialog
     List<Map<String, String>> bidsForConfirmationDialog = [];
     _bids.forEach((pana, bidData) {
       bidsForConfirmationDialog.add({
-        "digit":
-            bidData['singleDigit']!, // Use the stored single digit for display
+        "digit": bidData['singleDigit']!,
         "points": bidData['points']!,
-        "type": bidData['dayType']!.toUpperCase(), // Display type (OPEN/CLOSE)
-        "pana": pana, // This is the full pana for display
+        "type": bidData['dayType']!.toUpperCase(),
+        "pana": pana,
       });
     });
 
@@ -361,10 +356,9 @@ class _SinglePannaBulkBoardScreenState
       'dd MMM yyyy, hh:mm a',
     ).format(DateTime.now());
 
-    // Show the confirmation dialog
     showDialog(
       context: context,
-      barrierDismissible: false, // User must interact with buttons
+      barrierDismissible: false,
       builder: (BuildContext dialogContext) {
         return BidConfirmationDialog(
           gameTitle:
@@ -379,33 +373,28 @@ class _SinglePannaBulkBoardScreenState
           gameId: widget.gameId.toString(),
           gameType: widget.gameType,
           onConfirm: () async {
-            // Navigator.pop(dialogContext); // Dismiss the confirmation dialog
+            // Navigator.pop(
+            //   dialogContext,
+            // ); // Dismiss the confirmation dialog first
 
             setState(() {
-              _isApiCalling =
-                  true; // Set API calling state for final submission
+              _isApiCalling = true;
             });
 
             try {
-              bool success =
-                  await _placeFinalBids(); // Call the final submission logic
-
-              // Show overall success/failure dialog based on the result from _placeFinalBids
+              bool success = await _placeFinalBids();
               if (mounted) {
+                // Check if widget is still mounted before showing another dialog
                 if (success) {
                   await showDialog(
-                    context: context,
-                    barrierDismissible:
-                        false, // Can be true if you want to allow dismissing after success
+                    context: context, // Use the page's context
+                    barrierDismissible: false,
                     builder: (BuildContext context) => const BidSuccessDialog(),
                   );
                 } else {
-                  // _placeFinalBids already shows specific messages,
-                  // so this failure dialog can be generic or custom.
                   await showDialog(
-                    context: context,
-                    barrierDismissible:
-                        false, // Can be true if you want to allow dismissing after failure
+                    context: context, // Use the page's context
+                    barrierDismissible: false,
                     builder: (BuildContext context) => BidFailureDialog(
                       errorMessage:
                           "Some bids failed to place. Please check messages.",
@@ -424,7 +413,7 @@ class _SinglePannaBulkBoardScreenState
             } finally {
               if (mounted) {
                 setState(() {
-                  _isApiCalling = false; // Reset API calling state
+                  _isApiCalling = false;
                 });
               }
             }
@@ -434,10 +423,81 @@ class _SinglePannaBulkBoardScreenState
     );
   }
 
-  // --- REFACTORED Final Bid Submission Logic ---
-  // This function now uses BidService to send all collected bids in a single API call.
+  // Define _removeOverlay if it's needed, otherwise its call is commented out
+  // void _removeOverlay() {
+  //   log("Overlay removal logic would go here if needed.");
+  // }
+
+  Widget _buildDropdown() {
+    final List<String> gameTypes = widget.selectionStatus
+        ? ['Open', 'Close']
+        : ['Close'];
+
+    // This ensures that if the available gameTypes change (e.g. due to some external factor)
+    // and the current selectedGameType is no longer valid, it resets.
+    // However, with the current logic, gameTypes is static based on widget.selectionStatus.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !gameTypes.contains(selectedGameType)) {
+        setState(() {
+          selectedGameType = gameTypes.first;
+          // Sync _selectedPattiDayType as well
+          _selectedPattiDayType = selectedGameType == 'Open'
+              ? PattiDayType.open
+              : PattiDayType.close;
+        });
+      }
+    });
+
+    return Container(
+      height: 35, // Adjusted for better fit with DropdownButtonFormField
+      width: 150,
+      alignment: Alignment.center,
+      child: DropdownButtonFormField<String>(
+        value: selectedGameType, // Uses the state variable
+        isDense: true,
+        decoration: InputDecoration(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 0,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(30),
+            borderSide: const BorderSide(color: Colors.black),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(30),
+            borderSide: const BorderSide(color: Colors.black),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(30),
+            borderSide: const BorderSide(color: Colors.orange, width: 2),
+          ),
+        ),
+        items: gameTypes.map((type) {
+          return DropdownMenuItem(
+            value: type,
+            child: Text(type, style: GoogleFonts.poppins(fontSize: 14)),
+          );
+        }).toList(),
+        onChanged: (value) {
+          if (value != null && mounted) {
+            setState(() {
+              selectedGameType = value; // Update string state variable
+              // ** IMPORTANT: Sync _selectedPattiDayType with the new string value **
+              _selectedPattiDayType = value == 'Open'
+                  ? PattiDayType.open
+                  : PattiDayType.close;
+            });
+            _clearMessage(); // Good practice to clear messages
+            // _removeOverlay(); // Call if implemented and needed
+          }
+        },
+      ),
+    );
+  }
+
   Future<bool> _placeFinalBids() async {
-    final bidService = BidService(storage); // Instantiate BidService
+    final bidService = BidService(storage);
 
     if (_accessToken.isEmpty || _registerId.isEmpty) {
       _showMessage('Authentication error. Please log in again.', isError: true);
@@ -449,8 +509,6 @@ class _SinglePannaBulkBoardScreenState
       return false;
     }
 
-    // Prepare bidAmounts: Map<String, String> for BidService
-    // Keys are Pana numbers (digits), values are points (amounts)
     final Map<String, String> bidAmountsForService = {};
     _bids.forEach((pana, bidData) {
       bidAmountsForService[pana] = bidData['points']!;
@@ -464,6 +522,7 @@ class _SinglePannaBulkBoardScreenState
     );
 
     try {
+      // selectedGameType for the API now uses the synced _selectedPattiDayType
       final result = await bidService.placeFinalBids(
         gameName: widget.gameName,
         accessToken: _accessToken,
@@ -471,11 +530,10 @@ class _SinglePannaBulkBoardScreenState
         deviceId: _deviceId,
         deviceName: _deviceName,
         accountStatus: _accountStatus,
-        bidAmounts:
-            bidAmountsForService, // Pass the prepared Map<String, String>
+        bidAmounts: bidAmountsForService,
         selectedGameType: _selectedPattiDayType == PattiDayType.close
             ? 'CLOSE'
-            : 'OPEN', // Use the selected day type for the entire batch
+            : 'OPEN',
         gameId: widget.gameId,
         gameType: widget.gameType,
         totalBidAmount: totalPointsToSubmit,
@@ -486,14 +544,12 @@ class _SinglePannaBulkBoardScreenState
           'Consolidated bid submission successful.',
           name: 'ConsolidatedBidSubmission',
         );
-        // Update wallet balance locally and in storage
         final int newWalletBalance = _walletBalance - totalPointsToSubmit;
         await bidService.updateWalletBalance(newWalletBalance);
         if (mounted) {
           setState(() {
             _walletBalance = newWalletBalance;
-            _bids
-                .clear(); // Clear all bids after successful consolidated submission
+            _bids.clear();
           });
         }
         _showMessage('All bids submitted successfully!');
@@ -519,7 +575,6 @@ class _SinglePannaBulkBoardScreenState
     }
   }
 
-  // Builds the custom number pad for selecting single digits (0-9)
   Widget _buildNumberPad() {
     final numbers = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
@@ -529,7 +584,6 @@ class _SinglePannaBulkBoardScreenState
       alignment: WrapAlignment.center,
       children: numbers.map((number) {
         return GestureDetector(
-          // Disable tap if an API call is in progress
           onTap: _isApiCalling ? null : () => _onNumberPressed(number),
           child: Stack(
             alignment: Alignment.center,
@@ -539,12 +593,9 @@ class _SinglePannaBulkBoardScreenState
                 height: 60,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: _isApiCalling
-                      ? Colors.grey
-                      : Colors.amber, // Dim if disabled
+                  color: _isApiCalling ? Colors.grey : Colors.orange,
                   borderRadius: BorderRadius.circular(8),
-                  boxShadow:
-                      _isApiCalling // Less prominent shadow if disabled
+                  boxShadow: _isApiCalling
                       ? []
                       : [
                           BoxShadow(
@@ -571,7 +622,6 @@ class _SinglePannaBulkBoardScreenState
     );
   }
 
-  // Builds a single bid entry item for display in the list
   Widget _buildBidEntryItem(String pana, String points, String type) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -584,7 +634,7 @@ class _SinglePannaBulkBoardScreenState
             Expanded(
               flex: 2,
               child: Text(
-                pana, // Display the full pana
+                pana,
                 style: GoogleFonts.poppins(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
@@ -604,19 +654,18 @@ class _SinglePannaBulkBoardScreenState
             Expanded(
               flex: 2,
               child: Text(
-                type.toUpperCase(), // Display type (OPEN/CLOSE)
+                type.toUpperCase(),
                 style: GoogleFonts.poppins(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                   color: type.toLowerCase() == 'open'
-                      ? Colors.blue[700] // Differentiate open/close visually
+                      ? Colors.blue[700]
                       : Colors.green[700],
                 ),
               ),
             ),
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
-              // Disable removal if an API call is in progress
               onPressed: _isApiCalling ? null : () => _removeBid(pana),
             ),
           ],
@@ -625,7 +674,6 @@ class _SinglePannaBulkBoardScreenState
     );
   }
 
-  // Builds the persistent bottom bar showing total bids, points, and submit button
   Widget _buildBottomBar() {
     int totalBidsCount = _bids.length;
     int totalPoints = _getTotalPoints();
@@ -648,9 +696,10 @@ class _SinglePannaBulkBoardScreenState
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min, // Added for proper layout in Row
             children: [
               Text(
-                'Bids', // Changed from 'Bid' for better clarity
+                'Bids',
                 style: GoogleFonts.poppins(
                   fontSize: 14,
                   color: Colors.grey[700],
@@ -667,9 +716,10 @@ class _SinglePannaBulkBoardScreenState
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min, // Added for proper layout in Row
             children: [
               Text(
-                'Points', // Changed from 'Total' for better clarity
+                'Points',
                 style: GoogleFonts.poppins(
                   fontSize: 14,
                   color: Colors.grey[700],
@@ -685,14 +735,11 @@ class _SinglePannaBulkBoardScreenState
             ],
           ),
           ElevatedButton(
-            // Disable button if an API call is in progress
             onPressed: _isApiCalling
                 ? null
                 : _showConfirmationDialogAndSubmitBids,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _isApiCalling
-                  ? Colors.grey
-                  : Colors.amber, // Dim if disabled
+              backgroundColor: _isApiCalling ? Colors.grey : Colors.orange,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -746,9 +793,10 @@ class _SinglePannaBulkBoardScreenState
             child: Row(
               children: [
                 Image.asset(
-                  "assets/images/wallet_icon.png",
+                  "assets/images/ic_wallet.png",
+                  width: 22,
+                  height: 22,
                   color: Colors.black,
-                  height: 24,
                 ),
                 const SizedBox(width: 4),
                 _isWalletLoading
@@ -761,7 +809,7 @@ class _SinglePannaBulkBoardScreenState
                         ),
                       )
                     : Text(
-                        "${_walletBalance.toString()}",
+                        _walletBalance.toString(),
                         style: GoogleFonts.poppins(
                           color: Colors.black,
                           fontSize: 16,
@@ -794,51 +842,7 @@ class _SinglePannaBulkBoardScreenState
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                        ToggleButtons(
-                          isSelected: [
-                            _selectedPattiDayType == PattiDayType.close,
-                            _selectedPattiDayType == PattiDayType.open,
-                          ],
-                          onPressed: (int index) {
-                            if (_isApiCalling)
-                              return; // Disable selection during API call
-                            setState(() {
-                              if (index == 0) {
-                                _selectedPattiDayType = PattiDayType.close;
-                              } else {
-                                _selectedPattiDayType = PattiDayType.open;
-                              }
-                            });
-                          },
-                          borderRadius: BorderRadius.circular(30),
-                          selectedColor: Colors.white,
-                          fillColor: Colors.amber,
-                          color: Colors.black,
-                          borderColor: Colors.black,
-                          selectedBorderColor: Colors.amber,
-                          children: <Widget>[
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 8,
-                              ),
-                              child: Text(
-                                'Close',
-                                style: GoogleFonts.poppins(fontSize: 14),
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 8,
-                              ),
-                              child: Text(
-                                'Open',
-                                style: GoogleFonts.poppins(fontSize: 14),
-                              ),
-                            ),
-                          ],
-                        ),
+                        _buildDropdown(), // Dropdown uses selectedGameType
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -857,15 +861,15 @@ class _SinglePannaBulkBoardScreenState
                           height: 40,
                           child: TextFormField(
                             controller: _pointsController,
-                            cursorColor: Colors.amber,
+                            cursorColor: Colors.orange,
                             keyboardType: TextInputType.number,
                             inputFormatters: [
                               FilteringTextInputFormatter.digitsOnly,
                               LengthLimitingTextInputFormatter(4),
                             ],
                             style: GoogleFonts.poppins(fontSize: 14),
-                            onTap: _clearMessage, // Clear message on tap
-                            enabled: !_isApiCalling, // Disable during API call
+                            onTap: _clearMessage,
+                            enabled: !_isApiCalling,
                             decoration: InputDecoration(
                               hintText: 'Enter Amount',
                               contentPadding: const EdgeInsets.symmetric(
@@ -889,7 +893,7 @@ class _SinglePannaBulkBoardScreenState
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(30),
                                 borderSide: const BorderSide(
-                                  color: Colors.amber,
+                                  color: Colors.orange,
                                   width: 2,
                                 ),
                               ),
@@ -901,7 +905,9 @@ class _SinglePannaBulkBoardScreenState
                     const SizedBox(height: 30),
                     Center(
                       child: _isApiCalling
-                          ? const CircularProgressIndicator(color: Colors.amber)
+                          ? const CircularProgressIndicator(
+                              color: Colors.orange,
+                            )
                           : _buildNumberPad(),
                     ),
                   ],
@@ -943,7 +949,7 @@ class _SinglePannaBulkBoardScreenState
                           ),
                         ),
                       ),
-                      const SizedBox(width: 48),
+                      const SizedBox(width: 48), // For delete button alignment
                     ],
                   ),
                 ),
@@ -969,6 +975,7 @@ class _SinglePannaBulkBoardScreenState
                         },
                       ),
               ),
+              // Conditionally build bottom bar only if there are bids or if you always want it visible
               if (_bids.isNotEmpty) _buildBottomBar(),
             ],
           ),
@@ -1002,10 +1009,11 @@ class _SinglePannaBulkBoardScreenState
 // import 'package:intl/intl.dart';
 // import 'package:new_sara/ulits/Constents.dart'; // Ensure this path is correct for Constant.apiEndpoint
 //
+// import '../../../BidService.dart'; // Assuming BidService is in the root lib folder
 // import '../../../components/AnimatedMessageBar.dart';
 // import '../../../components/BidConfirmationDialog.dart';
-// import '../../../components/BidFailureDialog.dart'; // Assuming you have this
-// import '../../../components/BidSuccessDialog.dart'; // Assuming you have this
+// import '../../../components/BidFailureDialog.dart';
+// import '../../../components/BidSuccessDialog.dart';
 //
 // // Enum to represent whether the Patti is for 'Open' or 'Close'
 // enum PattiDayType { open, close }
@@ -1016,6 +1024,7 @@ class _SinglePannaBulkBoardScreenState
 //   final int gameId; // ID of the game
 //   final String gameName; // Name of the game (e.g., "KALYAN", "STARLINE MAIN")
 //   final String gameType; // Type of the game (e.g., "singlePana")
+//   final bool selectionStatus;
 //
 //   const SinglePannaBulkBoardScreen({
 //     Key? key,
@@ -1023,6 +1032,7 @@ class _SinglePannaBulkBoardScreenState
 //     required this.gameId,
 //     required this.gameName,
 //     required this.gameType,
+//     required this.selectionStatus,
 //   }) : super(key: key);
 //
 //   @override
@@ -1041,7 +1051,6 @@ class _SinglePannaBulkBoardScreenState
 //
 //   // Stores the bids: Key is the 'pana' (e.g., "127"),
 //   // Value is a Map containing "points", "dayType", and the "singleDigit" derived from pana.
-//   // Storing `singleDigit` is crucial for the API payload.
 //   Map<String, Map<String, String>> _bids = {};
 //
 //   // GetStorage instance for local data persistence
@@ -1184,8 +1193,13 @@ class _SinglePannaBulkBoardScreenState
 //       return;
 //     }
 //
-//     if (parsedPoints > _walletBalance) {
-//       _showMessage('Insufficient wallet balance.', isError: true);
+//     // Wallet balance check is primarily done before final submission,
+//     // but a quick check here prevents unnecessary API calls
+//     if (parsedPoints > _walletBalance && _walletBalance != 0) {
+//       _showMessage(
+//         'Insufficient wallet balance to add this bid.',
+//         isError: true,
+//       );
 //       return;
 //     }
 //
@@ -1366,36 +1380,48 @@ class _SinglePannaBulkBoardScreenState
 //           gameId: widget.gameId.toString(),
 //           gameType: widget.gameType,
 //           onConfirm: () async {
-//             Navigator.pop(dialogContext); // Dismiss the confirmation dialog
+//             // Navigator.pop(dialogContext); // Dismiss the confirmation dialog
 //
 //             setState(() {
 //               _isApiCalling =
 //                   true; // Set API calling state for final submission
 //             });
 //
-//             bool success = false;
 //             try {
-//               success =
+//               bool success =
 //                   await _placeFinalBids(); // Call the final submission logic
-//               if (success) {
-//                 // _bids.clear() is now handled within _placeFinalBids if successful
-//                 // Overall success message is handled by BidSuccessDialog
-//                 showDialog(
-//                   context: context,
-//                   barrierDismissible: true,
-//                   builder: (BuildContext context) => BidSuccessDialog(),
-//                 );
-//               } else {
-//                 // Overall failure message is handled by BidFailureDialog
-//                 showDialog(
-//                   context: context,
-//                   barrierDismissible: true,
-//                   builder: (BuildContext context) => BidFailureDialog(),
-//                 );
+//
+//               // Show overall success/failure dialog based on the result from _placeFinalBids
+//               if (mounted) {
+//                 if (success) {
+//                   await showDialog(
+//                     context: context,
+//                     barrierDismissible:
+//                         false, // Can be true if you want to allow dismissing after success
+//                     builder: (BuildContext context) => const BidSuccessDialog(),
+//                   );
+//                 } else {
+//                   // _placeFinalBids already shows specific messages,
+//                   // so this failure dialog can be generic or custom.
+//                   await showDialog(
+//                     context: context,
+//                     barrierDismissible:
+//                         false, // Can be true if you want to allow dismissing after failure
+//                     builder: (BuildContext context) => BidFailureDialog(
+//                       errorMessage:
+//                           "Some bids failed to place. Please check messages.",
+//                     ),
+//                   );
+//                 }
 //               }
 //             } catch (e) {
 //               log("Error during final bid submission: $e");
-//               _showMessage('An unexpected error occurred: $e', isError: true);
+//               if (mounted) {
+//                 _showMessage(
+//                   'An unexpected error occurred during bid submission: $e',
+//                   isError: true,
+//                 );
+//               }
 //             } finally {
 //               if (mounted) {
 //                 setState(() {
@@ -1409,189 +1435,89 @@ class _SinglePannaBulkBoardScreenState
 //     );
 //   }
 //
-//   // --- Final Bid Submission Logic ---
-//   // This function iterates through all collected bids and sends them
-//   // individually to the appropriate API endpoint.
+//   // --- REFACTORED Final Bid Submission Logic ---
+//   // This function now uses BidService to send all collected bids in a single API call.
 //   Future<bool> _placeFinalBids() async {
-//     bool allBidsSuccessful = true; // Flag to track overall success
+//     final bidService = BidService(storage); // Instantiate BidService
+//
+//     if (_accessToken.isEmpty || _registerId.isEmpty) {
+//       _showMessage('Authentication error. Please log in again.', isError: true);
+//       return false;
+//     }
+//
+//     if (_bids.isEmpty) {
+//       _showMessage('No bids to submit.', isError: true);
+//       return false;
+//     }
+//
+//     // Prepare bidAmounts: Map<String, String> for BidService
+//     // Keys are Pana numbers (digits), values are points (amounts)
+//     final Map<String, String> bidAmountsForService = {};
+//     _bids.forEach((pana, bidData) {
+//       bidAmountsForService[pana] = bidData['points']!;
+//     });
+//
+//     final int totalPointsToSubmit = _getTotalPoints();
 //
 //     log(
-//       'Starting final bid submission process. Total bids to process: ${_bids.length}',
-//       name: 'FinalBidSubmission',
+//       'Attempting consolidated final bid submission. Total points: $totalPointsToSubmit, Bids count: ${_bids.length}',
+//       name: 'ConsolidatedBidSubmission',
 //     );
 //
-//     // Determine the base API URL (jackpot/starline/regular) based on gameName
-//     String baseUrl;
-//     if (widget.gameName.toLowerCase().contains('jackpot')) {
-//       baseUrl = '${Constant.apiEndpoint}place-jackpot-bid';
-//     } else if (widget.gameName.toLowerCase().contains('starline')) {
-//       baseUrl = '${Constant.apiEndpoint}place-starline-bid';
-//     } else {
-//       baseUrl = '${Constant.apiEndpoint}place-bid';
-//     }
-//
-//     // Define common request headers
-//     final headers = {
-//       'deviceId': _deviceId,
-//       'deviceName': _deviceName,
-//       'accessStatus': _accountStatus
-//           ? '1'
-//           : '0', // Convert boolean to string '1' or '0'
-//       'Content-Type': 'application/json',
-//       'Authorization': 'Bearer $_accessToken',
-//     };
-//
-//     // Make a copy of _bids to iterate over, as _bids might be cleared if all successful
-//     final Map<String, Map<String, String>> bidsToProcess = Map.from(_bids);
-//
-//     // Iterate over each bid in the _bids map and send individual requests
-//     for (var entry in bidsToProcess.entries) {
-//       final String currentPanaFromKey =
-//           entry.key; // This is the Pana, like "127"
-//       final Map<String, dynamic> bidDetails = entry.value;
-//
-//       final String sessionType = bidDetails["dayType"]?.toUpperCase() ?? "";
-//       final int bidAmount = int.tryParse(bidDetails["points"] ?? '0') ?? 0;
-//
-//       // Retrieve the single digit that was stored alongside the pana
-//       final String singleDigitForThisPana = bidDetails["singleDigit"] ?? "";
-//       // The actual pana value is the key itself
-//       final String actualPana = currentPanaFromKey;
-//
-//       // Construct the single bid object for the 'bid' field
-//       final Map<String, dynamic> singleBidPayload = {
-//         "sessionType": sessionType,
-//         "digit": singleDigitForThisPana, // Send the derived single digit
-//         "pana": actualPana, // Send the full Pana
-//         "bidAmount": bidAmount,
-//       };
-//
-//       // Construct the full request body for this individual bid
-//       final body = jsonEncode({
-//         "registerId": _registerId,
-//         "gameId": widget.gameId
-//             .toString(), // Ensure gameId is a string as per curl example
-//         "bidAmount":
-//             bidAmount, // This is the amount for the current individual bid
-//         "gameType": widget.gameType, // Use the original gameCategoryType
-//         "bid": [
-//           singleBidPayload,
-//         ], // IMPORTANT: 'bid' should be a LIST of bid objects
-//       });
-//
-//       // Log the cURL command and headers for debugging purposes for each bid
-//       String curlCommand = 'curl -X POST \\';
-//       curlCommand += '\n  $baseUrl \\';
-//       headers.forEach((key, value) {
-//         curlCommand += '\n  -H "$key: $value" \\';
-//       });
-//       curlCommand += '\n  -d \'$body\'';
-//
-//       log(
-//         'CURL Command for Individual Bid Submission (Pana: $currentPanaFromKey):\n$curlCommand',
-//         name: 'FinalBidSubmission',
-//       );
-//       log(
-//         'Request Headers for Individual Bid Submission: $headers',
-//         name: 'FinalBidSubmission',
-//       );
-//       log(
-//         'Request Body for Individual Bid Submission: $body',
-//         name: 'FinalBidSubmission',
+//     try {
+//       final result = await bidService.placeFinalBids(
+//         gameName: widget.gameName,
+//         accessToken: _accessToken,
+//         registerId: _registerId,
+//         deviceId: _deviceId,
+//         deviceName: _deviceName,
+//         accountStatus: _accountStatus,
+//         bidAmounts:
+//             bidAmountsForService, // Pass the prepared Map<String, String>
+//         selectedGameType: _selectedPattiDayType == PattiDayType.close
+//             ? 'CLOSE'
+//             : 'OPEN', // Use the selected day type for the entire batch
+//         gameId: widget.gameId,
+//         gameType: widget.gameType,
+//         totalBidAmount: totalPointsToSubmit,
 //       );
 //
-//       // Make the API call for the current bid
-//       try {
-//         final response = await http.post(
-//           Uri.parse(baseUrl),
-//           headers: headers,
-//           body: body,
-//         );
-//
-//         final Map<String, dynamic> responseBody = json.decode(response.body);
-//
-//         // Handle the API response for the current bid
-//         if (response.statusCode == 200 && responseBody['status'] == true) {
-//           log(
-//             "Bid Status for Pana $currentPanaFromKey: ${response.statusCode}",
-//           );
-//           // Deduct points for this successful bid
-//           int newWalletBalance = _walletBalance - bidAmount;
-//           await storage.write('walletBalance', newWalletBalance.toString());
-//
-//           // Update UI wallet balance only if mounted
-//           if (mounted) {
-//             setState(() {
-//               _walletBalance = newWalletBalance;
-//             });
-//           }
-//           log(
-//             'Bid for Pana $currentPanaFromKey successful. Wallet updated: $_walletBalance',
-//             name: 'FinalBidSubmission',
-//           );
-//         } else {
-//           String errorMessage =
-//               responseBody['msg'] ?? "Unknown error occurred.";
-//           _showMessage(
-//             'Bid for Pana $currentPanaFromKey failed: $errorMessage',
-//             isError: true,
-//           );
-//           allBidsSuccessful = false; // Mark overall as failed if any bid fails
-//           log(
-//             'Bid for Pana $currentPanaFromKey failed: $errorMessage',
-//             name: 'FinalBidSubmission',
-//             error: responseBody,
-//           );
-//           // Don't break, try to submit remaining bids
-//         }
-//       } catch (e) {
-//         _showMessage(
-//           'Network error for Pana $currentPanaFromKey: $e',
-//           isError: true,
-//         );
-//         allBidsSuccessful = false; // Mark overall as failed on network error
+//       if (result['status'] == true) {
 //         log(
-//           'Network error for Pana $currentPanaFromKey: $e',
-//           name: 'FinalBidSubmission',
-//           error: e,
+//           'Consolidated bid submission successful.',
+//           name: 'ConsolidatedBidSubmission',
 //         );
-//         // Don't break, try to submit remaining bids
-//       }
-//     }
-//
-//     // After processing all bids, if all were successful, clear the local bids
-//     if (allBidsSuccessful) {
-//       // Show overall success dialog
-//       if (mounted) {
-//         showDialog(
-//           context: context,
-//           barrierDismissible: false,
-//           builder: (BuildContext dialogContext) => const BidSuccessDialog(),
+//         // Update wallet balance locally and in storage
+//         final int newWalletBalance = _walletBalance - totalPointsToSubmit;
+//         await bidService.updateWalletBalance(newWalletBalance);
+//         if (mounted) {
+//           setState(() {
+//             _walletBalance = newWalletBalance;
+//             _bids
+//                 .clear(); // Clear all bids after successful consolidated submission
+//           });
+//         }
+//         _showMessage('All bids submitted successfully!');
+//         return true;
+//       } else {
+//         String errorMessage =
+//             result['msg'] ?? 'Something went wrong during bid submission.';
+//         _showMessage('Bid submission failed: $errorMessage', isError: true);
+//         log(
+//           'Consolidated bid submission failed: $errorMessage',
+//           name: 'ConsolidatedBidSubmission',
+//           error: result,
 //         );
-//         _bids.clear(); // Clear the bids after successful submission
+//         return false;
 //       }
+//     } catch (e) {
 //       log(
-//         'All bids processed. Bids cleared locally.',
-//         name: 'FinalBidSubmission',
+//         'Error during consolidated bid submission: $e',
+//         name: 'ConsolidatedBidSubmissionError',
 //       );
-//     } else {
-//       // Show overall failure dialog if any bid failed
-//       if (mounted) {
-//         showDialog(
-//           context: context,
-//           barrierDismissible: false,
-//           builder: (BuildContext dialogContext) => BidFailureDialog(
-//             errorMessage: "Some bids failed to place. Please check messages.",
-//           ),
-//         );
-//       }
-//       log(
-//         'Some bids failed. Bids not cleared locally.',
-//         name: 'FinalBidSubmission',
-//       );
+//       _showMessage('An unexpected network error occurred: $e', isError: true);
+//       return false;
 //     }
-//
-//     return allBidsSuccessful; // Return overall success status
 //   }
 //
 //   // Builds the custom number pad for selecting single digits (0-9)
@@ -1599,8 +1525,8 @@ class _SinglePannaBulkBoardScreenState
 //     final numbers = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 //
 //     return Wrap(
-//       spacing: 10, // Adjusted for better visual spacing
-//       runSpacing: 10, // Adjusted for better visual spacing
+//       spacing: 10,
+//       runSpacing: 10,
 //       alignment: WrapAlignment.center,
 //       children: numbers.map((number) {
 //         return GestureDetector(
@@ -1616,7 +1542,7 @@ class _SinglePannaBulkBoardScreenState
 //                 decoration: BoxDecoration(
 //                   color: _isApiCalling
 //                       ? Colors.grey
-//                       : Colors.amber, // Dim if disabled
+//                       : Colors.orange, // Dim if disabled
 //                   borderRadius: BorderRadius.circular(8),
 //                   boxShadow:
 //                       _isApiCalling // Less prominent shadow if disabled
@@ -1767,7 +1693,7 @@ class _SinglePannaBulkBoardScreenState
 //             style: ElevatedButton.styleFrom(
 //               backgroundColor: _isApiCalling
 //                   ? Colors.grey
-//                   : Colors.amber, // Dim if disabled
+//                   : Colors.orange, // Dim if disabled
 //               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
 //               shape: RoundedRectangleBorder(
 //                 borderRadius: BorderRadius.circular(8),
@@ -1869,51 +1795,68 @@ class _SinglePannaBulkBoardScreenState
 //                             fontWeight: FontWeight.w500,
 //                           ),
 //                         ),
-//                         ToggleButtons(
-//                           isSelected: [
-//                             _selectedPattiDayType == PattiDayType.close,
-//                             _selectedPattiDayType == PattiDayType.open,
-//                           ],
-//                           onPressed: (int index) {
-//                             if (_isApiCalling)
-//                               return; // Disable selection during API call
-//                             setState(() {
-//                               if (index == 0) {
-//                                 _selectedPattiDayType = PattiDayType.close;
-//                               } else {
-//                                 _selectedPattiDayType = PattiDayType.open;
-//                               }
-//                             });
-//                           },
-//                           borderRadius: BorderRadius.circular(30),
-//                           selectedColor: Colors.white,
-//                           fillColor: Colors.amber,
-//                           color: Colors.black,
-//                           borderColor: Colors.black,
-//                           selectedBorderColor: Colors.amber,
-//                           children: <Widget>[
-//                             Padding(
-//                               padding: const EdgeInsets.symmetric(
-//                                 horizontal: 20,
-//                                 vertical: 8,
+//                         widget.selectionStatus
+//                             ? ToggleButtons(
+//                                 isSelected: [
+//                                   _selectedPattiDayType == PattiDayType.close,
+//                                   _selectedPattiDayType == PattiDayType.open,
+//                                 ],
+//                                 onPressed: (int index) {
+//                                   if (_isApiCalling) return;
+//                                   setState(() {
+//                                     _selectedPattiDayType = index == 0
+//                                         ? PattiDayType.close
+//                                         : PattiDayType.open;
+//                                   });
+//                                 },
+//                                 borderRadius: BorderRadius.circular(30),
+//                                 selectedColor: Colors.white,
+//                                 fillColor: Colors.orange,
+//                                 color: Colors.black,
+//                                 borderColor: Colors.black,
+//                                 selectedBorderColor: Colors.orange,
+//                                 children: <Widget>[
+//                                   Padding(
+//                                     padding: const EdgeInsets.symmetric(
+//                                       horizontal: 20,
+//                                       vertical: 8,
+//                                     ),
+//                                     child: Text(
+//                                       'Close',
+//                                       style: GoogleFonts.poppins(fontSize: 14),
+//                                     ),
+//                                   ),
+//                                   Padding(
+//                                     padding: const EdgeInsets.symmetric(
+//                                       horizontal: 20,
+//                                       vertical: 8,
+//                                     ),
+//                                     child: Text(
+//                                       'Open',
+//                                       style: GoogleFonts.poppins(fontSize: 14),
+//                                     ),
+//                                   ),
+//                                 ],
+//                               )
+//                             : Container(
+//                                 padding: const EdgeInsets.symmetric(
+//                                   horizontal: 20,
+//                                   vertical: 8,
+//                                 ),
+//                                 decoration: BoxDecoration(
+//                                   border: Border.all(color: Colors.black),
+//                                   borderRadius: BorderRadius.circular(30),
+//                                   color: Colors.orange,
+//                                 ),
+//                                 child: Text(
+//                                   'Close',
+//                                   style: GoogleFonts.poppins(
+//                                     fontSize: 14,
+//                                     color: Colors.white,
+//                                     fontWeight: FontWeight.w500,
+//                                   ),
+//                                 ),
 //                               ),
-//                               child: Text(
-//                                 'Close',
-//                                 style: GoogleFonts.poppins(fontSize: 14),
-//                               ),
-//                             ),
-//                             Padding(
-//                               padding: const EdgeInsets.symmetric(
-//                                 horizontal: 20,
-//                                 vertical: 8,
-//                               ),
-//                               child: Text(
-//                                 'Open',
-//                                 style: GoogleFonts.poppins(fontSize: 14),
-//                               ),
-//                             ),
-//                           ],
-//                         ),
 //                       ],
 //                     ),
 //                     const SizedBox(height: 16),
@@ -1932,7 +1875,7 @@ class _SinglePannaBulkBoardScreenState
 //                           height: 40,
 //                           child: TextFormField(
 //                             controller: _pointsController,
-//                             cursorColor: Colors.amber,
+//                             cursorColor: Colors.orange,
 //                             keyboardType: TextInputType.number,
 //                             inputFormatters: [
 //                               FilteringTextInputFormatter.digitsOnly,
@@ -1964,7 +1907,7 @@ class _SinglePannaBulkBoardScreenState
 //                               focusedBorder: OutlineInputBorder(
 //                                 borderRadius: BorderRadius.circular(30),
 //                                 borderSide: const BorderSide(
-//                                   color: Colors.amber,
+//                                   color: Colors.orange,
 //                                   width: 2,
 //                                 ),
 //                               ),
@@ -1976,7 +1919,7 @@ class _SinglePannaBulkBoardScreenState
 //                     const SizedBox(height: 30),
 //                     Center(
 //                       child: _isApiCalling
-//                           ? const CircularProgressIndicator(color: Colors.amber)
+//                           ? const CircularProgressIndicator(color: Colors.orange)
 //                           : _buildNumberPad(),
 //                     ),
 //                   ],

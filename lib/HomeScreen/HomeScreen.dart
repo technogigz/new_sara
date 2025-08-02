@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:new_sara/ChartScreen/ChartScreen.dart';
+import 'package:new_sara/Login/LoginWithMpinScreen.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -16,7 +17,6 @@ import '../Notification/NotificationScreen.dart';
 import '../Passbook/PassbookPage.dart';
 import '../SetMPIN/SetNewPinScreen.dart';
 import '../SettingsScreen/SettingsScreen.dart';
-import '../Splash.dart';
 // Assuming ChatScreen is the one used for bottom nav "Support" and drawer "Chats"
 import '../Support/ChatSupport/ChatSupport.dart'; // Or wherever your ChatScreen is defined
 import '../Support/SupportPage.dart'; // This is _screens[4]
@@ -37,11 +37,22 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 2; // Default to HomePage (main tab)
   late GetStorage storage = GetStorage();
+  late String accessToken;
+  late String registerId;
+  late bool accountStatus;
+  late String preferredLanguage;
+  late String mobile;
+  late String mobileNumber;
+  late String name;
+  late bool? accountActiveStatus;
+  late String walletBallence;
+  late bool isLogin;
 
   launchWhatsAppChat() {
     // Replace with your WhatsApp number
-    const phoneNumber = '8875115777';
-    launchUrl(Uri.parse('https://wa.me/91$phoneNumber'));
+    String phoneNumber = storage.read('whatsappNumber');
+    final cleanNumber = phoneNumber.replaceAll('+', '').replaceAll(' ', '');
+    launchUrl(Uri.parse('https://wa.me/91${cleanNumber}'));
   }
 
   // Define your screens. Ensure ChatScreen is const if it has no internal state
@@ -58,47 +69,29 @@ class _HomeScreenState extends State<HomeScreen> {
     ChatScreen(), // 8 (Used for bottom nav "Support" & drawer "Chats")
   ];
 
-  late String mobile = '';
-  late String name = '';
-  late bool accountActiveStatus;
-  late String walletBallence;
-
   @override
   void initState() {
     super.initState();
 
-    final storage = GetStorage();
-
     // Initial reads
     mobile = storage.read('mobileNoEnc') ?? '';
+    mobileNumber = storage.read('mobileNo') ?? '';
     name = storage.read('fullName') ?? '';
-    accountActiveStatus = storage.read('accountStatus') ?? false;
+    accountActiveStatus = storage.read('accountStatus');
     walletBallence = storage.read('walletBalance') ?? '';
 
     // Listen to updates
-    storage.listenKey('mobileNoEnc', (value) {
-      setState(() {
-        mobile = value ?? '';
-      });
-    });
+    storage.listenKey('mobileNoEnc', (value) => mobile = value);
+    storage.listenKey('fullName', (value) => name = value);
+    storage.listenKey('accountStatus', (value) => accountActiveStatus = value);
+    storage.listenKey('walletBalance', (value) => walletBallence = value);
 
-    storage.listenKey('fullName', (value) {
-      setState(() {
-        name = value ?? '';
-      });
-    });
+    if (storage.read('accessToken') != null &&
+        storage.read('registerId') != null) {
+      storage.write('isLoggedIn', true);
+    }
 
-    storage.listenKey('accountStatus', (value) {
-      setState(() {
-        accountActiveStatus = value ?? false;
-      });
-    });
-
-    storage.listenKey('walletBalance', (value) {
-      setState(() {
-        walletBallence = value ?? '0';
-      });
-    });
+    // setState(() {});
   }
 
   void _onItemTapped(int index) {
@@ -165,11 +158,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           child: FloatingActionButton(
-            backgroundColor: Colors.amber,
+            backgroundColor: Colors.orange,
             elevation: 4,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(100),
-              side: BorderSide(color: Colors.amber, width: 2),
+              side: BorderSide(color: Colors.orange, width: 2),
             ),
             onPressed: () => _onItemTapped(2), // Home is index 2
             child: Image.asset("assets/images/home_orange.png"),
@@ -211,7 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const Spacer(),
 
             // Show Wallet only if account is active
-            if (accountActiveStatus)
+            if (accountActiveStatus == true)
               GestureDetector(
                 onTap: () {
                   _navigateToDrawerScreenAndPush(PassbookPage());
@@ -244,7 +237,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(width: 12),
 
             // Show Notification Icon only if account is active
-            if (accountActiveStatus)
+            if (accountActiveStatus == true)
               Stack(
                 alignment: Alignment.topRight,
                 children: [
@@ -439,58 +432,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     accountStatus,
                   ),
 
-                  _buildDrawerItem("assets/images/power.png", "LOGOUT", () async {
-                    Navigator.pop(context);
-                    final String? token = storage.read('accessToken');
-                    final String? registerId = storage.read('registerId');
-                    final String url = '${Constant.apiEndpoint}user-logout';
-
-                    if (!mounted) return;
-
-                    try {
-                      final response = await http.post(
-                        Uri.parse(url),
-                        headers: {
-                          'deviceId': 'qwert',
-                          'deviceName': 'sm2233',
-                          'accessStatus': '1',
-                          'Content-Type': 'application/json',
-                          'Authorization': 'Bearer $token',
-                        },
-                        body: jsonEncode({'registerId': registerId}),
-                      );
-
-                      if (!mounted) return;
-
-                      if (response.statusCode == 200) {
-                        await storage.erase();
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const SplashScreen(),
-                          ),
-                          (route) => false,
-                        );
-                      } else {
-                        debugPrint(
-                          'Logout failed: ${response.statusCode} - ${response.body}',
-                        );
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Logout failed! Please try again.'),
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      debugPrint('Error during logout: $e');
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Logout error: Something went wrong!'),
-                        ),
-                      );
-                    }
-                  }, true),
+                  _buildDrawerItem("assets/images/power.png", "LOGOUT", () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LoginWithMpinScreen(),
+                      ),
+                    );
+                  }, accountStatus),
                 ],
               ),
             ),
@@ -524,7 +473,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _handleMpin() async {
-    if (!mounted) return;
+    final String? mobile1 = storage.read('mobileNo');
+    log("Mobile number: $mobile1");
     try {
       final response = await http.post(
         Uri.parse('${Constant.apiEndpoint}send-otp'),
@@ -534,10 +484,9 @@ class _HomeScreenState extends State<HomeScreen> {
           'accessStatus': '1',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({"mobileNo": mobile}),
+        body: jsonEncode({"mobileNo": mobile1}),
       );
 
-      if (!mounted) return;
       final data = jsonDecode(response.body);
       log("OTP API response: $data");
 
@@ -545,7 +494,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => SetNewPinScreen(mobile: mobile),
+            builder: (context) => SetNewPinScreen(mobile: mobile1 ?? ""),
           ),
         );
       } else {

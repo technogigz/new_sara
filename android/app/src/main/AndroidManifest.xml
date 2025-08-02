@@ -14,13 +14,15 @@
 
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
 
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:label="Sara777"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/launcher_icon"
         android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
         android:hardwareAccelerated="true"
         android:enableOnBackInvokedCallback="true">
@@ -86,6 +88,12 @@
             <data android:scheme="upi" />
         </intent>
         <!--  ****** END OF UPI QUERIES ****** -->
+
+            <intent>
+                <action android:name="android.intent.action.VIEW"/>
+                <data android:scheme="upi"/>
+            </intent>
+
 
     </queries>
 

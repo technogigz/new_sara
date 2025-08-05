@@ -820,178 +820,182 @@ class _SinglePannaBulkBoardScreenState
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Select Game Type:',
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Select Game Type:',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
-                        _buildDropdown(), // Dropdown uses selectedGameType
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Enter Points:',
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
+                          _buildDropdown(), // Dropdown uses selectedGameType
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Enter Points:',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
-                        SizedBox(
-                          width: 150,
-                          height: 40,
-                          child: TextFormField(
-                            controller: _pointsController,
-                            cursorColor: Colors.orange,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              LengthLimitingTextInputFormatter(4),
-                            ],
-                            style: GoogleFonts.poppins(fontSize: 14),
-                            onTap: _clearMessage,
-                            enabled: !_isApiCalling,
-                            decoration: InputDecoration(
-                              hintText: 'Enter Amount',
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 0,
-                              ),
-                              filled: true,
-                              fillColor: Colors.white,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(30),
-                                borderSide: const BorderSide(
-                                  color: Colors.black,
+                          SizedBox(
+                            width: 150,
+                            height: 40,
+                            child: TextFormField(
+                              controller: _pointsController,
+                              cursorColor: Colors.orange,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(4),
+                              ],
+                              style: GoogleFonts.poppins(fontSize: 14),
+                              onTap: _clearMessage,
+                              enabled: !_isApiCalling,
+                              decoration: InputDecoration(
+                                hintText: 'Enter Amount',
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 0,
                                 ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(30),
-                                borderSide: const BorderSide(
-                                  color: Colors.black,
+                                filled: true,
+                                fillColor: Colors.white,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                  borderSide: const BorderSide(
+                                    color: Colors.black,
+                                  ),
                                 ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(30),
-                                borderSide: const BorderSide(
-                                  color: Colors.orange,
-                                  width: 2,
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                  borderSide: const BorderSide(
+                                    color: Colors.black,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                  borderSide: const BorderSide(
+                                    color: Colors.orange,
+                                    width: 2,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 30),
-                    Center(
-                      child: _isApiCalling
-                          ? const CircularProgressIndicator(
-                              color: Colors.orange,
-                            )
-                          : _buildNumberPad(),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(thickness: 1),
-              if (_bids.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 8.0,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          'Pana',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        ],
                       ),
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          'Amount',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                      const SizedBox(height: 30),
+                      Center(
+                        child: _isApiCalling
+                            ? const CircularProgressIndicator(
+                                color: Colors.orange,
+                              )
+                            : _buildNumberPad(),
                       ),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          'Game Type',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 48), // For delete button alignment
                     ],
                   ),
                 ),
-              if (_bids.isNotEmpty) const Divider(thickness: 1),
-              Expanded(
-                child: _bids.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No bids placed yet. Click a number to add a bid!',
-                          style: GoogleFonts.poppins(color: Colors.grey),
+                const Divider(thickness: 1),
+                if (_bids.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8.0,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            'Pana',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
-                      )
-                    : ListView.builder(
-                        itemCount: _bids.length,
-                        itemBuilder: (context, index) {
-                          final pana = _bids.keys.elementAt(index);
-                          final bidData = _bids[pana]!;
-                          return _buildBidEntryItem(
-                            pana,
-                            bidData['points']!,
-                            bidData['dayType']!,
-                          );
-                        },
-                      ),
-              ),
-              // Conditionally build bottom bar only if there are bids or if you always want it visible
-              if (_bids.isNotEmpty) _buildBottomBar(),
-            ],
-          ),
-          if (_messageToShow != null)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: AnimatedMessageBar(
-                key: _messageBarKey,
-                message: _messageToShow!,
-                isError: _isErrorForMessage,
-                onDismissed: _clearMessage,
-              ),
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            'Amount',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            'Game Type',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(
+                          width: 48,
+                        ), // For delete button alignment
+                      ],
+                    ),
+                  ),
+                if (_bids.isNotEmpty) const Divider(thickness: 1),
+                Expanded(
+                  child: _bids.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No bids placed yet. Click a number to add a bid!',
+                            style: GoogleFonts.poppins(color: Colors.grey),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: _bids.length,
+                          itemBuilder: (context, index) {
+                            final pana = _bids.keys.elementAt(index);
+                            final bidData = _bids[pana]!;
+                            return _buildBidEntryItem(
+                              pana,
+                              bidData['points']!,
+                              bidData['dayType']!,
+                            );
+                          },
+                        ),
+                ),
+                // Conditionally build bottom bar only if there are bids or if you always want it visible
+                if (_bids.isNotEmpty) _buildBottomBar(),
+              ],
             ),
-        ],
+            if (_messageToShow != null)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: AnimatedMessageBar(
+                  key: _messageBarKey,
+                  message: _messageToShow!,
+                  isError: _isErrorForMessage,
+                  onDismissed: _clearMessage,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

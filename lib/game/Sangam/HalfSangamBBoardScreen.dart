@@ -323,8 +323,13 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
     }
 
     int? parsedPoints = int.tryParse(points);
-    if (parsedPoints == null || parsedPoints < 10 || parsedPoints > 1000) {
-      _showMessage('Points must be between 10 and 1000.', isError: true);
+    if (parsedPoints == null ||
+        parsedPoints < GetStorage().read('minBid') ||
+        parsedPoints > 1000) {
+      _showMessage(
+        'Points must be between ${GetStorage().read('minBid')} and 1000.',
+        isError: true,
+      );
       log('HalfSangamUI: Validation: Invalid points.', name: 'HalfSangamUI');
       return;
     }
@@ -735,211 +740,213 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
           const SizedBox(width: 12),
         ],
       ),
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 12.0,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildInputRow(
-                      'Ank',
-                      _ankController,
-                      hintText: 'e.g., 9',
-                      maxLength: 1,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildPannaInputRow(
-                      'Pana',
-                      _pannaController,
-                      hintText: 'e.g., 119',
-                      maxLength: 3,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildInputRow(
-                      'Enter Points :',
-                      _pointsController,
-                      hintText: 'Enter Amount',
-                      maxLength: 4,
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 45,
-                      child: ElevatedButton(
-                        onPressed: _isApiCalling ? null : _addBid,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _isApiCalling
-                              ? Colors.grey
-                              : Colors.orange, // Disable if API is calling
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        ),
-                        child: _isApiCalling
-                            ? const CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
-                                ),
-                                strokeWidth: 2,
-                              )
-                            : Text(
-                                "ADD BID",
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.5,
-                                  fontSize: 16,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(thickness: 1),
-
-              if (_bids.isNotEmpty)
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Column(
+              children: [
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16.0,
-                    vertical: 8.0,
+                    vertical: 12.0,
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          'Digit',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
+                      _buildInputRow(
+                        'Ank',
+                        _ankController,
+                        hintText: 'e.g., 9',
+                        maxLength: 1,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildPannaInputRow(
+                        'Pana',
+                        _pannaController,
+                        hintText: 'e.g., 119',
+                        maxLength: 3,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildInputRow(
+                        'Enter Points :',
+                        _pointsController,
+                        hintText: 'Enter Amount',
+                        maxLength: 4,
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 45,
+                        child: ElevatedButton(
+                          onPressed: _isApiCalling ? null : _addBid,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _isApiCalling
+                                ? Colors.grey
+                                : Colors.orange, // Disable if API is calling
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
                           ),
+                          child: _isApiCalling
+                              ? const CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                  strokeWidth: 2,
+                                )
+                              : Text(
+                                  "ADD BID",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.5,
+                                    fontSize: 16,
+                                  ),
+                                ),
                         ),
                       ),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          'Amount',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          'Game Type',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 48),
                     ],
                   ),
                 ),
-              if (_bids.isNotEmpty) const Divider(thickness: 1),
+                const Divider(thickness: 1),
 
-              Expanded(
-                child: _bids.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No bids added yet',
-                          style: GoogleFonts.poppins(color: Colors.grey),
+                if (_bids.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8.0,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            'Digit',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
-                      )
-                    : ListView.builder(
-                        itemCount: _bids.length,
-                        itemBuilder: (context, index) {
-                          final bid = _bids[index];
-                          final String displayDigit = bid['ank']!;
-                          final String displayPana = bid['panna']!;
-                          final String displaySangam =
-                              '$displayDigit - $displayPana';
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            'Amount',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            'Game Type',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 48),
+                      ],
+                    ),
+                  ),
+                if (_bids.isNotEmpty) const Divider(thickness: 1),
 
-                          return Container(
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withOpacity(0.2),
-                                  spreadRadius: 1,
-                                  blurRadius: 3,
-                                  offset: const Offset(0, 1),
-                                ),
-                              ],
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0,
-                                vertical: 8.0,
+                Expanded(
+                  child: _bids.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No bids added yet',
+                            style: GoogleFonts.poppins(color: Colors.grey),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: _bids.length,
+                          itemBuilder: (context, index) {
+                            final bid = _bids[index];
+                            final String displayDigit = bid['ank']!;
+                            final String displayPana = bid['panna']!;
+                            final String displaySangam =
+                                '$displayDigit - $displayPana';
+
+                            return Container(
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
                               ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    flex: 2,
-                                    child: Text(
-                                      displaySangam,
-                                      style: GoogleFonts.poppins(),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Text(
-                                      bid['points']!,
-                                      style: GoogleFonts.poppins(),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 3,
-                                    child: Text(
-                                      widget.screenTitle,
-                                      style: GoogleFonts.poppins(),
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.delete,
-                                      color: Colors.red,
-                                    ),
-                                    onPressed:
-                                        _isApiCalling // Disable if API is calling
-                                        ? null
-                                        : () => _removeBid(index),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.withOpacity(0.2),
+                                    spreadRadius: 1,
+                                    blurRadius: 3,
+                                    offset: const Offset(0, 1),
                                   ),
                                 ],
                               ),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-              _buildBottomBar(),
-            ],
-          ),
-          if (_messageToShow != null)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: AnimatedMessageBar(
-                key: _messageBarKey,
-                message: _messageToShow!,
-                isError: _isErrorForMessage,
-                onDismissed: _clearMessage,
-              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0,
+                                  vertical: 8.0,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      flex: 2,
+                                      child: Text(
+                                        displaySangam,
+                                        style: GoogleFonts.poppins(),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 2,
+                                      child: Text(
+                                        bid['points']!,
+                                        style: GoogleFonts.poppins(),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 3,
+                                      child: Text(
+                                        widget.screenTitle,
+                                        style: GoogleFonts.poppins(),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.delete,
+                                        color: Colors.red,
+                                      ),
+                                      onPressed:
+                                          _isApiCalling // Disable if API is calling
+                                          ? null
+                                          : () => _removeBid(index),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+                _buildBottomBar(),
+              ],
             ),
-        ],
+            if (_messageToShow != null)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: AnimatedMessageBar(
+                  key: _messageBarKey,
+                  message: _messageToShow!,
+                  isError: _isErrorForMessage,
+                  onDismissed: _clearMessage,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

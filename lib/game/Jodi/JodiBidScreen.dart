@@ -314,97 +314,100 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _inputRow(
+                        "Enter Jodi:",
+                        _buildInputField(
+                          controller: digitController,
+                          hint: "Enter Jodi",
+                          borderColor: Colors.orange,
+                          selected: 'digit',
+                        ),
+                      ),
+                      _inputRow(
+                        "Enter Points:",
+                        _buildInputField(
+                          controller: amountController,
+                          hint: "Enter Amount",
+                          borderColor: Colors.orange,
+                          selected: 'amount',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: ElevatedButton(
+                          onPressed: _isSubmitting ? null : _addBid,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _isSubmitting
+                                ? Colors.grey
+                                : Colors.orange,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            "ADD BID",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _inputRow(
-                      "Enter Jodi:",
-                      _buildInputField(
-                        controller: digitController,
-                        hint: "Enter Jodi",
-                        borderColor: Colors.orange,
-                        selected: 'digit',
-                      ),
-                    ),
-                    _inputRow(
-                      "Enter Points:",
-                      _buildInputField(
-                        controller: amountController,
-                        hint: "Enter Amount",
-                        borderColor: Colors.orange,
-                        selected: 'amount',
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: ElevatedButton(
-                        onPressed: _isSubmitting ? null : _addBid,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _isSubmitting
-                              ? Colors.grey
-                              : Colors.orange,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
+                const Divider(),
+                _buildTableHeader(),
+                const Divider(),
+                Expanded(
+                  child: bids.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No bids yet. Add some data!',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey[600],
+                            ),
                           ),
-                          elevation: 0,
+                        )
+                      : ListView.builder(
+                          itemCount: bids.length,
+                          itemBuilder: (_, idx) =>
+                              _buildBidItem(bids[idx], idx),
                         ),
-                        child: const Text(
-                          "ADD BID",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
-              ),
-              const Divider(),
-              _buildTableHeader(),
-              const Divider(),
-              Expanded(
-                child: bids.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No bids yet. Add some data!',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: bids.length,
-                        itemBuilder: (_, idx) => _buildBidItem(bids[idx], idx),
-                      ),
-              ),
-              if (bids.isNotEmpty) _buildBottomBar(),
-            ],
-          ),
-          if (_messageToShow != null)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: AnimatedMessageBar(
-                key: _messageBarKey,
-                message: _messageToShow!,
-                isError: _isErrorForMessage,
-                onDismissed: _clearMessage,
-              ),
+                if (bids.isNotEmpty) _buildBottomBar(),
+              ],
             ),
-        ],
+            if (_messageToShow != null)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: AnimatedMessageBar(
+                  key: _messageBarKey,
+                  message: _messageToShow!,
+                  isError: _isErrorForMessage,
+                  onDismissed: _clearMessage,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

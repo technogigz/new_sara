@@ -504,12 +504,9 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
   }
 
   Future<bool> _placeFinalBids() async {
-    late bool isSuccess; // Added this variable
-    // Initial check
     if (!mounted) return false;
 
     final _bidService = StarlineBidService(GetStorage());
-
     final Map<String, String> bidPayload = {};
     int currentBatchTotalPoints = 0;
 
@@ -550,6 +547,10 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
       return false;
     }
 
+    // --- Start of the main logic block ---
+    bool bidPlacementSuccessful = false;
+    String? errorMessage;
+
     try {
       final result = await _bidService.placeFinalBids(
         gameName: widget.title,
@@ -565,77 +566,208 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
         totalBidAmount: currentBatchTotalPoints,
       );
 
-      // CRITICAL: Check `mounted` after the asynchronous network call
+      // CRITICAL: Check mounted after the network call
       if (!mounted) return false;
 
-      // Use a local variable to check the status.
-      isSuccess = result['status'] == true;
-
-      if (isSuccess) {
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => const BidSuccessDialog(),
-        );
-
-        if (!mounted) return false;
-
-        final newWalletBalance = walletBalance - currentBatchTotalPoints;
-        setState(() {
-          walletBalance = newWalletBalance;
-          bids.removeWhere(
-            (element) =>
-                (element["type"] ?? "").toUpperCase() ==
-                selectedGameType.toUpperCase(),
-          );
-        });
-        await _bidService.updateWalletBalance(newWalletBalance);
-        _saveBids();
-        return true;
-      } else {
-        if (!mounted) return false;
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => BidFailureDialog(
-            errorMessage: result['msg'] ?? 'Something went wrong',
-          ),
-        );
-
-        // CRITICAL: Check `mounted` after the dialog is dismissed
-        if (!mounted) return false;
-        setState(() {
-          bids.removeWhere(
-            (element) =>
-                (element["type"] ?? "").toUpperCase() ==
-                selectedGameType.toUpperCase(),
-          );
-        });
-        _saveBids();
-        return false;
+      bidPlacementSuccessful = result['status'] == true;
+      if (!bidPlacementSuccessful) {
+        errorMessage = result['msg'] ?? 'Something went wrong';
       }
     } catch (e) {
       log(
         'Error during bid placement: $e',
         name: 'StarlineSinglePannaScreenBidError',
       );
+      // CRITICAL: Check mounted before setting the error message
+      if (!mounted) return false;
+      errorMessage = 'An unexpected error occurred during bid submission.';
+    }
 
-      // CRITICAL: Check `mounted` before showing the failure dialog
+    // Handle the UI logic based on the outcome of the network call.
+    // This separates the network logic from the UI logic.
+    if (!mounted) return false;
+
+    if (bidPlacementSuccessful) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const BidSuccessDialog(),
+      );
+
+      // After dialog, check mounted again
       if (!mounted) return false;
 
-      // Only show failure dialog if the bid was not a success.
-      if (!isSuccess) {
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => const BidFailureDialog(
-            errorMessage: 'An unexpected error occurred during bid submission.',
-          ),
+      final newWalletBalance = walletBalance - currentBatchTotalPoints;
+      setState(() {
+        walletBalance = newWalletBalance;
+        bids.removeWhere(
+          (element) =>
+              (element["type"] ?? "").toUpperCase() ==
+              selectedGameType.toUpperCase(),
         );
-      }
+      });
+      await _bidService.updateWalletBalance(newWalletBalance);
+      _saveBids();
+      return true;
+    } else {
+      // Bid failed or an error occurred, show the failure dialog
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => BidFailureDialog(
+          errorMessage: errorMessage ?? 'An unknown error occurred.',
+        ),
+      );
+
+      // After dialog, check mounted again
+      if (!mounted) return false;
+
+      // Clean up bids regardless of network failure, as the user should retry.
+      setState(() {
+        bids.removeWhere(
+          (element) =>
+              (element["type"] ?? "").toUpperCase() ==
+              selectedGameType.toUpperCase(),
+        );
+      });
+      _saveBids();
       return false;
     }
   }
+
+  // Future<bool> _placeFinalBids() async {
+  //   late bool isSuccess; // Added this variable
+  //   // Initial check
+  //   if (!mounted) return false;
+  //
+  //   final _bidService = StarlineBidService(GetStorage());
+  //
+  //   final Map<String, String> bidPayload = {};
+  //   int currentBatchTotalPoints = 0;
+  //
+  //   for (var entry in bids) {
+  //     if ((entry["type"] ?? "").toUpperCase() ==
+  //         selectedGameType.toUpperCase()) {
+  //       String digit = entry["digit"] ?? "";
+  //       String amount = entry["amount"] ?? "0";
+  //
+  //       if (digit.isNotEmpty && int.tryParse(amount) != null) {
+  //         bidPayload[digit] = amount;
+  //         currentBatchTotalPoints += int.parse(amount);
+  //       }
+  //     }
+  //   }
+  //
+  //   if (bidPayload.isEmpty) {
+  //     if (!mounted) return false;
+  //     await showDialog(
+  //       context: context,
+  //       barrierDismissible: false,
+  //       builder: (_) => const BidFailureDialog(
+  //         errorMessage: 'No valid bids for the selected game type.',
+  //       ),
+  //     );
+  //     return false;
+  //   }
+  //
+  //   if (accessToken.isEmpty || registerId.isEmpty) {
+  //     if (!mounted) return false;
+  //     await showDialog(
+  //       context: context,
+  //       barrierDismissible: false,
+  //       builder: (_) => const BidFailureDialog(
+  //         errorMessage: 'Authentication error. Please log in again.',
+  //       ),
+  //     );
+  //     return false;
+  //   }
+  //
+  //   try {
+  //     final result = await _bidService.placeFinalBids(
+  //       gameName: widget.title,
+  //       accessToken: accessToken,
+  //       registerId: registerId,
+  //       deviceId: deviceId,
+  //       deviceName: deviceName,
+  //       accountStatus: accountStatus,
+  //       bidAmounts: bidPayload,
+  //       selectedGameType: selectedGameType,
+  //       gameId: widget.gameId,
+  //       gameType: widget.gameType,
+  //       totalBidAmount: currentBatchTotalPoints,
+  //     );
+  //
+  //     // CRITICAL: Check `mounted` after the asynchronous network call
+  //     if (!mounted) return false;
+  //
+  //     // Use a local variable to check the status.
+  //     isSuccess = result['status'] == true;
+  //
+  //     if (isSuccess) {
+  //       await showDialog(
+  //         context: context,
+  //         barrierDismissible: false,
+  //         builder: (_) => const BidSuccessDialog(),
+  //       );
+  //
+  //       if (!mounted) return false;
+  //
+  //       final newWalletBalance = walletBalance - currentBatchTotalPoints;
+  //       setState(() {
+  //         walletBalance = newWalletBalance;
+  //         bids.removeWhere(
+  //           (element) =>
+  //               (element["type"] ?? "").toUpperCase() ==
+  //               selectedGameType.toUpperCase(),
+  //         );
+  //       });
+  //       await _bidService.updateWalletBalance(newWalletBalance);
+  //       _saveBids();
+  //       return true;
+  //     } else {
+  //       if (!mounted) return false;
+  //       await showDialog(
+  //         context: context,
+  //         barrierDismissible: false,
+  //         builder: (_) => BidFailureDialog(
+  //           errorMessage: result['msg'] ?? 'Something went wrong',
+  //         ),
+  //       );
+  //
+  //       // CRITICAL: Check `mounted` after the dialog is dismissed
+  //       if (!mounted) return false;
+  //       setState(() {
+  //         bids.removeWhere(
+  //           (element) =>
+  //               (element["type"] ?? "").toUpperCase() ==
+  //               selectedGameType.toUpperCase(),
+  //         );
+  //       });
+  //       _saveBids();
+  //       return false;
+  //     }
+  //   } catch (e) {
+  //     log(
+  //       'Error during bid placement: $e',
+  //       name: 'StarlineSinglePannaScreenBidError',
+  //     );
+  //
+  //     // CRITICAL: Check `mounted` before showing the failure dialog
+  //     if (!mounted) return false;
+  //
+  //     // Only show failure dialog if the bid was not a success.
+  //     if (!isSuccess) {
+  //       await showDialog(
+  //         context: context,
+  //         barrierDismissible: false,
+  //         builder: (_) => const BidFailureDialog(
+  //           errorMessage: 'An unexpected error occurred during bid submission.',
+  //         ),
+  //       );
+  //     }
+  //     return false;
+  //   }
+  // }
 
   Widget _inputRow(String label, Widget field) {
     return Padding(
@@ -657,70 +789,149 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
     );
   }
 
+  // INPUT FIELD BUILDER
   Widget _buildInputField(TextEditingController controller, String hint) {
-    Widget textField = SizedBox(
-      height: 35,
-      width: 150,
-      child: TextFormField(
-        controller: controller,
-        focusNode: controller == digitController ? _digitFocusNode : null,
-        cursorColor: Colors.orange,
-        keyboardType: TextInputType.number,
-        onTap: () {
-          _clearMessage();
-          if (controller == digitController) {
-            _onDigitChanged();
-          } else {
-            _removeOverlay();
-          }
-        },
-        onChanged: (value) {
-          if (controller == digitController) {
-            _onDigitChanged();
-          }
-        },
-        onEditingComplete: () {
-          if (controller == digitController && digitController.text.isEmpty) {
-            _removeOverlay();
-          }
-          FocusScope.of(context).unfocus();
-        },
-        onTapOutside: (_) {
-          if (controller == digitController && _overlayEntry != null) {
-            _removeOverlay();
-          }
-        },
-        textAlignVertical: TextAlignVertical.center,
-        decoration: InputDecoration(
-          hintText: hint,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 0,
+    // If the controller is not the digit controller, use a standard TextFormField.
+    if (controller != digitController) {
+      return SizedBox(
+        height: 35,
+        width: 150,
+        child: TextFormField(
+          controller: controller,
+          cursorColor: Colors.orange,
+          keyboardType: TextInputType.number,
+          onTap: () => _clearMessage(),
+          textAlignVertical: TextAlignVertical.center,
+          decoration: InputDecoration(
+            hintText: hint,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 0,
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(30),
+              borderSide: const BorderSide(color: Colors.black),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(30),
+              borderSide: const BorderSide(color: Colors.black),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(30),
+              borderSide: const BorderSide(color: Colors.orange, width: 2),
+            ),
           ),
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.black),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.black),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.orange, width: 2),
-          ),
+          style: GoogleFonts.poppins(fontSize: 14),
         ),
-        style: GoogleFonts.poppins(fontSize: 14),
-      ),
-    );
-
-    if (controller == digitController) {
-      return CompositedTransformTarget(link: _layerLink, child: textField);
+      );
     }
 
-    return textField;
+    // Use Autocomplete for the digit controller.
+    return SizedBox(
+      height: 35,
+      width: 150,
+      child: Autocomplete<String>(
+        optionsBuilder: (TextEditingValue textEditingValue) {
+          if (textEditingValue.text.isEmpty) {
+            // No suggestions if the field is empty
+            return const Iterable<String>.empty();
+          }
+          // Filter options based on user input
+          return Single_Pana.where(
+            (pana) => pana.startsWith(textEditingValue.text),
+          );
+        },
+        onSelected: (String selection) {
+          // Set the text field value to the selected option
+          digitController.text = selection;
+          _clearMessage();
+          FocusScope.of(context).unfocus();
+        },
+        fieldViewBuilder:
+            (
+              BuildContext context,
+              TextEditingController textEditingController,
+              FocusNode focusNode,
+              VoidCallback onFieldSubmitted,
+            ) {
+              // This builds the actual text field. Use the provided controllers and focus node.
+              return TextFormField(
+                controller: textEditingController,
+                focusNode: focusNode,
+                cursorColor: Colors.orange,
+                keyboardType: TextInputType.number,
+                onTap: () => _clearMessage(),
+                textAlignVertical: TextAlignVertical.center,
+                decoration: InputDecoration(
+                  hintText: hint,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 0,
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: const BorderSide(color: Colors.black),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: const BorderSide(color: Colors.black),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: const BorderSide(
+                      color: Colors.orange,
+                      width: 2,
+                    ),
+                  ),
+                ),
+                style: GoogleFonts.poppins(fontSize: 14),
+              );
+            },
+        optionsViewBuilder:
+            (
+              BuildContext context,
+              AutocompleteOnSelected<String> onSelected,
+              Iterable<String> options,
+            ) {
+              // This builds the dropdown list of suggestions.
+              return Align(
+                alignment: Alignment.topLeft,
+                child: Material(
+                  elevation: 4.0,
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    width: 150,
+                    height: 200, // You can set a fixed or max height
+                    child: ListView.builder(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      itemCount: options.length,
+                      itemBuilder: (BuildContext context, int index) {
+                        final String option = options.elementAt(index);
+                        return InkWell(
+                          onTap: () {
+                            onSelected(option);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            child: Text(option, style: GoogleFonts.poppins()),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              );
+            },
+      ),
+    );
   }
 
   Widget _buildTableHeader() {
@@ -828,186 +1039,193 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
             ),
           ],
         ),
-        body: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Column(
-                children: [
-                  // This section now displays the hardcoded game type
-                  _inputRow(
-                    "Enter Single Panna:",
-                    _buildInputField(digitController, "Bid Panna"),
-                  ),
-                  _inputRow(
-                    "Enter Points:",
-                    _buildInputField(amountController, "Enter Amount"),
-                  ),
-                  const SizedBox(height: 10),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: SizedBox(
-                      height: 35,
-                      width: 150,
-                      child: ElevatedButton(
-                        onPressed: _addBid,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: Column(
+                  children: [
+                    // This section now displays the hardcoded game type
+                    _inputRow(
+                      "Enter Single Panna:",
+                      _buildInputField(digitController, "Bid Panna"),
+                    ),
+                    _inputRow(
+                      "Enter Points:",
+                      _buildInputField(amountController, "Enter Amount"),
+                    ),
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: SizedBox(
+                        height: 35,
+                        width: 150,
+                        child: ElevatedButton(
+                          onPressed: _addBid,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
                           ),
-                        ),
-                        child: Text(
-                          "ADD BID",
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
+                          child: Text(
+                            "ADD BID",
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  _buildTableHeader(),
-                  Divider(color: Colors.grey.shade300),
-                  Expanded(
-                    child: bids.isEmpty
-                        ? Center(
-                            child: Text(
-                              "No Bids Added",
-                              style: GoogleFonts.poppins(
-                                color: Colors.black38,
-                                fontSize: 16,
-                              ),
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: bids.length,
-                            itemBuilder: (context, index) {
-                              final bid = bids[index];
-                              return Card(
-                                margin: const EdgeInsets.symmetric(vertical: 4),
-                                elevation: 1,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12.0,
-                                    vertical: 10.0,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        flex: 2,
-                                        child: Text(
-                                          bid['digit']!,
-                                          textAlign: TextAlign.center,
-                                          style: GoogleFonts.poppins(),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        flex: 2,
-                                        child: Text(
-                                          bid['amount']!,
-                                          textAlign: TextAlign.center,
-                                          style: GoogleFonts.poppins(),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        flex: 3,
-                                        child: Text(
-                                          bid['type']!,
-                                          textAlign: TextAlign.center,
-                                          style: GoogleFonts.poppins(),
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: 48,
-                                        child: IconButton(
-                                          icon: const Icon(
-                                            Icons.delete,
-                                            color: Colors.red,
-                                            size: 20,
-                                          ),
-                                          onPressed: () => _removeBid(index),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                  if (bids.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.2),
-                            spreadRadius: 1,
-                            blurRadius: 3,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "Total Points:",
-                            style: GoogleFonts.poppins(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            "${_getTotalPoints()}",
-                            style: GoogleFonts.poppins(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.green.shade700,
-                            ),
-                          ),
-                          SizedBox(
-                            height: 40,
-                            child: ElevatedButton(
-                              onPressed: _showBidConfirmationDialog,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orange,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
+                    _buildTableHeader(),
+                    Divider(color: Colors.grey.shade300),
+                    Expanded(
+                      child: bids.isEmpty
+                          ? Center(
                               child: Text(
-                                "CONFIRM",
+                                "No Bids Added",
                                 style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black38,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: bids.length,
+                              itemBuilder: (context, index) {
+                                final bid = bids[index];
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                  ),
+                                  elevation: 1,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12.0,
+                                      vertical: 10.0,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text(
+                                            bid['digit']!,
+                                            textAlign: TextAlign.center,
+                                            style: GoogleFonts.poppins(),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text(
+                                            bid['amount']!,
+                                            textAlign: TextAlign.center,
+                                            style: GoogleFonts.poppins(),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 3,
+                                          child: Text(
+                                            bid['type']!,
+                                            textAlign: TextAlign.center,
+                                            style: GoogleFonts.poppins(),
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          width: 48,
+                                          child: IconButton(
+                                            icon: const Icon(
+                                              Icons.delete,
+                                              color: Colors.red,
+                                              size: 20,
+                                            ),
+                                            onPressed: () => _removeBid(index),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                    if (bids.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.2),
+                              spreadRadius: 1,
+                              blurRadius: 3,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "Total Points:",
+                              style: GoogleFonts.poppins(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              "${_getTotalPoints()}",
+                              style: GoogleFonts.poppins(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.green.shade700,
+                              ),
+                            ),
+                            SizedBox(
+                              height: 40,
+                              child: ElevatedButton(
+                                onPressed: _showBidConfirmationDialog,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: Text(
+                                  "CONFIRM",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            if (_messageToShow != null)
-              AnimatedMessageBar(
-                key: _messageBarKey,
-                message: _messageToShow!,
-                isError: _isErrorForMessage,
-                onDismissed: _clearMessage,
-              ),
-          ],
+              if (_messageToShow != null)
+                AnimatedMessageBar(
+                  key: _messageBarKey,
+                  message: _messageToShow!,
+                  isError: _isErrorForMessage,
+                  onDismissed: _clearMessage,
+                ),
+            ],
+          ),
         ),
       ),
     );

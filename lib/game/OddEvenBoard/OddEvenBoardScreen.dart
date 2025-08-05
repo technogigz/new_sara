@@ -440,222 +440,226 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Select Game Type',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey[300]!),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<LataDayType>(
-                              value: _selectedLataDayType,
-                              icon: const Icon(
-                                Icons.keyboard_arrow_down,
-                                color: Colors.orange,
-                              ),
-                              onChanged: (LataDayType? newValue) {
-                                setState(() {
-                                  _selectedLataDayType = newValue;
-                                });
-                              },
-                              items:
-                                  dropdownItems, // Use the dynamically built list
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: RadioListTile<GameType>(
-                            title: const Text('Odd'),
-                            value: GameType.odd,
-                            groupValue: _selectedGameType,
-                            onChanged: (GameType? value) {
-                              setState(() {
-                                _selectedGameType = value;
-                              });
-                            },
-                            activeColor: Colors.orange,
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ),
-                        Expanded(
-                          child: RadioListTile<GameType>(
-                            title: const Text('Even'),
-                            value: GameType.even,
-                            groupValue: _selectedGameType,
-                            onChanged: (GameType? value) {
-                              setState(() {
-                                _selectedGameType = value;
-                              });
-                            },
-                            activeColor: Colors.orange,
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            'Enter Points :',
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Select Game Type',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _buildPointsInputField(_pointsController),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        SizedBox(
-                          width: 150,
-                          child: ElevatedButton(
-                            onPressed: _addEntry,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.orange,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              elevation: 3,
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
                             ),
-                            child: const Text(
-                              'ADD',
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey[300]!),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<LataDayType>(
+                                value: _selectedLataDayType,
+                                icon: const Icon(
+                                  Icons.keyboard_arrow_down,
+                                  color: Colors.orange,
+                                ),
+                                onChanged: (LataDayType? newValue) {
+                                  setState(() {
+                                    _selectedLataDayType = newValue;
+                                  });
+                                },
+                                items:
+                                    dropdownItems, // Use the dynamically built list
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: RadioListTile<GameType>(
+                              title: const Text('Odd'),
+                              value: GameType.odd,
+                              groupValue: _selectedGameType,
+                              onChanged: (GameType? value) {
+                                setState(() {
+                                  _selectedGameType = value;
+                                });
+                              },
+                              activeColor: Colors.orange,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                          Expanded(
+                            child: RadioListTile<GameType>(
+                              title: const Text('Even'),
+                              value: GameType.even,
+                              groupValue: _selectedGameType,
+                              onChanged: (GameType? value) {
+                                setState(() {
+                                  _selectedGameType = value;
+                                });
+                              },
+                              activeColor: Colors.orange,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Enter Points :',
                               style: TextStyle(
-                                color: Colors.white,
                                 fontSize: 16,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Divider(height: 1, color: Colors.grey[400]),
-              if (_entries.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 8.0,
-                  ),
-                  child: Row(
-                    children: [
-                      const Expanded(
-                        flex: 2,
-                        child: Text(
-                          'Digit',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _buildPointsInputField(_pointsController),
                           ),
-                        ),
+                        ],
                       ),
-                      const Expanded(
-                        flex: 3,
-                        child: Text(
-                          'Points',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          SizedBox(
+                            width: 150,
+                            child: ElevatedButton(
+                              onPressed: _addEntry,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                elevation: 3,
+                              ),
+                              child: const Text(
+                                'ADD',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                      const Expanded(
-                        flex: 2,
-                        child: Text(
-                          'Type',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 48), // Space for delete icon
                     ],
                   ),
                 ),
-              if (_entries.isNotEmpty)
                 Divider(height: 1, color: Colors.grey[400]),
-              Expanded(
-                child: _entries.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No entries yet. Add some data!',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[600],
+                if (_entries.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8.0,
+                    ),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          flex: 2,
+                          child: Text(
+                            'Digit',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
-                      )
-                    : ListView.builder(
-                        itemCount: _entries.length,
-                        itemBuilder: (context, index) {
-                          final entry = _entries[index];
-                          return _buildEntryItem(
-                            entry['digit']!,
-                            entry['points']!,
-                            entry['type']!,
-                            index,
-                          );
-                        },
-                      ),
-              ),
-              if (_entries.isNotEmpty) _buildBottomBar(),
-            ],
-          ),
-          // Animated Message Bar at the top
-          if (_messageToShow != null)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: AnimatedMessageBar(
-                key:
-                    _messageBarKey, // Key to trigger animation on message change
-                message: _messageToShow!,
-                isError: _isErrorForMessage,
-                onDismissed: _clearMessage,
-              ),
+                        const Expanded(
+                          flex: 3,
+                          child: Text(
+                            'Points',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                        const Expanded(
+                          flex: 2,
+                          child: Text(
+                            'Type',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 48), // Space for delete icon
+                      ],
+                    ),
+                  ),
+                if (_entries.isNotEmpty)
+                  Divider(height: 1, color: Colors.grey[400]),
+                Expanded(
+                  child: _entries.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No entries yet. Add some data!',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: _entries.length,
+                          itemBuilder: (context, index) {
+                            final entry = _entries[index];
+                            return _buildEntryItem(
+                              entry['digit']!,
+                              entry['points']!,
+                              entry['type']!,
+                              index,
+                            );
+                          },
+                        ),
+                ),
+                if (_entries.isNotEmpty) _buildBottomBar(),
+              ],
             ),
-        ],
+            // Animated Message Bar at the top
+            if (_messageToShow != null)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: AnimatedMessageBar(
+                  key:
+                      _messageBarKey, // Key to trigger animation on message change
+                  message: _messageToShow!,
+                  isError: _isErrorForMessage,
+                  onDismissed: _clearMessage,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

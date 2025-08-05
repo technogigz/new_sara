@@ -295,247 +295,253 @@ class _GroupJodiScreenState extends State<GroupJodiScreen> {
           ),
         ],
       ),
-      body: Stack(
-        // Use Stack to overlay the message bar
-        children: [
-          Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  children: [
-                    _buildInputRow("Enter Jodi", jodiController, isJodi: true),
-                    const SizedBox(height: 10),
-                    _buildInputRow("Enter Points", pointsController),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 45,
-                      child: ElevatedButton(
-                        onPressed: addBid,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFF5B544),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          elevation: 3,
-                        ),
-                        child: const Text(
-                          "ADD",
-                          style: TextStyle(fontSize: 16, color: Colors.white),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              if (bids.isNotEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  child: Row(
+      body: SafeArea(
+        child: Stack(
+          // Use Stack to overlay the message bar
+          children: [
+            Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
                     children: [
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          'Jodi',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                      _buildInputRow(
+                        "Enter Jodi",
+                        jodiController,
+                        isJodi: true,
+                      ),
+                      const SizedBox(height: 10),
+                      _buildInputRow("Enter Points", pointsController),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 45,
+                        child: ElevatedButton(
+                          onPressed: addBid,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFF5B544),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 3,
+                          ),
+                          child: const Text(
+                            "ADD",
+                            style: TextStyle(fontSize: 16, color: Colors.white),
                           ),
                         ),
                       ),
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          'Points',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 48),
                     ],
                   ),
                 ),
-              Expanded(
-                child: bids.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No entries yet. Add some data!',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[600],
+                const Divider(height: 1),
+                if (bids.isNotEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            'Jodi',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
-                      )
-                    : ListView.builder(
-                        itemCount: bids.length,
-                        itemBuilder: (context, index) {
-                          final bid = bids[index];
-                          return Container(
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            'Points',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
                             ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withOpacity(0.2),
-                                  spreadRadius: 1,
-                                  blurRadius: 3,
-                                  offset: const Offset(0, 1),
-                                ),
-                              ],
+                          ),
+                        ),
+                        SizedBox(width: 48),
+                      ],
+                    ),
+                  ),
+                Expanded(
+                  child: bids.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No entries yet. Add some data!',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey[600],
                             ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0,
-                                vertical: 8.0,
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: bids.length,
+                          itemBuilder: (context, index) {
+                            final bid = bids[index];
+                            return Container(
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
                               ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    flex: 2,
-                                    child: Text(
-                                      bid['jodi']!,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 3,
-                                    child: Text(
-                                      bid['points']!,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.delete,
-                                      color: Colors.red,
-                                    ),
-                                    onPressed: () => removeBid(index),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.withOpacity(0.2),
+                                    spreadRadius: 1,
+                                    blurRadius: 3,
+                                    offset: const Offset(0, 1),
                                   ),
                                 ],
                               ),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-              if (bids.isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.3),
-                        spreadRadius: 2,
-                        blurRadius: 5,
-                        offset: const Offset(0, -3),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Bids",
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                          Text(
-                            "${bids.length}",
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Points",
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                          Text(
-                            "$totalPoints",
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          _showConfirmationDialog();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFF5B544),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          elevation: 3,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0,
+                                  vertical: 8.0,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      flex: 2,
+                                      child: Text(
+                                        bid['jodi']!,
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 3,
+                                      child: Text(
+                                        bid['points']!,
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.delete,
+                                        color: Colors.red,
+                                      ),
+                                      onPressed: () => removeBid(index),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
                         ),
-                        child: const Text(
-                          "SUBMIT",
-                          style: TextStyle(color: Colors.white, fontSize: 16),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
-            ],
-          ),
-          // --- AnimatedMessageBar at the top ---
-          if (_isMessageBarVisible)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: AnimatedMessageBar(
-                message: _messageBarMessage,
-                isError: _isMessageBarError,
-                onDismissed: () {
-                  // Optional: if you need to do something after the bar dismisses
-                  if (mounted) {
-                    setState(() {
-                      _isMessageBarVisible = false; // Hide after dismissal
-                    });
-                  }
-                },
-              ),
+                if (bids.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.3),
+                          spreadRadius: 2,
+                          blurRadius: 5,
+                          offset: const Offset(0, -3),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Bids",
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                            Text(
+                              "${bids.length}",
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Points",
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                            Text(
+                              "$totalPoints",
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            _showConfirmationDialog();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFF5B544),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 3,
+                          ),
+                          child: const Text(
+                            "SUBMIT",
+                            style: TextStyle(color: Colors.white, fontSize: 16),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
-          // --- End AnimatedMessageBar ---
-        ],
+            // --- AnimatedMessageBar at the top ---
+            if (_isMessageBarVisible)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: AnimatedMessageBar(
+                  message: _messageBarMessage,
+                  isError: _isMessageBarError,
+                  onDismissed: () {
+                    // Optional: if you need to do something after the bar dismisses
+                    if (mounted) {
+                      setState(() {
+                        _isMessageBarVisible = false; // Hide after dismissal
+                      });
+                    }
+                  },
+                ),
+              ),
+            // --- End AnimatedMessageBar ---
+          ],
+        ),
       ),
     );
   }

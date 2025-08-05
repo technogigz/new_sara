@@ -189,145 +189,147 @@ class _KingStarlineDashboardScreenState
           style: TextStyle(color: Colors.black, fontSize: 18),
         ),
       ),
-      body: Column(
-        children: [
-          Container(
-            color: Colors.grey.shade300,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                InkWell(
-                  onTap: () {
-                    // Handle history tap
-                    log("History button tapped");
-                  },
-                  borderRadius: BorderRadius.circular(8),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(
-                      vertical: 8.0,
-                      horizontal: 4.0,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(width: 5),
-                        Icon(
-                          Icons.calendar_month,
-                          color: Colors.black,
-                          size: 24,
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          'History',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Notifications',
-                      style: TextStyle(color: Colors.black, fontSize: 14),
-                    ),
-                    Transform.scale(
-                      scale: 0.8,
-                      child: Switch(
-                        value: _notificationsEnabled,
-                        onChanged: (bool value) {
-                          setState(() {
-                            _notificationsEnabled = value;
-                          });
-                          log(
-                            "Notifications switched to: $_notificationsEnabled",
-                          );
-                        },
-                        activeTrackColor: Colors.teal[300],
-                        activeColor: Colors.teal,
-                        inactiveTrackColor: Colors.grey[300],
-                        inactiveThumbColor: Colors.grey,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Divider(height: 1, thickness: 1, color: Colors.grey[200]),
-          const SizedBox(height: 5),
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 5.0,
-            ), // Horizontal padding of 5.0 on each side
-            child: Column(
-              children: [
-                Row(
-                  // This is likely the problematic Row
-                  children: [
-                    _buildInfoCard('Single Digit', '10-100'),
-                    const SizedBox(width: 5), // Fixed width of 5
-                    _buildInfoCard('Double Pana', '10-3200'),
-                  ],
-                ),
-                const SizedBox(height: 5),
-                Row(
-                  // This one too, potentially
-                  children: [
-                    _buildInfoCard('Single Pana', '10-1600'),
-                    const SizedBox(width: 10), // Fixed width of 10
-                    _buildInfoCard('Triple Pana', '10-10000'),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 5),
-          _isLoading
-              ? const Expanded(
-                  child: Center(
-                    child: CircularProgressIndicator(color: Colors.amber),
-                  ),
-                )
-              : _errorMessage.isNotEmpty
-              ? Expanded(
-                  child: Center(
-                    child: Text(
-                      _errorMessage,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.red.shade700,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                )
-              : Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    itemCount: _gameTimes.length,
-                    itemBuilder: (context, index) {
-                      final game = _gameTimes[index];
-                      return _buildGameTimeListItem(
-                        id: game
-                            .id, // <--- Correctly passing the parsed game ID here
-                        time: game.time,
-                        status: game.status,
-                        result: game.result,
-                        isClosed: game.isClosed,
-                        openTime: game.openTime,
-                        additionalInfo: game.additionalInfo,
-                      );
+      body: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              color: Colors.grey.shade300,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  InkWell(
+                    onTap: () {
+                      // Handle history tap
+                      log("History button tapped");
                     },
+                    borderRadius: BorderRadius.circular(8),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(
+                        vertical: 8.0,
+                        horizontal: 4.0,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(width: 5),
+                          Icon(
+                            Icons.calendar_month,
+                            color: Colors.black,
+                            size: 24,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'History',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-        ],
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Notifications',
+                        style: TextStyle(color: Colors.black, fontSize: 14),
+                      ),
+                      Transform.scale(
+                        scale: 0.8,
+                        child: Switch(
+                          value: _notificationsEnabled,
+                          onChanged: (bool value) {
+                            setState(() {
+                              _notificationsEnabled = value;
+                            });
+                            log(
+                              "Notifications switched to: $_notificationsEnabled",
+                            );
+                          },
+                          activeTrackColor: Colors.teal[300],
+                          activeColor: Colors.teal,
+                          inactiveTrackColor: Colors.grey[300],
+                          inactiveThumbColor: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Divider(height: 1, thickness: 1, color: Colors.grey[200]),
+            const SizedBox(height: 5),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 5.0,
+              ), // Horizontal padding of 5.0 on each side
+              child: Column(
+                children: [
+                  Row(
+                    // This is likely the problematic Row
+                    children: [
+                      _buildInfoCard('Single Digit', '10-100'),
+                      const SizedBox(width: 5), // Fixed width of 5
+                      _buildInfoCard('Double Pana', '10-3200'),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  Row(
+                    // This one too, potentially
+                    children: [
+                      _buildInfoCard('Single Pana', '10-1600'),
+                      const SizedBox(width: 10), // Fixed width of 10
+                      _buildInfoCard('Triple Pana', '10-10000'),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 5),
+            _isLoading
+                ? const Expanded(
+                    child: Center(
+                      child: CircularProgressIndicator(color: Colors.amber),
+                    ),
+                  )
+                : _errorMessage.isNotEmpty
+                ? Expanded(
+                    child: Center(
+                      child: Text(
+                        _errorMessage,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  )
+                : Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      itemCount: _gameTimes.length,
+                      itemBuilder: (context, index) {
+                        final game = _gameTimes[index];
+                        return _buildGameTimeListItem(
+                          id: game
+                              .id, // <--- Correctly passing the parsed game ID here
+                          time: game.time,
+                          status: game.status,
+                          result: game.result,
+                          isClosed: game.isClosed,
+                          openTime: game.openTime,
+                          additionalInfo: game.additionalInfo,
+                        );
+                      },
+                    ),
+                  ),
+          ],
+        ),
       ),
     );
   }

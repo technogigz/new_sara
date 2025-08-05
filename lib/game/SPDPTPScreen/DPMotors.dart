@@ -695,210 +695,215 @@ class _DPMotorsBetScreenState extends State<DPMotorsBetScreen> {
           const SizedBox(width: 12),
         ],
       ),
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                child: Column(
-                  children: [
-                    _inputRow("Select Game Type:", _buildDropdown()),
-                    const SizedBox(height: 12),
-                    _inputRow("Enter 3-Digit Number:", _buildDigitInputField()),
-                    if (_isDigitSuggestionsVisible &&
-                        filteredDigitOptions.isNotEmpty)
-                      Container(
-                        margin: const EdgeInsets.only(top: 8),
-                        constraints: const BoxConstraints(maxHeight: 200),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.2),
-                              spreadRadius: 2,
-                              blurRadius: 5,
-                            ),
-                          ],
-                        ),
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: filteredDigitOptions.length,
-                          itemBuilder: (context, index) {
-                            final suggestion = filteredDigitOptions[index];
-                            return ListTile(
-                              title: Text(suggestion),
-                              onTap: () {
-                                setState(() {
-                                  digitController.text = suggestion;
-                                  _isDigitSuggestionsVisible = false;
-                                  digitController.selection =
-                                      TextSelection.fromPosition(
-                                        TextPosition(
-                                          offset: digitController.text.length,
-                                        ),
-                                      );
-                                });
-                                log(
-                                  'DPMotorsBetScreen: Digit suggestion selected: $suggestion',
-                                );
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-                    _inputRow(
-                      "Enter Points:",
-                      _buildTextField(
-                        pointsController,
-                        "Enter Amount",
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(4),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 45,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        ),
-                        onPressed: _isApiCalling ? null : _addEntry,
-                        child: _isApiCalling
-                            ? const CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              )
-                            : const Text(
-                                "ADD BID",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                  ],
-                ),
-              ),
-              const Divider(thickness: 1),
-              if (addedEntries.isNotEmpty)
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Column(
+              children: [
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
-                    vertical: 8,
+                    vertical: 12,
                   ),
-                  child: Row(
+                  child: Column(
                     children: [
-                      Expanded(
-                        child: Text(
-                          "Digit",
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
+                      _inputRow("Select Game Type:", _buildDropdown()),
+                      const SizedBox(height: 12),
+                      _inputRow(
+                        "Enter 3-Digit Number:",
+                        _buildDigitInputField(),
+                      ),
+                      if (_isDigitSuggestionsVisible &&
+                          filteredDigitOptions.isNotEmpty)
+                        Container(
+                          margin: const EdgeInsets.only(top: 8),
+                          constraints: const BoxConstraints(maxHeight: 200),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.2),
+                                spreadRadius: 2,
+                                blurRadius: 5,
+                              ),
+                            ],
+                          ),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filteredDigitOptions.length,
+                            itemBuilder: (context, index) {
+                              final suggestion = filteredDigitOptions[index];
+                              return ListTile(
+                                title: Text(suggestion),
+                                onTap: () {
+                                  setState(() {
+                                    digitController.text = suggestion;
+                                    _isDigitSuggestionsVisible = false;
+                                    digitController.selection =
+                                        TextSelection.fromPosition(
+                                          TextPosition(
+                                            offset: digitController.text.length,
+                                          ),
+                                        );
+                                  });
+                                  log(
+                                    'DPMotorsBetScreen: Digit suggestion selected: $suggestion',
+                                  );
+                                },
+                              );
+                            },
                           ),
                         ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          "Amount",
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
-                          ),
+                      const SizedBox(height: 12),
+                      _inputRow(
+                        "Enter Points:",
+                        _buildTextField(
+                          pointsController,
+                          "Enter Amount",
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(4),
+                          ],
                         ),
                       ),
-                      Expanded(
-                        child: Text(
-                          "Game Type",
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 45,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
                           ),
+                          onPressed: _isApiCalling ? null : _addEntry,
+                          child: _isApiCalling
+                              ? const CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                )
+                              : const Text(
+                                  "ADD BID",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                         ),
                       ),
-                      const SizedBox(width: 48),
+                      const SizedBox(height: 18),
                     ],
                   ),
                 ),
-              if (addedEntries.isNotEmpty) const Divider(thickness: 1),
-              Expanded(
-                child: addedEntries.isEmpty
-                    ? Center(
-                        child: Text(
-                          "No bids added yet",
-                          style: GoogleFonts.poppins(color: Colors.grey),
+                const Divider(thickness: 1),
+                if (addedEntries.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            "Digit",
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
-                      )
-                    : ListView.builder(
-                        itemCount: addedEntries.length,
-                        itemBuilder: (_, index) {
-                          final entry = addedEntries[index];
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 6,
+                        Expanded(
+                          child: Text(
+                            "Amount",
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
                             ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    entry['digit']!,
-                                    style: GoogleFonts.poppins(),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Text(
-                                    entry['amount']!,
-                                    style: GoogleFonts.poppins(),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Text(
-                                    '${entry['gameType']} (${entry['type']})',
-                                    style: GoogleFonts.poppins(),
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete,
-                                    color: Colors.red,
-                                  ),
-                                  onPressed: _isApiCalling
-                                      ? null
-                                      : () => _removeEntry(index),
-                                ),
-                              ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            "Game Type",
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
                             ),
-                          );
-                        },
-                      ),
-              ),
-              if (addedEntries.isNotEmpty) _buildBottomBar(),
-            ],
-          ),
-          if (_messageToShow != null)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: AnimatedMessageBar(
-                key: _messageBarKey,
-                message: _messageToShow!,
-                isError: _isErrorForMessage,
-                onDismissed: _clearMessage,
-              ),
+                          ),
+                        ),
+                        const SizedBox(width: 48),
+                      ],
+                    ),
+                  ),
+                if (addedEntries.isNotEmpty) const Divider(thickness: 1),
+                Expanded(
+                  child: addedEntries.isEmpty
+                      ? Center(
+                          child: Text(
+                            "No bids added yet",
+                            style: GoogleFonts.poppins(color: Colors.grey),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: addedEntries.length,
+                          itemBuilder: (_, index) {
+                            final entry = addedEntries[index];
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 6,
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      entry['digit']!,
+                                      style: GoogleFonts.poppins(),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      entry['amount']!,
+                                      style: GoogleFonts.poppins(),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      '${entry['gameType']} (${entry['type']})',
+                                      style: GoogleFonts.poppins(),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete,
+                                      color: Colors.red,
+                                    ),
+                                    onPressed: _isApiCalling
+                                        ? null
+                                        : () => _removeEntry(index),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                ),
+                if (addedEntries.isNotEmpty) _buildBottomBar(),
+              ],
             ),
-        ],
+            if (_messageToShow != null)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: AnimatedMessageBar(
+                  key: _messageBarKey,
+                  message: _messageToShow!,
+                  isError: _isErrorForMessage,
+                  onDismissed: _clearMessage,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

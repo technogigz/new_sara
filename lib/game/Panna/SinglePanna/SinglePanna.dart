@@ -399,6 +399,64 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
     }
   }
 
+  // Future<void> _addBid() async {
+  //   _clearMessage();
+  //   _removeOverlay(); // Hide suggestions when add bid is pressed
+  //
+  //   final digit = digitController.text.trim();
+  //   final amount = amountController.text.trim();
+  //
+  //   if (digit.isEmpty || amount.isEmpty) {
+  //     _showMessage('Please fill in all fields.', isError: true);
+  //     return;
+  //   }
+  //
+  //   if (!Single_Pana.contains(digit)) {
+  //     _showMessage('Please enter a valid Single Panna number.', isError: true);
+  //     return;
+  //   }
+  //
+  //   final intAmount = int.tryParse(amount);
+  //   if (intAmount == null || intAmount <= 0) {
+  //     _showMessage(
+  //       'Please enter a valid amount greater than 0.',
+  //       isError: true,
+  //     );
+  //     return;
+  //   }
+  //
+  //   final existingIndex = bids.indexWhere(
+  //     (entry) => entry['digit'] == digit && entry['type'] == selectedGameType,
+  //   );
+  //
+  //   if (mounted) {
+  //     setState(() {
+  //       if (existingIndex != -1) {
+  //         final currentAmount = int.parse(bids[existingIndex]['amount']!);
+  //         bids[existingIndex]['amount'] = (currentAmount + intAmount)
+  //             .toString();
+  //         _showMessage(
+  //           'Updated amount for Panna: $digit, Type: $selectedGameType.',
+  //         );
+  //       } else {
+  //         bids.add({
+  //           'digit': digit,
+  //           'amount': amount,
+  //           'type': selectedGameType,
+  //         });
+  //         _showMessage(
+  //           'Added bid: Panna $digit, Amount $amount, Type $selectedGameType.',
+  //         );
+  //       }
+  //       _saveBids();
+  //       digitController.clear();
+  //       amountController.clear();
+  //       // _isPanaSuggestionsVisible = false; // Now handled by _removeOverlay() via _onDigitChanged
+  //       FocusScope.of(context).unfocus();
+  //     });
+  //   }
+  // }
+
   Future<void> _addBid() async {
     _clearMessage();
     _removeOverlay(); // Hide suggestions when add bid is pressed
@@ -417,9 +475,10 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
     }
 
     final intAmount = int.tryParse(amount);
-    if (intAmount == null || intAmount <= 0) {
+    if (intAmount == null || intAmount < 10) {
+      // <-- MODIFIED THIS LINE
       _showMessage(
-        'Please enter a valid amount greater than 0.',
+        'Minimum amount is 10. Please enter a valid amount of 10 or more.', // <-- MODIFIED THIS LINE
         isError: true,
       );
       return;
@@ -451,7 +510,6 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
         _saveBids();
         digitController.clear();
         amountController.clear();
-        // _isPanaSuggestionsVisible = false; // Now handled by _removeOverlay() via _onDigitChanged
         FocusScope.of(context).unfocus();
       });
     }
@@ -708,70 +766,149 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
   }
 
   // INPUT FIELD BUILDER
+  // INPUT FIELD BUILDER
   Widget _buildInputField(TextEditingController controller, String hint) {
-    Widget textField = SizedBox(
-      height: 35,
-      width: 150,
-      child: TextFormField(
-        controller: controller,
-        focusNode: controller == digitController ? _digitFocusNode : null,
-        cursorColor: Colors.orange,
-        keyboardType: TextInputType.number,
-        onTap: () {
-          _clearMessage();
-          if (controller == digitController) {
-            _onDigitChanged();
-          } else {
-            _removeOverlay();
-          }
-        },
-        onChanged: (value) {
-          if (controller == digitController) {
-            _onDigitChanged();
-          }
-        },
-        onEditingComplete: () {
-          if (controller == digitController && digitController.text.isEmpty) {
-            _removeOverlay();
-          }
-          FocusScope.of(context).unfocus();
-        },
-        onTapOutside: (_) {
-          if (controller == digitController && _overlayEntry != null) {
-            _removeOverlay();
-          }
-        },
-        textAlignVertical: TextAlignVertical.center,
-        decoration: InputDecoration(
-          hintText: hint,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 0,
+    // If the controller is not the digit controller, use a standard TextFormField.
+    if (controller != digitController) {
+      return SizedBox(
+        height: 35,
+        width: 150,
+        child: TextFormField(
+          controller: controller,
+          cursorColor: Colors.orange,
+          keyboardType: TextInputType.number,
+          onTap: () => _clearMessage(),
+          textAlignVertical: TextAlignVertical.center,
+          decoration: InputDecoration(
+            hintText: hint,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 0,
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(30),
+              borderSide: const BorderSide(color: Colors.black),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(30),
+              borderSide: const BorderSide(color: Colors.black),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(30),
+              borderSide: const BorderSide(color: Colors.orange, width: 2),
+            ),
           ),
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.black),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.black),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.orange, width: 2),
-          ),
+          style: GoogleFonts.poppins(fontSize: 14),
         ),
-        style: GoogleFonts.poppins(fontSize: 14),
-      ),
-    );
-
-    if (controller == digitController) {
-      return CompositedTransformTarget(link: _layerLink, child: textField);
+      );
     }
 
-    return textField;
+    // Use Autocomplete for the digit controller.
+    return SizedBox(
+      height: 35,
+      width: 150,
+      child: Autocomplete<String>(
+        optionsBuilder: (TextEditingValue textEditingValue) {
+          if (textEditingValue.text.isEmpty) {
+            // No suggestions if the field is empty
+            return const Iterable<String>.empty();
+          }
+          // Filter options based on user input
+          return Single_Pana.where(
+            (pana) => pana.startsWith(textEditingValue.text),
+          );
+        },
+        onSelected: (String selection) {
+          // Set the text field value to the selected option
+          digitController.text = selection;
+          _clearMessage();
+          FocusScope.of(context).unfocus();
+        },
+        fieldViewBuilder:
+            (
+              BuildContext context,
+              TextEditingController textEditingController,
+              FocusNode focusNode,
+              VoidCallback onFieldSubmitted,
+            ) {
+              // This builds the actual text field. Use the provided controllers and focus node.
+              return TextFormField(
+                controller: textEditingController,
+                focusNode: focusNode,
+                cursorColor: Colors.orange,
+                keyboardType: TextInputType.number,
+                onTap: () => _clearMessage(),
+                textAlignVertical: TextAlignVertical.center,
+                decoration: InputDecoration(
+                  hintText: hint,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 0,
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: const BorderSide(color: Colors.black),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: const BorderSide(color: Colors.black),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: const BorderSide(
+                      color: Colors.orange,
+                      width: 2,
+                    ),
+                  ),
+                ),
+                style: GoogleFonts.poppins(fontSize: 14),
+              );
+            },
+        optionsViewBuilder:
+            (
+              BuildContext context,
+              AutocompleteOnSelected<String> onSelected,
+              Iterable<String> options,
+            ) {
+              // This builds the dropdown list of suggestions.
+              return Align(
+                alignment: Alignment.topLeft,
+                child: Material(
+                  elevation: 4.0,
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    width: 150,
+                    height: 200, // You can set a fixed or max height
+                    child: ListView.builder(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      itemCount: options.length,
+                      itemBuilder: (BuildContext context, int index) {
+                        final String option = options.elementAt(index);
+                        return InkWell(
+                          onTap: () {
+                            onSelected(option);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            child: Text(option, style: GoogleFonts.poppins()),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              );
+            },
+      ),
+    );
   }
 
   Widget _buildTableHeader() {
@@ -880,186 +1017,193 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
             ),
           ],
         ),
-        body: Stack(
-          // Stack is necessary for the AnimatedMessageBar and potentially the Overlay
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Column(
-                children: [
-                  _inputRow(
-                    "Enter Single Panna:",
-                    _buildInputField(digitController, "Bid Panna"),
-                  ),
-                  _inputRow(
-                    "Enter Points:",
-                    _buildInputField(amountController, "Enter Amount"),
-                  ),
-                  const SizedBox(height: 10),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: SizedBox(
-                      height: 35,
-                      width: 150,
-                      child: ElevatedButton(
-                        onPressed: _addBid,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
+        body: SafeArea(
+          child: Stack(
+            // Stack is necessary for the AnimatedMessageBar and potentially the Overlay
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: Column(
+                  children: [
+                    _inputRow(
+                      "Enter Single Panna:",
+                      _buildInputField(digitController, "Bid Panna"),
+                    ),
+                    _inputRow(
+                      "Enter Points:",
+                      _buildInputField(amountController, "Enter Amount"),
+                    ),
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: SizedBox(
+                        height: 35,
+                        width: 150,
+                        child: ElevatedButton(
+                          onPressed: _addBid,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
                           ),
-                        ),
-                        child: Text(
-                          "ADD BID",
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
+                          child: Text(
+                            "ADD BID",
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  _buildTableHeader(),
-                  Divider(color: Colors.grey.shade300),
-                  Expanded(
-                    child: bids.isEmpty
-                        ? Center(
-                            child: Text(
-                              "No Bids Added",
-                              style: GoogleFonts.poppins(
-                                color: Colors.black38,
-                                fontSize: 16,
-                              ),
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: bids.length,
-                            itemBuilder: (context, index) {
-                              final bid = bids[index];
-                              return Card(
-                                margin: const EdgeInsets.symmetric(vertical: 4),
-                                elevation: 1,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12.0,
-                                    vertical: 10.0,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        flex: 2,
-                                        child: Text(
-                                          bid['digit']!,
-                                          textAlign: TextAlign.center,
-                                          style: GoogleFonts.poppins(),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        flex: 2,
-                                        child: Text(
-                                          bid['amount']!,
-                                          textAlign: TextAlign.center,
-                                          style: GoogleFonts.poppins(),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        flex: 3,
-                                        child: Text(
-                                          bid['type']!,
-                                          textAlign: TextAlign.center,
-                                          style: GoogleFonts.poppins(),
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: 48,
-                                        child: IconButton(
-                                          icon: const Icon(
-                                            Icons.delete,
-                                            color: Colors.red,
-                                            size: 20,
-                                          ),
-                                          onPressed: () => _removeBid(index),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                  if (bids.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.2),
-                            spreadRadius: 1,
-                            blurRadius: 3,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "Total Points:",
-                            style: GoogleFonts.poppins(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            "${_getTotalPoints()}",
-                            style: GoogleFonts.poppins(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.green.shade700,
-                            ),
-                          ),
-                          SizedBox(
-                            height: 40,
-                            child: ElevatedButton(
-                              onPressed: _showBidConfirmationDialog,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orange,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
+                    _buildTableHeader(),
+                    Divider(color: Colors.grey.shade300),
+                    Expanded(
+                      child: bids.isEmpty
+                          ? Center(
                               child: Text(
-                                "CONFIRM",
+                                "No Bids Added",
                                 style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black38,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: bids.length,
+                              itemBuilder: (context, index) {
+                                final bid = bids[index];
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                  ),
+                                  elevation: 1,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12.0,
+                                      vertical: 10.0,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text(
+                                            bid['digit']!,
+                                            textAlign: TextAlign.center,
+                                            style: GoogleFonts.poppins(),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text(
+                                            bid['amount']!,
+                                            textAlign: TextAlign.center,
+                                            style: GoogleFonts.poppins(),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 3,
+                                          child: Text(
+                                            bid['type']!,
+                                            textAlign: TextAlign.center,
+                                            style: GoogleFonts.poppins(),
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          width: 48,
+                                          child: IconButton(
+                                            icon: const Icon(
+                                              Icons.delete,
+                                              color: Colors.red,
+                                              size: 20,
+                                            ),
+                                            onPressed: () => _removeBid(index),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                    if (bids.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.2),
+                              spreadRadius: 1,
+                              blurRadius: 3,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "Total Points:",
+                              style: GoogleFonts.poppins(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              "${_getTotalPoints()}",
+                              style: GoogleFonts.poppins(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.green.shade700,
+                              ),
+                            ),
+                            SizedBox(
+                              height: 40,
+                              child: ElevatedButton(
+                                onPressed: _showBidConfirmationDialog,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: Text(
+                                  "CONFIRM",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            if (_messageToShow != null)
-              AnimatedMessageBar(
-                key: _messageBarKey,
-                message: _messageToShow!,
-                isError: _isErrorForMessage,
-                onDismissed: _clearMessage,
-              ),
-          ],
+              if (_messageToShow != null)
+                AnimatedMessageBar(
+                  key: _messageBarKey,
+                  message: _messageToShow!,
+                  isError: _isErrorForMessage,
+                  onDismissed: _clearMessage,
+                ),
+            ],
+          ),
         ),
       ),
     );

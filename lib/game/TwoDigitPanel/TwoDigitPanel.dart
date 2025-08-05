@@ -530,124 +530,290 @@ class _TwoDigitPanelScreenState extends State<TwoDigitPanelScreen> {
           const SizedBox(width: 12),
         ],
       ),
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Padding(
-                            padding: EdgeInsets.only(top: 6.0),
-                            child: Text(
-                              'Enter Two Digits:',
+      body: SafeArea(
+        child: Stack(
+          children: [
+            SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Padding(
+                              padding: EdgeInsets.only(top: 6.0),
+                              child: Text(
+                                'Enter Two Digits:',
+                                style: TextStyle(fontSize: 14),
+                              ),
+                            ),
+                            SizedBox(height: 50),
+                            Text(
+                              'Enter Points:',
                               style: TextStyle(fontSize: 14),
                             ),
+                          ],
+                        ),
+                        const Spacer(),
+                        Column(
+                          children: [
+                            SizedBox(
+                              height: 40,
+                              width: 180,
+                              child: TextField(
+                                controller: digitController,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  LengthLimitingTextInputFormatter(2),
+                                ],
+                                onTap: _clearMessage,
+                                enabled: !isAnyApiCalling,
+                                decoration: InputDecoration(
+                                  hintText: 'Bid Digits',
+                                  hintStyle: const TextStyle(fontSize: 14),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 0,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                    borderSide: const BorderSide(
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                    borderSide: const BorderSide(
+                                      color: Colors.orange,
+                                      width: 2,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              height: 40,
+                              width: 180,
+                              child: TextField(
+                                controller: amountController,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  LengthLimitingTextInputFormatter(4),
+                                ],
+                                onTap: _clearMessage,
+                                enabled: !isAnyApiCalling,
+                                decoration: InputDecoration(
+                                  hintText: 'Enter Amount',
+                                  hintStyle: const TextStyle(fontSize: 14),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 0,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                    borderSide: const BorderSide(
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                    borderSide: const BorderSide(
+                                      color: Colors.orange,
+                                      width: 2,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            ElevatedButton(
+                              onPressed: isAnyApiCalling ? null : addBid,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isAnyApiCalling
+                                    ? Colors.grey
+                                    : Colors.orange,
+                                minimumSize: const Size(80, 45),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 2,
+                              ),
+                              child: _isAddBidApiCalling
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
+                                      ),
+                                    )
+                                  : const Text(
+                                      'ADD BID',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1, thickness: 1),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: const [
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Digit',
+                            style: TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          SizedBox(height: 50),
-                          Text('Enter Points:', style: TextStyle(fontSize: 14)),
-                        ],
+                        ),
+                        SizedBox(width: 40),
+                        Expanded(
+                          child: Text(
+                            'Amount',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        SizedBox(width: 40),
+                        Expanded(
+                          child: Text(
+                            'Type',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        Spacer(),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: bids.isEmpty
+                        ? const Center(child: Text('No bids yet'))
+                        : ListView.builder(
+                            itemCount: bids.length,
+                            itemBuilder: (context, index) {
+                              final bid = bids[index];
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 0,
+                                ),
+                                child: Card(
+                                  elevation: 1,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 10,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(child: Text(bid.digit)),
+                                        Expanded(child: Text(bid.amount)),
+                                        Expanded(
+                                          child: Row(
+                                            children: [
+                                              Text(bid.type),
+                                              const Spacer(),
+                                              IconButton(
+                                                icon: const Icon(
+                                                  Icons.delete_outline,
+                                                  color: Colors.orange,
+                                                ),
+                                                onPressed: isAnyApiCalling
+                                                    ? null
+                                                    : () => deleteBid(index),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                  if (bids.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
                       ),
-                      const Spacer(),
-                      Column(
+                      decoration: const BoxDecoration(color: Colors.white),
+                      child: Row(
                         children: [
-                          SizedBox(
-                            height: 40,
-                            width: 180,
-                            child: TextField(
-                              controller: digitController,
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                                LengthLimitingTextInputFormatter(2),
-                              ],
-                              onTap: _clearMessage,
-                              enabled: !isAnyApiCalling,
-                              decoration: InputDecoration(
-                                hintText: 'Bid Digits',
-                                hintStyle: const TextStyle(fontSize: 14),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 0,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(30),
-                                  borderSide: const BorderSide(
-                                    color: Colors.black,
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(30),
-                                  borderSide: const BorderSide(
-                                    color: Colors.orange,
-                                    width: 2,
-                                  ),
+                          Column(
+                            children: [
+                              SizedBox(width: 40),
+                              const Text(
+                                "Bid",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
                                 ),
                               ),
-                            ),
+                              Text("${bids.length}"),
+                            ],
                           ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            height: 40,
-                            width: 180,
-                            child: TextField(
-                              controller: amountController,
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                                LengthLimitingTextInputFormatter(4),
-                              ],
-                              onTap: _clearMessage,
-                              enabled: !isAnyApiCalling,
-                              decoration: InputDecoration(
-                                hintText: 'Enter Amount',
-                                hintStyle: const TextStyle(fontSize: 14),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 0,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(30),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(30),
-                                  borderSide: const BorderSide(
-                                    color: Colors.black,
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(30),
-                                  borderSide: const BorderSide(
-                                    color: Colors.orange,
-                                    width: 2,
-                                  ),
+                          const SizedBox(width: 20),
+                          Column(
+                            children: [
+                              const Text(
+                                "Total",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
                                 ),
                               ),
-                            ),
+                              Text("$totalAmount"),
+                            ],
                           ),
-                          const SizedBox(height: 12),
+                          const Spacer(),
                           ElevatedButton(
-                            onPressed: isAnyApiCalling ? null : addBid,
+                            onPressed: isAnyApiCalling
+                                ? null
+                                : _showConfirmationDialog,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: isAnyApiCalling
                                   ? Colors.grey
                                   : Colors.orange,
-                              minimumSize: const Size(80, 45),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                                vertical: 12,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              elevation: 2,
                             ),
-                            child: _isAddBidApiCalling
+                            child: _isSubmitBidApiCalling
                                 ? const SizedBox(
                                     width: 20,
                                     height: 20,
@@ -659,193 +825,33 @@ class _TwoDigitPanelScreenState extends State<TwoDigitPanelScreen> {
                                     ),
                                   )
                                 : const Text(
-                                    'ADD BID',
+                                    'SUBMIT',
                                     style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
                                       color: Colors.white,
+                                      fontSize: 16,
                                     ),
                                   ),
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1, thickness: 1),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  child: Row(
-                    children: const [
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Digit',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      SizedBox(width: 40),
-                      Expanded(
-                        child: Text(
-                          'Amount',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      SizedBox(width: 40),
-                      Expanded(
-                        child: Text(
-                          'Type',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      Spacer(),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: bids.isEmpty
-                      ? const Center(child: Text('No bids yet'))
-                      : ListView.builder(
-                          itemCount: bids.length,
-                          itemBuilder: (context, index) {
-                            final bid = bids[index];
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 0,
-                              ),
-                              child: Card(
-                                elevation: 1,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 10,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(child: Text(bid.digit)),
-                                      Expanded(child: Text(bid.amount)),
-                                      Expanded(
-                                        child: Row(
-                                          children: [
-                                            Text(bid.type),
-                                            const Spacer(),
-                                            IconButton(
-                                              icon: const Icon(
-                                                Icons.delete_outline,
-                                                color: Colors.orange,
-                                              ),
-                                              onPressed: isAnyApiCalling
-                                                  ? null
-                                                  : () => deleteBid(index),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                ),
-                if (bids.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
                     ),
-                    decoration: const BoxDecoration(color: Colors.white),
-                    child: Row(
-                      children: [
-                        Column(
-                          children: [
-                            SizedBox(width: 40),
-                            const Text(
-                              "Bid",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            Text("${bids.length}"),
-                          ],
-                        ),
-                        const SizedBox(width: 20),
-                        Column(
-                          children: [
-                            const Text(
-                              "Total",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            Text("$totalAmount"),
-                          ],
-                        ),
-                        const Spacer(),
-                        ElevatedButton(
-                          onPressed: isAnyApiCalling
-                              ? null
-                              : _showConfirmationDialog,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isAnyApiCalling
-                                ? Colors.grey
-                                : Colors.orange,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 32,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: _isSubmitBidApiCalling
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
-                                    ),
-                                  ),
-                                )
-                              : const Text(
-                                  'SUBMIT',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          if (_messageToShow != null)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: AnimatedMessageBar(
-                key: _messageBarKey,
-                message: _messageToShow!,
-                isError: _isErrorForMessage,
-                onDismissed: _clearMessage,
+                ],
               ),
             ),
-        ],
+            if (_messageToShow != null)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: AnimatedMessageBar(
+                  key: _messageBarKey,
+                  message: _messageToShow!,
+                  isError: _isErrorForMessage,
+                  onDismissed: _clearMessage,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

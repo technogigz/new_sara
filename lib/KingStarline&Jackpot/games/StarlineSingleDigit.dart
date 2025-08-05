@@ -251,45 +251,92 @@ class _StarlineSingleDigitBetScreenState
     );
   }
 
+  // void _showConfirmationDialog() {
+  //   _clearMessage();
+  //   if (addedEntries.isEmpty) {
+  //     _showMessage('Please add at least one bid.', isError: true);
+  //     return;
+  //   }
+  //
+  //   final List<Map<String, String>> bidsForConfirmation = addedEntries.map((
+  //     bid,
+  //   ) {
+  //     return {
+  //       "digit": bid['digit']!,
+  //       "points": bid['points']!,
+  //       "type": selectedGameBetType,
+  //       "pana": "",
+  //     };
+  //   }).toList();
+  //
+  //   if (bidsForConfirmation.isEmpty) {
+  //     _showMessage('No bids to submit.', isError: true);
+  //     return;
+  //   }
+  //
+  //   final int totalPointsForConfirmation = bidsForConfirmation.fold(
+  //     0,
+  //     (sum, item) => sum + (int.tryParse(item['points'] ?? '0') ?? 0),
+  //   );
+  //
+  //   if (walletBalance < totalPointsForConfirmation) {
+  //     _showMessage(
+  //       'Insufficient wallet balance to place this bid.',
+  //       isError: true,
+  //     );
+  //     return;
+  //   }
+  //
+  //   final String formattedDate = DateFormat(
+  //     'dd MMM yyyy, hh:mm a',
+  //   ).format(DateTime.now());
+  //
+  //   showDialog(
+  //     context: context,
+  //     barrierDismissible: false,
+  //     builder: (BuildContext dialogContext) {
+  //       return BidConfirmationDialog(
+  //         gameTitle: widget.title,
+  //         gameDate: formattedDate,
+  //         bids: bidsForConfirmation,
+  //         totalBids: bidsForConfirmation.length,
+  //         totalBidsAmount: totalPointsForConfirmation,
+  //         walletBalanceBeforeDeduction: walletBalance,
+  //         walletBalanceAfterDeduction:
+  //             (walletBalance - totalPointsForConfirmation).toString(),
+  //         gameId: widget.gameId.toString(),
+  //         gameType: widget.gameCategoryType,
+  //         onConfirm: () async {
+  //           // Navigator.pop(dialogContext); // Close confirmation dialog first
+  //           await _placeFinalBids(); // Then process the bid
+  //         },
+  //       );
+  //     },
+  //   );
+  // }
+
   void _showConfirmationDialog() {
+    FocusScope.of(context).unfocus(); // Close keyboard
     _clearMessage();
+
     if (addedEntries.isEmpty) {
-      _showMessage('Please add at least one bid.', isError: true);
-      return;
-    }
-
-    final List<Map<String, String>> bidsForConfirmation = addedEntries.map((
-      bid,
-    ) {
-      return {
-        "digit": bid['digit']!,
-        "points": bid['points']!,
-        "type": selectedGameBetType,
-        "pana": "",
-      };
-    }).toList();
-
-    if (bidsForConfirmation.isEmpty) {
-      _showMessage('No bids to submit.', isError: true);
-      return;
-    }
-
-    final int totalPointsForConfirmation = bidsForConfirmation.fold(
-      0,
-      (sum, item) => sum + (int.tryParse(item['points'] ?? '0') ?? 0),
-    );
-
-    if (walletBalance < totalPointsForConfirmation) {
       _showMessage(
-        'Insufficient wallet balance to place this bid.',
+        'Please add at least one bid before submitting.',
         isError: true,
       );
       return;
     }
 
-    final String formattedDate = DateFormat(
-      'dd MMM yyyy, hh:mm a',
-    ).format(DateTime.now());
+    final bidsForConfirmation = addedEntries
+        .map((entry) => {'digit': entry['digit']!, 'points': entry['points']!})
+        .toList();
+
+    final int totalPointsForConfirmation = bidsForConfirmation.fold<int>(
+      0,
+      (sum, bid) => sum + int.tryParse(bid['points'] ?? '0')!,
+    );
+
+    final formattedDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
     showDialog(
       context: context,
@@ -307,132 +354,32 @@ class _StarlineSingleDigitBetScreenState
           gameId: widget.gameId.toString(),
           gameType: widget.gameCategoryType,
           onConfirm: () async {
-            Navigator.pop(dialogContext);
-            await _placeFinalBids();
+            Navigator.of(
+              dialogContext,
+            ).pop(); // ✅ Close confirmation dialog first
+            await Future.delayed(
+              const Duration(milliseconds: 100),
+            ); // ✅ Avoid render issues
+            await _placeFinalBids(); // ✅ Then submit the bids
           },
         );
       },
     );
   }
 
-  // Future<void> _placeFinalBids() async {
-  //   if (!mounted) return;
-  //
-  //   setState(() {
-  //     _isApiCalling = true;
-  //   });
-  //   _clearMessage();
-  //
-  //   if (addedEntries.isEmpty) {
-  //     _showMessage('No bids to submit.', isError: true);
-  //     if (mounted) {
-  //       setState(() {
-  //         _isApiCalling = false;
-  //       });
-  //     }
-  //     return;
-  //   }
-  //
-  //   final String? accessToken = storage.read('accessToken');
-  //   final String? deviceId = storage.read('deviceId');
-  //   final String? deviceName = storage.read('deviceName');
-  //
-  //   if (accessToken == null || deviceId == null || deviceName == null) {
-  //     _showMessage('Authentication error. Please log in again.', isError: true);
-  //     if (mounted) {
-  //       setState(() {
-  //         _isApiCalling = false;
-  //       });
-  //     }
-  //     return;
-  //   }
-  //
-  //   Map<String, String> bidAmounts = {};
-  //   int totalBidAmount = 0;
-  //   for (var bid in addedEntries) {
-  //     bidAmounts[bid['digit']!] = bid['points']!;
-  //     totalBidAmount += int.tryParse(bid['points']!) ?? 0;
-  //   }
-  //
-  //   try {
-  //     final response = await _bidService.placeFinalBids(
-  //       gameName: widget.title,
-  //       accessToken: accessToken,
-  //       registerId: registerId,
-  //       deviceId: deviceId,
-  //       deviceName: deviceName,
-  //       accountStatus: accountStatus,
-  //       bidAmounts: bidAmounts,
-  //       selectedGameType: selectedGameBetType,
-  //       gameId: widget.gameId,
-  //       gameType: widget.gameCategoryType,
-  //       totalBidAmount: totalBidAmount,
-  //     );
-  //
-  //     if (!mounted) return;
-  //
-  //     if (response['status'] == true) {
-  //       final int newBalance = walletBalance - totalBidAmount;
-  //       setState(() {
-  //         walletBalance = newBalance;
-  //         addedEntries.clear();
-  //         digitController.clear();
-  //         pointsController.clear();
-  //       });
-  //       await _bidService.updateWalletBalance(newBalance);
-  //       _showMessage('All bids submitted successfully!');
-  //
-  //       if (!mounted) return;
-  //       await showDialog(
-  //         context: context,
-  //         barrierDismissible: false,
-  //         builder: (ctx) => const BidSuccessDialog(),
-  //       );
-  //     } else {
-  //       String errorMessage = response['msg'] ?? 'Unknown error occurred.';
-  //       _showMessage(errorMessage, isError: true);
-  //       if (!mounted) return;
-  //       await showDialog(
-  //         context: context,
-  //         barrierDismissible: false,
-  //         builder: (ctx) => BidFailureDialog(errorMessage: errorMessage),
-  //       );
-  //     }
-  //   } catch (e) {
-  //     log("Bid submission error: $e");
-  //     if (!mounted) return;
-  //     _showMessage(
-  //       'An unexpected error occurred: ${e.toString()}',
-  //       isError: true,
-  //     );
-  //
-  //     if (!mounted) return;
-  //     await showDialog(
-  //       context: context,
-  //       barrierDismissible: false,
-  //       builder: (ctx) =>
-  //           BidFailureDialog(errorMessage: 'An unexpected error occurred: $e'),
-  //     );
-  //   } finally {
-  //     if (mounted) {
-  //       setState(() {
-  //         _isApiCalling = false;
-  //       });
-  //     }
-  //   }
-  // }
-
   Future<void> _placeFinalBids() async {
     if (!mounted) return;
 
+    // Start API call
     setState(() {
       _isApiCalling = true;
     });
     _clearMessage();
+    FocusScope.of(context).unfocus(); // Dismiss keyboard if open
 
     if (addedEntries.isEmpty) {
       _showMessage('No bids to submit.', isError: true);
-      if (!mounted) return; // Check again
+      if (!mounted) return;
       setState(() {
         _isApiCalling = false;
       });
@@ -445,7 +392,7 @@ class _StarlineSingleDigitBetScreenState
 
     if (accessToken == null || deviceId == null || deviceName == null) {
       _showMessage('Authentication error. Please log in again.', isError: true);
-      if (!mounted) return; // Check again
+      if (!mounted) return;
       setState(() {
         _isApiCalling = false;
       });
@@ -455,8 +402,12 @@ class _StarlineSingleDigitBetScreenState
     Map<String, String> bidAmounts = {};
     int totalBidAmount = 0;
     for (var bid in addedEntries) {
-      bidAmounts[bid['digit']!] = bid['points']!;
-      totalBidAmount += int.tryParse(bid['points']!) ?? 0;
+      final digit = bid['digit'];
+      final points = bid['points'];
+      if (digit != null && points != null) {
+        bidAmounts[digit] = points;
+        totalBidAmount += int.tryParse(points) ?? 0;
+      }
     }
 
     try {
@@ -474,20 +425,27 @@ class _StarlineSingleDigitBetScreenState
         totalBidAmount: totalBidAmount,
       );
 
-      if (!mounted) return; // Crucial check after the await call
+      if (!mounted) return;
 
       if (response['status'] == true) {
         final int newBalance = walletBalance - totalBidAmount;
+
         setState(() {
           walletBalance = newBalance;
           addedEntries.clear();
           digitController.clear();
           pointsController.clear();
         });
+
         await _bidService.updateWalletBalance(newBalance);
+
         _showMessage('All bids submitted successfully!');
 
-        if (!mounted) return; // Check again before showing dialog
+        // Show success dialog AFTER state is updated
+        if (!mounted) return;
+        await Future.delayed(
+          const Duration(milliseconds: 150),
+        ); // Small delay to avoid build issues
         await showDialog(
           context: context,
           barrierDismissible: false,
@@ -496,7 +454,9 @@ class _StarlineSingleDigitBetScreenState
       } else {
         String errorMessage = response['msg'] ?? 'Unknown error occurred.';
         _showMessage(errorMessage, isError: true);
-        if (!mounted) return; // Check again before showing dialog
+
+        if (!mounted) return;
+        await Future.delayed(const Duration(milliseconds: 150));
         await showDialog(
           context: context,
           barrierDismissible: false,
@@ -505,13 +465,13 @@ class _StarlineSingleDigitBetScreenState
       }
     } catch (e) {
       log("Bid submission error: $e");
-      if (!mounted) return; // Check again
       _showMessage(
         'An unexpected error occurred: ${e.toString()}',
         isError: true,
       );
 
-      if (!mounted) return; // Check again before showing dialog
+      if (!mounted) return;
+      await Future.delayed(const Duration(milliseconds: 150));
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -520,7 +480,6 @@ class _StarlineSingleDigitBetScreenState
       );
     } finally {
       if (mounted) {
-        // Final check in the finally block
         setState(() {
           _isApiCalling = false;
         });
@@ -572,155 +531,160 @@ class _StarlineSingleDigitBetScreenState
             const SizedBox(width: 12),
           ],
         ),
-        body: Stack(
-          children: [
-            Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  child: Column(
-                    children: [
-                      _inputRow("Enter Single Digit:", _buildDigitInputField()),
-                      const SizedBox(height: 12),
-                      _inputRow(
-                        "Enter Points:",
-                        _buildTextField(
-                          pointsController,
-                          "Enter Amount",
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 45,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _isApiCalling
-                                ? Colors.grey
-                                : Colors.orange,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
-                          onPressed: _isApiCalling ? null : _addEntry,
-                          child: _isApiCalling
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
-                                    ),
-                                  ),
-                                )
-                              : const Text(
-                                  "ADD BID",
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                    ],
-                  ),
-                ),
-                const Divider(thickness: 1),
-                if (addedEntries.isNotEmpty)
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Column(
+                children: [
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
-                      vertical: 8,
+                      vertical: 12,
                     ),
-                    child: Row(
+                    child: Column(
                       children: [
-                        Expanded(
-                          child: Text(
-                            "Digit",
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                            ),
+                        _inputRow(
+                          "Enter Single Digit:",
+                          _buildDigitInputField(),
+                        ),
+                        const SizedBox(height: 12),
+                        _inputRow(
+                          "Enter Points:",
+                          _buildTextField(
+                            pointsController,
+                            "Enter Amount",
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
                           ),
                         ),
-                        Expanded(
-                          child: Text(
-                            "Amount",
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 45,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _isApiCalling
+                                  ? Colors.grey
+                                  : Colors.orange,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
                             ),
+                            onPressed: _isApiCalling ? null : _addEntry,
+                            child: _isApiCalling
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : const Text(
+                                    "ADD BID",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                           ),
                         ),
-                        const SizedBox(width: 48),
+                        const SizedBox(height: 18),
                       ],
                     ),
                   ),
-                if (addedEntries.isNotEmpty) const Divider(thickness: 1),
-                Expanded(
-                  child: addedEntries.isEmpty
-                      ? const Center(child: Text("No data added yet"))
-                      : ListView.builder(
-                          itemCount: addedEntries.length,
-                          itemBuilder: (_, index) {
-                            final entry = addedEntries[index];
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 6,
+                  const Divider(thickness: 1),
+                  if (addedEntries.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              "Digit",
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.bold,
                               ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      entry['digit']!,
-                                      style: GoogleFonts.poppins(),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Text(
-                                      entry['points']!,
-                                      style: GoogleFonts.poppins(),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 48),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.delete,
-                                      color: Colors.red,
-                                    ),
-                                    onPressed: _isApiCalling
-                                        ? null
-                                        : () => _removeEntry(index),
-                                  ),
-                                ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              "Amount",
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.bold,
                               ),
-                            );
-                          },
-                        ),
-                ),
-                if (addedEntries.isNotEmpty) _buildBottomBar(),
-              ],
-            ),
-            if (_messageToShow != null)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: AnimatedMessageBar(
-                  key: _messageBarKey,
-                  message: _messageToShow!,
-                  isError: _isErrorForMessage,
-                  onDismissed: _clearMessage,
-                ),
+                            ),
+                          ),
+                          const SizedBox(width: 48),
+                        ],
+                      ),
+                    ),
+                  if (addedEntries.isNotEmpty) const Divider(thickness: 1),
+                  Expanded(
+                    child: addedEntries.isEmpty
+                        ? const Center(child: Text("No data added yet"))
+                        : ListView.builder(
+                            itemCount: addedEntries.length,
+                            itemBuilder: (_, index) {
+                              final entry = addedEntries[index];
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 6,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        entry['digit']!,
+                                        style: GoogleFonts.poppins(),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        entry['points']!,
+                                        style: GoogleFonts.poppins(),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 48),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.delete,
+                                        color: Colors.red,
+                                      ),
+                                      onPressed: _isApiCalling
+                                          ? null
+                                          : () => _removeEntry(index),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                  if (addedEntries.isNotEmpty) _buildBottomBar(),
+                ],
               ),
-          ],
+              if (_messageToShow != null)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: AnimatedMessageBar(
+                    key: _messageBarKey,
+                    message: _messageToShow!,
+                    isError: _isErrorForMessage,
+                    onDismissed: _clearMessage,
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

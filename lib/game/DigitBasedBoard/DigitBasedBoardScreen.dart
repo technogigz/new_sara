@@ -525,177 +525,182 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildDigitInputField(
-                            'Left Digit',
-                            _leftDigitController,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildDigitInputField(
-                            'Right Digit',
-                            _rightDigitController,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Enter Points :',
-                            style: GoogleFonts.poppins(
-                              // Using GoogleFonts
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildDigitInputField(
+                              'Left Digit',
+                              _leftDigitController,
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _buildPointsInputField(_pointsController),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        SizedBox(
-                          width: 150,
-                          child: ElevatedButton(
-                            onPressed: _isSubmitting
-                                ? null
-                                : _addEntry, // Disable when submitting
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _isSubmitting
-                                  ? Colors.grey
-                                  : Colors.orange, // Grey out when disabled
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildDigitInputField(
+                              'Right Digit',
+                              _rightDigitController,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Enter Points :',
+                              style: GoogleFonts.poppins(
+                                // Using GoogleFonts
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
                               ),
-                              elevation: 3,
                             ),
-                            child: _isSubmitting
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _buildPointsInputField(_pointsController),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          SizedBox(
+                            width: 150,
+                            child: ElevatedButton(
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : _addEntry, // Disable when submitting
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _isSubmitting
+                                    ? Colors.grey
+                                    : Colors.orange, // Grey out when disabled
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                elevation: 3,
+                              ),
+                              child: _isSubmitting
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
+                                      ),
+                                    )
+                                  : Text(
+                                      'ADD',
+                                      style: GoogleFonts.poppins(
+                                        // Using GoogleFonts
+                                        color: Colors.white,
+                                        fontSize: 16,
                                       ),
                                     ),
-                                  )
-                                : Text(
-                                    'ADD',
-                                    style: GoogleFonts.poppins(
-                                      // Using GoogleFonts
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                    ),
-                                  ),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Divider(height: 1, color: Colors.grey[400]),
-              if (_entries.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 8.0,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          'Jodi',
-                          style: GoogleFonts.poppins(
-                            // Using GoogleFonts
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
+                        ],
                       ),
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          'Points',
-                          style: GoogleFonts.poppins(
-                            // Using GoogleFonts
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 48),
                     ],
                   ),
                 ),
-              if (_entries.isNotEmpty)
                 Divider(height: 1, color: Colors.grey[400]),
-              Expanded(
-                child: _entries.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No entries yet. Add some data!',
-                          style: GoogleFonts.poppins(
-                            // Using GoogleFonts
-                            fontSize: 16,
-                            color: Colors.grey[600],
+                if (_entries.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8.0,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            'Jodi',
+                            style: GoogleFonts.poppins(
+                              // Using GoogleFonts
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
-                      )
-                    : ListView.builder(
-                        itemCount: _entries.length,
-                        itemBuilder: (context, index) {
-                          final entry = _entries[index];
-                          return _buildEntryItem(
-                            entry['jodi']!,
-                            entry['points']!,
-                            index,
-                          );
-                        },
-                      ),
-              ),
-              if (_entries.isNotEmpty) _buildBottomBar(),
-            ],
-          ),
-          // --- AnimatedMessageBar Positioned Here ---
-          if (_messageToShow != null)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: AnimatedMessageBar(
-                key: _messageBarKey,
-                message: _messageToShow!,
-                isError: _isErrorForMessage,
-                onDismissed: _clearMessage,
-              ),
+                        Expanded(
+                          flex: 3,
+                          child: Text(
+                            'Points',
+                            style: GoogleFonts.poppins(
+                              // Using GoogleFonts
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 48),
+                      ],
+                    ),
+                  ),
+                if (_entries.isNotEmpty)
+                  Divider(height: 1, color: Colors.grey[400]),
+                Expanded(
+                  child: _entries.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No entries yet. Add some data!',
+                            style: GoogleFonts.poppins(
+                              // Using GoogleFonts
+                              fontSize: 16,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: _entries.length,
+                          itemBuilder: (context, index) {
+                            final entry = _entries[index];
+                            return _buildEntryItem(
+                              entry['jodi']!,
+                              entry['points']!,
+                              index,
+                            );
+                          },
+                        ),
+                ),
+                if (_entries.isNotEmpty) _buildBottomBar(),
+              ],
             ),
-          // --- End AnimatedMessageBar ---
-        ],
+            // --- AnimatedMessageBar Positioned Here ---
+            if (_messageToShow != null)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: AnimatedMessageBar(
+                  key: _messageBarKey,
+                  message: _messageToShow!,
+                  isError: _isErrorForMessage,
+                  onDismissed: _clearMessage,
+                ),
+              ),
+            // --- End AnimatedMessageBar ---
+          ],
+        ),
       ),
     );
   }

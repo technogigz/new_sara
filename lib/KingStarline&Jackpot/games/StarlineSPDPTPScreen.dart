@@ -481,368 +481,370 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
           const SizedBox(width: 12),
         ],
       ),
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 12.0,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Checkbox(
-                                value: _isSPSelected,
-                                onChanged: _isApiCalling
-                                    ? null
-                                    : (bool? value) {
-                                        setState(() {
-                                          _isSPSelected = value!;
-                                          if (value) {
-                                            _isDPSelected = false;
-                                            _isTPSelected = false;
-                                          }
-                                          _clearMessage();
-                                        });
-                                      },
-                                activeColor: Colors.orange,
-                              ),
-                              Text(
-                                'SP',
-                                style: GoogleFonts.poppins(fontSize: 16),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Checkbox(
-                                value: _isDPSelected,
-                                onChanged: _isApiCalling
-                                    ? null
-                                    : (bool? value) {
-                                        setState(() {
-                                          _isDPSelected = value!;
-                                          if (value) {
-                                            _isSPSelected = false;
-                                            _isTPSelected = false;
-                                          }
-                                          _clearMessage();
-                                        });
-                                      },
-                                activeColor: Colors.orange,
-                              ),
-                              Text(
-                                'DP',
-                                style: GoogleFonts.poppins(fontSize: 16),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Checkbox(
-                                value: _isTPSelected,
-                                onChanged: _isApiCalling
-                                    ? null
-                                    : (bool? value) {
-                                        setState(() {
-                                          _isTPSelected = value!;
-                                          if (value) {
-                                            _isSPSelected = false;
-                                            _isDPSelected = false;
-                                          }
-                                          _clearMessage();
-                                        });
-                                      },
-                                activeColor: Colors.orange,
-                              ),
-                              Text(
-                                'TP',
-                                style: GoogleFonts.poppins(fontSize: 16),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Enter Panna:',
-                          style: TextStyle(fontSize: 16),
-                        ),
-                        SizedBox(
-                          width: 150,
-                          height: 40,
-                          child: TextField(
-                            cursorColor: Colors.orange,
-                            controller: _pannaController,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              LengthLimitingTextInputFormatter(3),
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            decoration: const InputDecoration(
-                              hintText: 'Enter Panna',
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.all(
-                                  Radius.circular(20),
-                                ),
-                                borderSide: BorderSide(color: Colors.black),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.all(
-                                  Radius.circular(20),
-                                ),
-                                borderSide: BorderSide(color: Colors.black),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.all(
-                                  Radius.circular(20),
-                                ),
-                                borderSide: BorderSide(
-                                  color: Colors.orange,
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                            onTap: _clearMessage,
-                            enabled: !_isApiCalling,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Enter Points:',
-                          style: TextStyle(fontSize: 16),
-                        ),
-                        SizedBox(
-                          width: 150,
-                          height: 40,
-                          child: TextField(
-                            cursorColor: Colors.orange,
-                            controller: _pointsController,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              LengthLimitingTextInputFormatter(4),
-                            ],
-                            decoration: const InputDecoration(
-                              hintText: 'Enter Amount',
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.all(
-                                  Radius.circular(20),
-                                ),
-                                borderSide: BorderSide(color: Colors.black),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.all(
-                                  Radius.circular(20),
-                                ),
-                                borderSide: BorderSide(color: Colors.black),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.all(
-                                  Radius.circular(20),
-                                ),
-                                borderSide: BorderSide(
-                                  color: Colors.orange,
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                            onTap: _clearMessage,
-                            enabled: !_isApiCalling,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 15),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: SizedBox(
-                        width: 150,
-                        height: 45,
-                        child: ElevatedButton(
-                          onPressed: _isApiCalling ? null : _addBid,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _isApiCalling
-                                ? Colors.grey
-                                : Colors.orange,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
-                          child: _isApiCalling
-                              ? const CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                )
-                              : Text(
-                                  "ADD",
-                                  textAlign: TextAlign.center,
-                                  style: GoogleFonts.poppins(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.5,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(thickness: 1),
-              if (_bids.isNotEmpty)
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Column(
+              children: [
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16.0,
-                    vertical: 8.0,
+                    vertical: 12.0,
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(
-                          'Digit',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          'Amount',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          'Game Type',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 48),
-                    ],
-                  ),
-                ),
-              if (_bids.isNotEmpty) const Divider(thickness: 1),
-              Expanded(
-                child: _bids.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No Bids Placed',
-                          style: GoogleFonts.poppins(color: Colors.grey),
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: _bids.length,
-                        itemBuilder: (context, index) {
-                          final bid = _bids[index];
-                          return Container(
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withOpacity(0.2),
-                                  spreadRadius: 1,
-                                  blurRadius: 3,
-                                  offset: const Offset(0, 2),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Checkbox(
+                                  value: _isSPSelected,
+                                  onChanged: _isApiCalling
+                                      ? null
+                                      : (bool? value) {
+                                          setState(() {
+                                            _isSPSelected = value!;
+                                            if (value) {
+                                              _isDPSelected = false;
+                                              _isTPSelected = false;
+                                            }
+                                            _clearMessage();
+                                          });
+                                        },
+                                  activeColor: Colors.orange,
+                                ),
+                                Text(
+                                  'SP',
+                                  style: GoogleFonts.poppins(fontSize: 16),
                                 ),
                               ],
                             ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0,
-                                vertical: 8.0,
+                          ),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Checkbox(
+                                  value: _isDPSelected,
+                                  onChanged: _isApiCalling
+                                      ? null
+                                      : (bool? value) {
+                                          setState(() {
+                                            _isDPSelected = value!;
+                                            if (value) {
+                                              _isSPSelected = false;
+                                              _isTPSelected = false;
+                                            }
+                                            _clearMessage();
+                                          });
+                                        },
+                                  activeColor: Colors.orange,
+                                ),
+                                Text(
+                                  'DP',
+                                  style: GoogleFonts.poppins(fontSize: 16),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Checkbox(
+                                  value: _isTPSelected,
+                                  onChanged: _isApiCalling
+                                      ? null
+                                      : (bool? value) {
+                                          setState(() {
+                                            _isTPSelected = value!;
+                                            if (value) {
+                                              _isSPSelected = false;
+                                              _isDPSelected = false;
+                                            }
+                                            _clearMessage();
+                                          });
+                                        },
+                                  activeColor: Colors.orange,
+                                ),
+                                Text(
+                                  'TP',
+                                  style: GoogleFonts.poppins(fontSize: 16),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Enter Panna:',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          SizedBox(
+                            width: 150,
+                            height: 40,
+                            child: TextField(
+                              cursorColor: Colors.orange,
+                              controller: _pannaController,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                LengthLimitingTextInputFormatter(3),
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              decoration: const InputDecoration(
+                                hintText: 'Enter Panna',
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(20),
+                                  ),
+                                  borderSide: BorderSide(color: Colors.black),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(20),
+                                  ),
+                                  borderSide: BorderSide(color: Colors.black),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(20),
+                                  ),
+                                  borderSide: BorderSide(
+                                    color: Colors.orange,
+                                    width: 2,
+                                  ),
+                                ),
                               ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      bid['digit']!,
-                                      style: GoogleFonts.poppins(),
+                              onTap: _clearMessage,
+                              enabled: !_isApiCalling,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Enter Points:',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          SizedBox(
+                            width: 150,
+                            height: 40,
+                            child: TextField(
+                              cursorColor: Colors.orange,
+                              controller: _pointsController,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(4),
+                              ],
+                              decoration: const InputDecoration(
+                                hintText: 'Enter Amount',
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(20),
+                                  ),
+                                  borderSide: BorderSide(color: Colors.black),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(20),
+                                  ),
+                                  borderSide: BorderSide(color: Colors.black),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(20),
+                                  ),
+                                  borderSide: BorderSide(
+                                    color: Colors.orange,
+                                    width: 2,
+                                  ),
+                                ),
+                              ),
+                              onTap: _clearMessage,
+                              enabled: !_isApiCalling,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 15),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: SizedBox(
+                          width: 150,
+                          height: 45,
+                          child: ElevatedButton(
+                            onPressed: _isApiCalling ? null : _addBid,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _isApiCalling
+                                  ? Colors.grey
+                                  : Colors.orange,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                            ),
+                            child: _isApiCalling
+                                ? const CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  )
+                                : Text(
+                                    "ADD",
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.5,
+                                      fontSize: 16,
                                     ),
                                   ),
-                                  Expanded(
-                                    child: Text(
-                                      bid['amount']!,
-                                      style: GoogleFonts.poppins(),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Text(
-                                      '${bid['gameType']} ($_selectedGameTypeOption)',
-                                      style: GoogleFonts.poppins(
-                                        color: Colors.green[700],
-                                      ),
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.delete,
-                                      color: Colors.red,
-                                    ),
-                                    onPressed: _isApiCalling
-                                        ? null
-                                        : () => _removeBid(index),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(thickness: 1),
+                if (_bids.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8.0,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Digit',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            'Amount',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            'Game Type',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 48),
+                      ],
+                    ),
+                  ),
+                if (_bids.isNotEmpty) const Divider(thickness: 1),
+                Expanded(
+                  child: _bids.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No Bids Placed',
+                            style: GoogleFonts.poppins(color: Colors.grey),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: _bids.length,
+                          itemBuilder: (context, index) {
+                            final bid = _bids[index];
+                            return Container(
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.withOpacity(0.2),
+                                    spreadRadius: 1,
+                                    blurRadius: 3,
+                                    offset: const Offset(0, 2),
                                   ),
                                 ],
                               ),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-              if (_bids.isNotEmpty) _buildBottomBar(),
-            ],
-          ),
-          if (_messageToShow != null)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: AnimatedMessageBar(
-                key: _messageBarKey,
-                message: _messageToShow!,
-                isError: _isErrorForMessage,
-                onDismissed: _clearMessage,
-              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0,
+                                  vertical: 8.0,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        bid['digit']!,
+                                        style: GoogleFonts.poppins(),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        bid['amount']!,
+                                        style: GoogleFonts.poppins(),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        '${bid['gameType']} ($_selectedGameTypeOption)',
+                                        style: GoogleFonts.poppins(
+                                          color: Colors.green[700],
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.delete,
+                                        color: Colors.red,
+                                      ),
+                                      onPressed: _isApiCalling
+                                          ? null
+                                          : () => _removeBid(index),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+                if (_bids.isNotEmpty) _buildBottomBar(),
+              ],
             ),
-        ],
+            if (_messageToShow != null)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: AnimatedMessageBar(
+                  key: _messageBarKey,
+                  message: _messageToShow!,
+                  isError: _isErrorForMessage,
+                  onDismissed: _clearMessage,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

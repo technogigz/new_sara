@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  connectivity_plus
   firebase_core
   flutter_pay_upi
   local_auth_windows

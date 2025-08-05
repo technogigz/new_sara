@@ -618,201 +618,206 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                _inputRow(
-                  "Select Game Type:",
-                  _buildDropdown(widget.selectionStatus),
-                ),
-                _inputRow("Enter Points:", _buildTextField()),
-                const SizedBox(height: 30),
-                _buildNumberPad(), // Number pad internally handles _isApiCalling visual state
-                const SizedBox(height: 20),
-                if (bidAmounts.isNotEmpty) // Only show headers if bids exist
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 0.0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            'Digit',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 3,
-                          child: Text(
-                            'Points',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            'Type',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 48), // Space for delete icon
-                      ],
-                    ),
-                  ),
-                Expanded(
-                  child: bidAmounts.isEmpty
-                      ? Center(
-                          child: Text(
-                            'No bids placed yet. Click a number to add a bid!',
-                            style: GoogleFonts.poppins(color: Colors.grey),
-                          ),
-                        )
-                      : ListView.builder(
-                          itemCount: bidAmounts.length,
-                          itemBuilder: (context, index) {
-                            final digit = bidAmounts.keys.elementAt(index);
-                            final amount = bidAmounts[digit]!;
-                            return _buildBidEntryItem(
-                              digit,
-                              amount,
-                              selectedGameType,
-                            );
-                          },
-                        ),
-                ),
-              ],
-            ),
-          ),
-          // AnimatedMessageBar positioned at the top
-          if (_messageToShow != null)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: AnimatedMessageBar(
-                key: _messageBarKey,
-                message: _messageToShow!,
-                isError: _isErrorForMessage,
-                onDismissed: _clearMessage,
-              ),
-            ),
-          // Bottom total bar (always visible, disabled when no bids)
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.3),
-                    spreadRadius: 2,
-                    blurRadius: 5,
-                    offset: const Offset(0, -3),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Bids", // Changed to "Bids" for clarity
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      Text(
-                        "${bidAmounts.length}",
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                  _inputRow(
+                    "Select Game Type:",
+                    _buildDropdown(widget.selectionStatus),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Points", // Changed to "Points" for clarity
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      Text(
-                        "$totalAmount",
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  ElevatedButton(
-                    onPressed: (_isApiCalling || bidAmounts.isEmpty)
-                        ? null // Disable button while API is calling OR if no bids
-                        : _showConfirmationDialog,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: (_isApiCalling || bidAmounts.isEmpty)
-                          ? Colors.grey
-                          : Colors.orange, // Grey out when disabled
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24, // Consistent padding
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                          8,
-                        ), // Consistent border radius
-                      ),
-                      elevation: 3, // Consistent elevation
-                    ),
-                    child: _isApiCalling
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
+                  _inputRow("Enter Points:", _buildTextField()),
+                  const SizedBox(height: 30),
+                  _buildNumberPad(), // Number pad internally handles _isApiCalling visual state
+                  const SizedBox(height: 20),
+                  if (bidAmounts.isNotEmpty) // Only show headers if bids exist
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 0.0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              'Digit',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: Colors.black87,
                               ),
                             ),
-                          )
-                        : Text(
-                            "SUBMIT", // Consistent text
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontSize: 16,
+                          ),
+                          Expanded(
+                            flex: 3,
+                            child: Text(
+                              'Points',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: Colors.black87,
+                              ),
                             ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              'Type',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 48), // Space for delete icon
+                        ],
+                      ),
+                    ),
+                  Expanded(
+                    child: bidAmounts.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No bids placed yet. Click a number to add a bid!',
+                              style: GoogleFonts.poppins(color: Colors.grey),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: bidAmounts.length,
+                            itemBuilder: (context, index) {
+                              final digit = bidAmounts.keys.elementAt(index);
+                              final amount = bidAmounts[digit]!;
+                              return _buildBidEntryItem(
+                                digit,
+                                amount,
+                                selectedGameType,
+                              );
+                            },
                           ),
                   ),
                 ],
               ),
             ),
-          ),
-        ],
+            // AnimatedMessageBar positioned at the top
+            if (_messageToShow != null)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: AnimatedMessageBar(
+                  key: _messageBarKey,
+                  message: _messageToShow!,
+                  isError: _isErrorForMessage,
+                  onDismissed: _clearMessage,
+                ),
+              ),
+            // Bottom total bar (always visible, disabled when no bids)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.3),
+                      spreadRadius: 2,
+                      blurRadius: 5,
+                      offset: const Offset(0, -3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Bids", // Changed to "Bids" for clarity
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        Text(
+                          "${bidAmounts.length}",
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Points", // Changed to "Points" for clarity
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        Text(
+                          "$totalAmount",
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    ElevatedButton(
+                      onPressed: (_isApiCalling || bidAmounts.isEmpty)
+                          ? null // Disable button while API is calling OR if no bids
+                          : _showConfirmationDialog,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: (_isApiCalling || bidAmounts.isEmpty)
+                            ? Colors.grey
+                            : Colors.orange, // Grey out when disabled
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24, // Consistent padding
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            8,
+                          ), // Consistent border radius
+                        ),
+                        elevation: 3, // Consistent elevation
+                      ),
+                      child: _isApiCalling
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : Text(
+                              "SUBMIT", // Consistent text
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: 16,
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

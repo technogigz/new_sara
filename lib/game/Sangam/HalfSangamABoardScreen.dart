@@ -357,8 +357,13 @@ class _HalfSangamABoardScreenState extends State<HalfSangamABoardScreen> {
 
     // 3. Validate Points (10 to 1000)
     int? parsedPoints = int.tryParse(points);
-    if (parsedPoints == null || parsedPoints < 10 || parsedPoints > 1000) {
-      _showMessage('Points must be between 10 and 1000.', isError: true);
+    if (parsedPoints == null ||
+        parsedPoints < GetStorage().read('minBid') ||
+        parsedPoints > 1000) {
+      _showMessage(
+        'Points must be between ${GetStorage().read('minBid')} and 1000.',
+        isError: true,
+      );
       log('HalfSangamAUI: Validation: Invalid points.', name: 'HalfSangamAUI');
       return;
     }
@@ -741,195 +746,197 @@ class _HalfSangamABoardScreenState extends State<HalfSangamABoardScreen> {
           const SizedBox(width: 12),
         ],
       ),
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 12.0,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildInputRow(
-                      'Enter Open Digit :',
-                      _openDigitController,
-                      hintText: 'e.g., 5',
-                      maxLength: 1,
-                      enabled: !_isApiCalling, // Disable when API is calling
-                    ),
-                    const SizedBox(height: 16),
-                    _buildPannaInputRow(
-                      'Enter Close Panna :',
-                      _closePannaController,
-                      hintText: 'e.g., 123',
-                      maxLength: 3,
-                      enabled: !_isApiCalling, // Disable when API is calling
-                    ),
-                    const SizedBox(height: 16),
-                    _buildInputRow(
-                      'Enter Points :',
-                      _pointsController,
-                      hintText: 'e.g., 100',
-                      maxLength: 4,
-                      enabled: !_isApiCalling, // Disable when API is calling
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 45,
-                      child: ElevatedButton(
-                        onPressed: _isApiCalling
-                            ? null
-                            : _addBid, // Disable when API is calling
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange, // Kept as amber
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        ),
-                        child: _isApiCalling
-                            ? const CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
-                                ),
-                                strokeWidth:
-                                    2, // Added strokeWidth for better visibility
-                              )
-                            : Text(
-                                "ADD",
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.5,
-                                  fontSize: 16,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(thickness: 1),
-
-              // Table Headers
-              if (_bids.isNotEmpty)
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Column(
+              children: [
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16.0,
-                    vertical: 8.0,
+                    vertical: 12.0,
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(
-                          'Sangam',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
+                      _buildInputRow(
+                        'Enter Open Digit :',
+                        _openDigitController,
+                        hintText: 'e.g., 5',
+                        maxLength: 1,
+                        enabled: !_isApiCalling, // Disable when API is calling
+                      ),
+                      const SizedBox(height: 16),
+                      _buildPannaInputRow(
+                        'Enter Close Panna :',
+                        _closePannaController,
+                        hintText: 'e.g., 123',
+                        maxLength: 3,
+                        enabled: !_isApiCalling, // Disable when API is calling
+                      ),
+                      const SizedBox(height: 16),
+                      _buildInputRow(
+                        'Enter Points :',
+                        _pointsController,
+                        hintText: 'e.g., 100',
+                        maxLength: 4,
+                        enabled: !_isApiCalling, // Disable when API is calling
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 45,
+                        child: ElevatedButton(
+                          onPressed: _isApiCalling
+                              ? null
+                              : _addBid, // Disable when API is calling
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange, // Kept as amber
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
                           ),
+                          child: _isApiCalling
+                              ? const CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                  strokeWidth:
+                                      2, // Added strokeWidth for better visibility
+                                )
+                              : Text(
+                                  "ADD",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.5,
+                                    fontSize: 16,
+                                  ),
+                                ),
                         ),
                       ),
-                      Expanded(
-                        child: Text(
-                          'Points',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 48), // Space for delete icon
                     ],
                   ),
                 ),
-              if (_bids.isNotEmpty) const Divider(thickness: 1),
+                const Divider(thickness: 1),
 
-              // Dynamic List of Bids
-              Expanded(
-                child: _bids.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No Bids Placed',
-                          style: GoogleFonts.poppins(color: Colors.grey),
+                // Table Headers
+                if (_bids.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8.0,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Sangam',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
-                      )
-                    : ListView.builder(
-                        itemCount: _bids.length,
-                        itemBuilder: (context, index) {
-                          final bid = _bids[index];
-                          return Container(
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
+                        Expanded(
+                          child: Text(
+                            'Points',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
                             ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withOpacity(0.2),
-                                  spreadRadius: 1,
-                                  blurRadius: 3,
-                                  offset: const Offset(0, 1),
-                                ),
-                              ],
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0,
-                                vertical: 8.0,
+                          ),
+                        ),
+                        const SizedBox(width: 48), // Space for delete icon
+                      ],
+                    ),
+                  ),
+                if (_bids.isNotEmpty) const Divider(thickness: 1),
+
+                // Dynamic List of Bids
+                Expanded(
+                  child: _bids.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No Bids Placed',
+                            style: GoogleFonts.poppins(color: Colors.grey),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: _bids.length,
+                          itemBuilder: (context, index) {
+                            final bid = _bids[index];
+                            return Container(
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
                               ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      bid['sangam']!,
-                                      style: GoogleFonts.poppins(),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Text(
-                                      bid['points']!,
-                                      style: GoogleFonts.poppins(),
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.delete,
-                                      color: Colors.red,
-                                    ),
-                                    onPressed: _isApiCalling
-                                        ? null
-                                        : () => _removeBid(
-                                            index,
-                                          ), // Disable when API is calling
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.withOpacity(0.2),
+                                    spreadRadius: 1,
+                                    blurRadius: 3,
+                                    offset: const Offset(0, 1),
                                   ),
                                 ],
                               ),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-              // Bottom Bar (conditionally rendered)
-              _buildBottomBar(), // Removed if (_bids.isNotEmpty) for consistent bottom bar
-            ],
-          ),
-          // AnimatedMessageBar positioned at the top
-          if (_messageToShow != null)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: AnimatedMessageBar(
-                key: _messageBarKey,
-                message: _messageToShow!,
-                isError: _isErrorForMessage,
-                onDismissed: _clearMessage,
-              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0,
+                                  vertical: 8.0,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        bid['sangam']!,
+                                        style: GoogleFonts.poppins(),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        bid['points']!,
+                                        style: GoogleFonts.poppins(),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.delete,
+                                        color: Colors.red,
+                                      ),
+                                      onPressed: _isApiCalling
+                                          ? null
+                                          : () => _removeBid(
+                                              index,
+                                            ), // Disable when API is calling
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+                // Bottom Bar (conditionally rendered)
+                _buildBottomBar(), // Removed if (_bids.isNotEmpty) for consistent bottom bar
+              ],
             ),
-        ],
+            // AnimatedMessageBar positioned at the top
+            if (_messageToShow != null)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: AnimatedMessageBar(
+                  key: _messageBarKey,
+                  message: _messageToShow!,
+                  isError: _isErrorForMessage,
+                  onDismissed: _clearMessage,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

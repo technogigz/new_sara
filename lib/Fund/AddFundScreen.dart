@@ -52,8 +52,8 @@ class _AddFundScreenState extends State<AddFundScreen>
   late String registerId = GetStorage().read('registerId') ?? '';
   late String walletBalance =
       GetStorage().read('walletBalance')?.toString() ?? '0';
-  String currentLangCode = GetStorage().read('language') ?? 'en';
-  String mobile = GetStorage().read('mobileNo') ?? '';
+  late String currentLangCode = GetStorage().read('language') ?? 'en';
+  late String mobile = GetStorage().read('mobileNo') ?? '';
 
   final upiPay = FlutterPayUpiManager(); // Correct instantiation
   final String _apiBaseUrl = Constant.apiEndpoint;
@@ -66,10 +66,10 @@ class _AddFundScreenState extends State<AddFundScreen>
   final String deviceId = GetStorage().read('deviceId') ?? '';
   final String deviceName = GetStorage().read('deviceName') ?? '';
 
-  static const int _minAmount = 1;
+  late final int _minAmount =
+      int.tryParse(_storage.read('minDeposit')?.toString() ?? '1000') ?? 1000;
 
   bool _isProcessingPayment = false;
-  bool _isProcessingQRPayment = false;
   int _currentTransactionAmount = 0;
   String _currentTransactionId = '';
   String _currentPaymentMethodType = '';
@@ -197,46 +197,75 @@ class _AddFundScreenState extends State<AddFundScreen>
 
   void _showUpiAppSelectionSheet() {
     showModalBottomSheet(
-      context: context,
-      builder: (_) => GridView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _apps.length,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 0.9,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
         ),
-        itemBuilder: (_, i) {
-          final app = _apps[i]; // Change appMeta to app, as it's UpiApp now
-          return InkWell(
-            onTap: () {
-              Navigator.pop(context);
-              _currentPaymentMethodType = app.name
-                  .toString(); // Access appName directly
-              _launchUpiWithApp(_apps[i]); // Pass UpiApp
-            },
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(
-                  height: 48,
-                  width: 48,
-                  child: app.icon != null
-                      ? Image.memory(
-                          app.icon!,
-                        ) // Use Image.memory and handle null
-                      : const Icon(Icons.payment, size: 48), // Fallback icon
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  app.name.toString(),
-                  textAlign: TextAlign.center,
-                ), // Access appName directly
-              ],
+      ),
+      backgroundColor: Colors.grey.shade300,
+      isScrollControlled: true,
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(width: 16),
+                  Text(
+                    'Select UPI App',
+                    style: GoogleFonts.poppins(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          );
-        },
+            Divider(color: Colors.black, indent: 16, endIndent: 16),
+            GridView.builder(
+              physics: const BouncingScrollPhysics(),
+              itemCount: _apps.length,
+              shrinkWrap: true,
+              controller: ScrollController(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 0.9,
+              ),
+              itemBuilder: (_, i) {
+                final app = _apps[i];
+                return InkWell(
+                  onTap: () {
+                    Navigator.pop(context);
+                    // Accessing the app name and launching the payment
+                    _currentPaymentMethodType = app.name!;
+                    _launchUpiWithApp(_apps[i]);
+                  },
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        height: 48,
+                        width: 48,
+                        child: app.icon != null
+                            ? Image.memory(app.icon!)
+                            : const Icon(Icons.payment, size: 48),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(app.name!, textAlign: TextAlign.center),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     ).whenComplete(() {
       if (_isProcessingPayment && _currentPaymentMethodType.isEmpty) {
@@ -247,176 +276,141 @@ class _AddFundScreenState extends State<AddFundScreen>
     });
   }
 
+  // Future<void> _launchUpiWithApp(UpiApp app) async {
+  //   if (mounted) {
+  //     setState(() {
+  //       _isProcessingPayment = true;
+  //       _currentPaymentMethodType = app.name.toString(); // Use app.appName here
+  //     });
+  //   }
+  //
+  //   try {
+  //     FlutterPayUpiManager.startPayment(
+  //       paymentApp: app.app!,
+  //       // Use app.packageName here for the identifier
+  //       payeeVpa: _hardcodedUpiPayeeVPA,
+  //       payeeName: _hardcodedUpiPayeeName,
+  //       transactionId: _currentTransactionId,
+  //       payeeMerchantCode: _merchantCode,
+  //       description: "Add funds",
+  //       amount: amountController.text,
+  //       response: (UpiResponse, String) {
+  //         log(
+  //           'UPI Response before: $UpiResponse.status: ${UpiResponse.status}',
+  //         );
+  //
+  //         if (mounted) {
+  //           setState(() {
+  //             _isProcessingPayment = false;
+  //             _currentPaymentMethodType = app.name!;
+  //             log(
+  //               'UPI Response after: $UpiResponse.status: ${UpiResponse.status}',
+  //             );
+  //             _reportPaymentStatusToBackend(UpiResponse);
+  //           });
+  //         }
+  //       },
+  //       error: (String) {
+  //         log('UPI Response error: $String.status: $String');
+  //
+  //         if (mounted) {
+  //           setState(() {
+  //             _isProcessingPayment = false;
+  //             _currentPaymentMethodType = '';
+  //             _reportPaymentStatusToBackend(UpiResponse as UpiResponse);
+  //           });
+  //         }
+  //       }, // amountController.text is already a String
+  //     );
+  //   } catch (e) {
+  //     log('UPI Launch Error: $e');
+  //     // Report failure to backend if an exception occurs
+  //     if (mounted) {
+  //       setState(() {
+  //         _isProcessingPayment = false;
+  //         _currentPaymentMethodType = '';
+  //         _reportPaymentStatusToBackend(UpiResponse as UpiResponse);
+  //       });
+  //     }
+  //   } finally {
+  //     // Always reset processing state in finally block to ensure it happens regardless of success or error
+  //     if (mounted) {
+  //       setState(() {
+  //         _isProcessingPayment = false;
+  //         _currentPaymentMethodType = '';
+  //       });
+  //     }
+  //   }
+  // }
+
   Future<void> _launchUpiWithApp(UpiApp app) async {
     if (mounted) {
       setState(() {
         _isProcessingPayment = true;
-        _currentPaymentMethodType = app.name.toString(); // Use app.appName here
+        _currentPaymentMethodType = app.name.toString();
       });
     }
 
     try {
       FlutterPayUpiManager.startPayment(
         paymentApp: app.app!,
-        // Use app.packageName here for the identifier
         payeeVpa: _hardcodedUpiPayeeVPA,
         payeeName: _hardcodedUpiPayeeName,
         transactionId: _currentTransactionId,
         payeeMerchantCode: _merchantCode,
         description: "Add funds",
         amount: amountController.text,
-        response: (UpiResponse, String) {
-          log(
-            'UPI Response before: $UpiResponse.status: ${UpiResponse.status}',
-          );
+        response: (UpiResponse upiResponse, String response) {
+          log('UPI Response received: ${upiResponse.status}');
 
           if (mounted) {
             setState(() {
               _isProcessingPayment = false;
               _currentPaymentMethodType = app.name!;
-              log(
-                'UPI Response after: $UpiResponse.status: ${UpiResponse.status}',
-              );
-              _reportPaymentStatusToBackend('SUCCESS', UpiResponse);
+
+              // Check if the payment was a success before reporting to backend
+              if (upiResponse.status == 'success') {
+                _reportPaymentStatusToBackend(upiResponse);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Payment failed or cancelled.')),
+                );
+              }
             });
           }
         },
-        error: (String) {
-          log('UPI Response error: $String.status: $String');
-
+        error: (String errorMessage) {
+          log('UPI Payment Error: $errorMessage');
           if (mounted) {
             setState(() {
               _isProcessingPayment = false;
               _currentPaymentMethodType = '';
-              _reportPaymentStatusToBackend(
-                'FAILED',
-                UpiResponse as UpiResponse,
-              );
             });
-          }
-        }, // amountController.text is already a String
-      );
-    } catch (e) {
-      log('UPI Launch Error: $e');
-      // Report failure to backend if an exception occurs
-      if (mounted) {
-        setState(() {
-          _isProcessingPayment = false;
-          _currentPaymentMethodType = '';
-          _reportPaymentStatusToBackend(
-            'FAILED',
-            UpiResponse.fromResponseString(e.toString()),
-          );
-        });
-      }
-    } finally {
-      // Always reset processing state in finally block to ensure it happens regardless of success or error
-      if (mounted) {
-        setState(() {
-          _isProcessingPayment = false;
-          _currentPaymentMethodType = '';
-        });
-      }
-    }
-  }
-
-  // Refactored and corrected method for the QR payment gateway
-  Future<void> _createTransactionLink() async {
-    // Validate input before making the API call
-    final amountText = amountController.text.trim();
-    final parsedAmount = int.tryParse(amountText);
-    final parsedMobile = int.tryParse(mobile);
-
-    if (parsedAmount == null || parsedAmount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter a valid amount.")),
-      );
-      return;
-    }
-
-    if (parsedMobile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Invalid mobile number found.")),
-      );
-      return;
-    }
-
-    if (mounted) {
-      setState(() {
-        _isProcessingPayment = true;
-      });
-    }
-
-    try {
-      final String apiUrl = '${Constant.apiEndpoint}create-transaction-link';
-
-      final response = await http.post(
-        Uri.parse(apiUrl),
-        headers: <String, String>{
-          'deviceId': deviceId,
-          'deviceName': deviceName,
-          'accessStatus': '1',
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $accessToken',
-        },
-        body: jsonEncode(<String, dynamic>{
-          'registerId': registerId,
-          'amount': parsedAmount,
-          'mobile': parsedMobile,
-        }),
-      );
-
-      final Map<String, dynamic> responseData = jsonDecode(response.body);
-
-      if (response.statusCode == 200 && responseData['status'] == true) {
-        log('API Response (Success): ${response.body}');
-        // If the API call is successful, extract the payment link
-        final transactionResponse = CreateTransactionLinkResponse.fromJson(
-          responseData,
-        );
-        final paymentLink = transactionResponse.paymentLink;
-
-        if (paymentLink != null) {
-          // Navigate to the QR Payment Screen
-          if (mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => QRPaymentScreen(
-                  paymentLink: paymentLink,
-                  amount: amountText,
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'An error occurred during UPI payment: $errorMessage',
                 ),
               ),
             );
           }
-        } else {
-          throw Exception('Payment link not found in response.');
-        }
-      } else {
-        log('API Response (Error): ${response.body}');
-        // Throw an exception for any API-level errors
-        throw Exception(
-          responseData['msg'] ?? 'Failed to create transaction link.',
-        );
-      }
+        },
+      );
     } catch (e) {
-      log('Error creating transaction link: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
-    } finally {
+      log('UPI Launch Error: $e');
       if (mounted) {
         setState(() {
           _isProcessingPayment = false;
+          _currentPaymentMethodType = '';
         });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to launch UPI app.')));
       }
     }
   }
 
-  Future<void> _reportPaymentStatusToBackend(
-    String status,
-    UpiResponse upiResponse,
-  ) async {
+  Future<void> _reportPaymentStatusToBackend(UpiResponse upiResponse) async {
     final paymentHashKey =
         upiResponse.transactionReferenceId ??
         upiResponse.transactionID ??
@@ -558,6 +552,99 @@ class _AddFundScreenState extends State<AddFundScreen>
     }
   }
 
+  // Refactored and corrected method for the QR payment gateway
+  Future<void> _createTransactionLink() async {
+    // Validate input before making the API call
+    final amountText = amountController.text.trim();
+    final parsedAmount = int.tryParse(amountText);
+    final parsedMobile = int.tryParse(mobile);
+
+    if (parsedAmount == null || parsedAmount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a valid amount.")),
+      );
+      return;
+    }
+
+    if (parsedMobile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid mobile number found.")),
+      );
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isProcessingPayment = true;
+      });
+    }
+
+    try {
+      final String apiUrl = '${Constant.apiEndpoint}create-transaction-link';
+
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: <String, String>{
+          'deviceId': deviceId,
+          'deviceName': deviceName,
+          'accessStatus': '1',
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: jsonEncode(<String, dynamic>{
+          'registerId': registerId,
+          'amount': parsedAmount,
+          'mobile': parsedMobile,
+        }),
+      );
+
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && responseData['status'] == true) {
+        log('API Response (Success): ${response.body}');
+        // If the API call is successful, extract the payment link
+        final transactionResponse = CreateTransactionLinkResponse.fromJson(
+          responseData,
+        );
+        final paymentLink = transactionResponse.paymentLink;
+
+        if (paymentLink != null) {
+          // Navigate to the QR Payment Screen
+          if (mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => QRPaymentScreen(
+                  paymentLink: paymentLink,
+                  amount: amountText,
+                ),
+              ),
+            );
+          }
+        } else {
+          throw Exception('Payment link not found in response.');
+        }
+      } else {
+        log('API Response (Error): ${response.body}');
+        // Throw an exception for any API-level errors
+        throw Exception(
+          responseData['msg'] ?? 'Failed to create transaction link.',
+        );
+      }
+    } catch (e) {
+      log('Error creating transaction link: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessingPayment = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -575,210 +662,219 @@ class _AddFundScreenState extends State<AddFundScreen>
           builder: (_, s) => Text(s.data ?? "Add Funds"),
         ),
       ),
-      body: SingleChildScrollView(
-        // Wrap the Padding with SingleChildScrollView
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              const SizedBox(height: 100),
-              Card(
-                color: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 4,
-                child: Padding(
-                  padding: const EdgeInsets.all(0),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 20),
-                      Container(
-                        width: double.infinity,
-                        color: Colors.black,
-                        child: SizedBox(
-                          height: 35,
-                          child: Center(
-                            child: Text(
-                              "Sara777",
-                              style: GoogleFonts.poppins(
-                                fontSize: 20,
-                                fontWeight: FontWeight.normal,
-                                color: Colors.white,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          // Wrap the Padding with SingleChildScrollView
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                const SizedBox(height: 100),
+                Card(
+                  color: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 4,
+                  child: Padding(
+                    padding: const EdgeInsets.all(0),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 20),
+                        Container(
+                          width: double.infinity,
+                          color: Colors.black,
+                          child: SizedBox(
+                            height: 35,
+                            child: Center(
+                              child: Text(
+                                "Sara777",
+                                style: GoogleFonts.poppins(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.normal,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 20),
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            Image.asset(
-                              "assets/images/ic_wallet.png",
-                              height: 60,
-                              width: 60,
-                              color: Colors.orange,
-                            ),
-                            const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  "\u20b9 $walletBalance",
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.orange,
+                        const SizedBox(height: 20),
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              Image.asset(
+                                "assets/images/ic_wallet.png",
+                                height: 60,
+                                width: 60,
+                                color: Colors.orange,
+                              ),
+                              const SizedBox(width: 12),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "\u20b9 $walletBalance",
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orange,
+                                    ),
                                   ),
-                                ),
-                                FutureBuilder<String>(
-                                  future: _t("Current Balance"),
-                                  builder: (_, s) =>
-                                      Text(s.data ?? "Current Balance"),
-                                ),
-                              ],
-                            ),
-                            const Spacer(),
-                            Image.asset(
-                              "assets/images/mastercard.png",
-                              height: 60,
-                              width: 60,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              TextField(
-                controller: amountController,
-                keyboardType: TextInputType.number,
-                cursorColor: Colors.orange,
-                decoration: InputDecoration(
-                  hintText: "Amount",
-                  prefixIcon: Card(
-                    color: Colors.orange,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    elevation: 4,
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Image.asset(
-                        "assets/images/fund.png",
-                        height: 24,
-                        width: 24,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(50),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(50),
-                    borderSide: const BorderSide(
-                      color: Colors.orange,
-                      width: 2,
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(50),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
-                      width: 1,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 200),
-
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isProcessingPayment
-                      ? null
-                      : _validateAndPreparePayment,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 4,
-                  ),
-                  child: _isProcessingPayment
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          "ADD POINT - UPI",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                                  FutureBuilder<String>(
+                                    future: _t("Current Balance"),
+                                    builder: (_, s) =>
+                                        Text(s.data ?? "Current Balance"),
+                                  ),
+                                ],
+                              ),
+                              const Spacer(),
+                              Image.asset(
+                                "assets/images/mastercard.png",
+                                height: 60,
+                                width: 60,
+                              ),
+                            ],
                           ),
                         ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  // The onPressed property is now a direct call to the method.
-                  // The conditional check for _isProcessingPayment is removed.
-                  onPressed: _createTransactionLink,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: Text(
-                    "ADD POINT - QR - PAYTM - GATEWAY",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.normal,
+                      ],
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 15),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // TODO: Implement action for "SARA777" button
-                    print('SARA777 button pressed!');
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                const SizedBox(height: 24),
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  cursorColor: Colors.orange,
+                  decoration: InputDecoration(
+                    hintText: "Amount",
+                    prefixIcon: Card(
+                      color: Colors.orange,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      elevation: 4,
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Image.asset(
+                          "assets/images/fund.png",
+                          height: 24,
+                          width: 24,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    "HOW TO ADD POINT",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.normal,
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(50),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(50),
+                      borderSide: const BorderSide(
+                        color: Colors.orange,
+                        width: 2,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(50),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 200),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isProcessingPayment
+                        ? null
+                        : _validateAndPreparePayment,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 4,
+                    ),
+                    child: _isProcessingPayment
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : FutureBuilder<String>(
+                            future: _t("ADD POINT - UPI"),
+                            builder: (_, s) => Text(
+                              s.data ?? "ADD POINT - UPI",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _createTransactionLink,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: FutureBuilder<String>(
+                      future: _t("ADD POINT - QR - PAYTM - GATEWAY"),
+                      builder: (_, s) => Text(
+                        s.data ?? "ADD POINT - QR - PAYTM - GATEWAY",
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 15),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      // TODO: Implement action for "SARA777" button
+                      print('SARA777 button pressed!');
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: FutureBuilder<String>(
+                      future: _t("HOW TO ADD POINT"),
+                      builder: (_, s) => Text(
+                        s.data ?? "HOW TO ADD POINT",
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

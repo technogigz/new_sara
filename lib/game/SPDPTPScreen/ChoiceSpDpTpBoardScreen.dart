@@ -596,7 +596,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
           const SizedBox(width: 12),
         ],
       ),
-      body: Stack(
+      body: SafeArea(child: Stack(
         children: [
           Column(
             children: [
@@ -636,13 +636,13 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                 onChanged: _isApiCalling
                                     ? null
                                     : (String? newValue) {
-                                        setState(() {
-                                          _selectedGameTypeOption = newValue;
-                                          _clearMessage();
-                                        });
-                                      },
+                                  setState(() {
+                                    _selectedGameTypeOption = newValue;
+                                    _clearMessage();
+                                  });
+                                },
                                 items:
-                                    dropdownItems, // Use the dynamically built list
+                                dropdownItems, // Use the dynamically built list
                               ),
                             ),
                           ),
@@ -661,15 +661,15 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                 onChanged: _isApiCalling
                                     ? null
                                     : (bool? value) {
-                                        setState(() {
-                                          _isSPSelected = value ?? false;
-                                          if (_isSPSelected) {
-                                            _isDPSelected = false;
-                                            _isTPSelected = false;
-                                          }
-                                          _clearMessage();
-                                        });
-                                      },
+                                  setState(() {
+                                    _isSPSelected = value ?? false;
+                                    if (_isSPSelected) {
+                                      _isDPSelected = false;
+                                      _isTPSelected = false;
+                                    }
+                                    _clearMessage();
+                                  });
+                                },
                                 activeColor: Colors.orange,
                                 checkColor: Colors.white,
                               ),
@@ -689,15 +689,15 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                 onChanged: _isApiCalling
                                     ? null
                                     : (bool? value) {
-                                        setState(() {
-                                          _isDPSelected = value ?? false;
-                                          if (_isDPSelected) {
-                                            _isSPSelected = false;
-                                            _isTPSelected = false;
-                                          }
-                                          _clearMessage();
-                                        });
-                                      },
+                                  setState(() {
+                                    _isDPSelected = value ?? false;
+                                    if (_isDPSelected) {
+                                      _isSPSelected = false;
+                                      _isTPSelected = false;
+                                    }
+                                    _clearMessage();
+                                  });
+                                },
                                 activeColor: Colors.orange,
                                 checkColor: Colors.white,
                               ),
@@ -717,15 +717,15 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                 onChanged: _isApiCalling
                                     ? null
                                     : (bool? value) {
-                                        setState(() {
-                                          _isTPSelected = value ?? false;
-                                          if (_isTPSelected) {
-                                            _isSPSelected = false;
-                                            _isDPSelected = false;
-                                          }
-                                          _clearMessage();
-                                        });
-                                      },
+                                  setState(() {
+                                    _isTPSelected = value ?? false;
+                                    if (_isTPSelected) {
+                                      _isSPSelected = false;
+                                      _isDPSelected = false;
+                                    }
+                                    _clearMessage();
+                                  });
+                                },
                                 activeColor: Colors.orange,
                                 checkColor: Colors.white,
                               ),
@@ -834,18 +834,18 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                           ),
                           child: _isApiCalling
                               ? const CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                )
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          )
                               : Text(
-                                  "ADD",
-                                  textAlign: TextAlign.center,
-                                  style: GoogleFonts.poppins(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 16,
-                                  ),
-                                ),
+                            "ADD",
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -900,80 +900,80 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
               Expanded(
                 child: _bids.isEmpty
                     ? Center(
-                        child: Text(
-                          'No Bids Added Yet',
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      )
+                  child: Text(
+                    'No Bids Added Yet',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                )
                     : ListView.builder(
-                        padding: const EdgeInsets.only(top: 0, bottom: 8.0),
-                        itemCount: _bids.length,
-                        itemBuilder: (context, index) {
-                          final bid = _bids[index];
-                          return Container(
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 4,
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12.0,
-                              vertical: 8.0,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(8),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withOpacity(0.15),
-                                  spreadRadius: 1,
-                                  blurRadius: 2,
-                                  offset: const Offset(0, 1),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  flex: 2,
-                                  child: Text(
-                                    bid['digit']!,
-                                    style: GoogleFonts.poppins(fontSize: 15),
-                                  ),
-                                ),
-                                Expanded(
-                                  flex: 2,
-                                  child: Text(
-                                    bid['points']!,
-                                    style: GoogleFonts.poppins(fontSize: 15),
-                                  ),
-                                ),
-                                Expanded(
-                                  flex: 3,
-                                  child: Text(
-                                    '${bid['gameType']} (${bid['type']})',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 15,
-                                      color: Colors.green[700],
-                                    ),
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete,
-                                    color: Colors.red,
-                                  ),
-                                  onPressed: _isApiCalling
-                                      ? null
-                                      : () => _removeBid(index),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
+                  padding: const EdgeInsets.only(top: 0, bottom: 8.0),
+                  itemCount: _bids.length,
+                  itemBuilder: (context, index) {
+                    final bid = _bids[index];
+                    return Container(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
                       ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12.0,
+                        vertical: 8.0,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.15),
+                            spreadRadius: 1,
+                            blurRadius: 2,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              bid['digit']!,
+                              style: GoogleFonts.poppins(fontSize: 15),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              bid['points']!,
+                              style: GoogleFonts.poppins(fontSize: 15),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 3,
+                            child: Text(
+                              '${bid['gameType']} (${bid['type']})',
+                              style: GoogleFonts.poppins(
+                                fontSize: 15,
+                                color: Colors.green[700],
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.delete,
+                              color: Colors.red,
+                            ),
+                            onPressed: _isApiCalling
+                                ? null
+                                : () => _removeBid(index),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
               if (_bids.isNotEmpty) _buildBottomBar(),
             ],
@@ -991,7 +991,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
               ),
             ),
         ],
-      ),
+      ),),
     );
   }
 

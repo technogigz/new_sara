@@ -111,114 +111,118 @@ class _DepositHistoryPageState extends State<DepositHistoryPage> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: FutureBuilder<List<DepositHistoryItem>>(
-        future: _depositFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: Colors.orange),
-            );
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-
-          final list = snapshot.data ?? [];
-
-          if (list.isEmpty) {
-            return const Center(child: Text('No deposit history found'));
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(12),
-            itemCount: list.length,
-            itemBuilder: (context, index) {
-              final item = list[index];
-              // Determine status color and icon based on statusText
-              Color statusColor = Colors.grey;
-              IconData statusIcon = Icons.info_outline;
-              if (item.statusText.toLowerCase() == 'completed') {
-                statusColor = Colors.green;
-                statusIcon = Icons.check_circle;
-              } else if (item.statusText.toLowerCase() == 'pending') {
-                statusColor = Colors.orange;
-                statusIcon = Icons.access_time;
-              } else if (item.statusText.toLowerCase() == 'failed' ||
-                  item.statusText.toLowerCase() == 'rejected') {
-                statusColor = Colors.red;
-                statusIcon = Icons.cancel;
-              }
-
-              return Card(
-                color: Colors
-                    .white, // Changed card color to white for better contrast
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                margin: const EdgeInsets.symmetric(vertical: 4),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            item.requestDate, // Use requestDate
-                            style: const TextStyle(color: Colors.black54),
-                          ),
-                          Row(
-                            children: [
-                              Icon(statusIcon, size: 16, color: statusColor),
-                              const SizedBox(width: 4),
-                              Text(
-                                item.statusText, // Use statusText
-                                style: TextStyle(color: statusColor),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const Divider(),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            "Amount",
-                            style: TextStyle(color: Colors.black),
-                          ),
-                          Text(
-                            "₹ ${item.amount}", // Amount is now String, ensure it's parsed if needed for calculations
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Colors
-                                  .green, // Assuming deposit is always positive
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            "Narration",
-                            style: TextStyle(color: Colors.black),
-                          ),
-                          Text(
-                            item.remark, // Use remark for narration
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+      body: SafeArea(
+        child: FutureBuilder<List<DepositHistoryItem>>(
+          future: _depositFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(color: Colors.orange),
               );
-            },
-          );
-        },
+            } else if (snapshot.hasError) {
+              return Center(child: Text('Error: ${snapshot.error}'));
+            }
+
+            final list = snapshot.data ?? [];
+
+            if (list.isEmpty) {
+              return const Center(child: Text('No deposit history found'));
+            }
+
+            return ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: list.length,
+              itemBuilder: (context, index) {
+                final item = list[index];
+                // Determine status color and icon based on statusText
+                Color statusColor = Colors.grey;
+                IconData statusIcon = Icons.info_outline;
+                if (item.statusText.toLowerCase() == 'completed') {
+                  statusColor = Colors.green;
+                  statusIcon = Icons.check_circle;
+                } else if (item.statusText.toLowerCase() == 'pending') {
+                  statusColor = Colors.orange;
+                  statusIcon = Icons.access_time;
+                } else if (item.statusText.toLowerCase() == 'failed' ||
+                    item.statusText.toLowerCase() == 'rejected') {
+                  statusColor = Colors.red;
+                  statusIcon = Icons.cancel;
+                }
+
+                return Card(
+                  color: Colors
+                      .white, // Changed card color to white for better contrast
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              item.requestDate, // Use requestDate
+                              style: const TextStyle(color: Colors.black54),
+                            ),
+                            Row(
+                              children: [
+                                Icon(statusIcon, size: 16, color: statusColor),
+                                const SizedBox(width: 4),
+                                Text(
+                                  item.statusText, // Use statusText
+                                  style: TextStyle(color: statusColor),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const Divider(),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              "Amount",
+                              style: TextStyle(color: Colors.black),
+                            ),
+                            Text(
+                              "₹ ${item.amount}", // Amount is now String, ensure it's parsed if needed for calculations
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Colors
+                                    .green, // Assuming deposit is always positive
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              "Narration",
+                              style: TextStyle(color: Colors.black),
+                            ),
+                            Text(
+                              item.remark, // Use remark for narration
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }

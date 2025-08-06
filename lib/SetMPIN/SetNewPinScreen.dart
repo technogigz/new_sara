@@ -126,9 +126,10 @@ class _SetNewPinScreenState extends State<SetNewPinScreen> {
 
         popToast(msg, 2, Colors.white, Colors.green);
 
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (route) => false, // Remove all previous routes
         );
       } else {
         popToast(msg, 4, Colors.white, ColorsR.appColorRed);

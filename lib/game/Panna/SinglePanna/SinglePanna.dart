@@ -399,64 +399,6 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
     }
   }
 
-  // Future<void> _addBid() async {
-  //   _clearMessage();
-  //   _removeOverlay(); // Hide suggestions when add bid is pressed
-  //
-  //   final digit = digitController.text.trim();
-  //   final amount = amountController.text.trim();
-  //
-  //   if (digit.isEmpty || amount.isEmpty) {
-  //     _showMessage('Please fill in all fields.', isError: true);
-  //     return;
-  //   }
-  //
-  //   if (!Single_Pana.contains(digit)) {
-  //     _showMessage('Please enter a valid Single Panna number.', isError: true);
-  //     return;
-  //   }
-  //
-  //   final intAmount = int.tryParse(amount);
-  //   if (intAmount == null || intAmount <= 0) {
-  //     _showMessage(
-  //       'Please enter a valid amount greater than 0.',
-  //       isError: true,
-  //     );
-  //     return;
-  //   }
-  //
-  //   final existingIndex = bids.indexWhere(
-  //     (entry) => entry['digit'] == digit && entry['type'] == selectedGameType,
-  //   );
-  //
-  //   if (mounted) {
-  //     setState(() {
-  //       if (existingIndex != -1) {
-  //         final currentAmount = int.parse(bids[existingIndex]['amount']!);
-  //         bids[existingIndex]['amount'] = (currentAmount + intAmount)
-  //             .toString();
-  //         _showMessage(
-  //           'Updated amount for Panna: $digit, Type: $selectedGameType.',
-  //         );
-  //       } else {
-  //         bids.add({
-  //           'digit': digit,
-  //           'amount': amount,
-  //           'type': selectedGameType,
-  //         });
-  //         _showMessage(
-  //           'Added bid: Panna $digit, Amount $amount, Type $selectedGameType.',
-  //         );
-  //       }
-  //       _saveBids();
-  //       digitController.clear();
-  //       amountController.clear();
-  //       // _isPanaSuggestionsVisible = false; // Now handled by _removeOverlay() via _onDigitChanged
-  //       FocusScope.of(context).unfocus();
-  //     });
-  //   }
-  // }
-
   Future<void> _addBid() async {
     _clearMessage();
     _removeOverlay(); // Hide suggestions when add bid is pressed
@@ -478,7 +420,7 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
     if (intAmount == null || intAmount < 10) {
       // <-- MODIFIED THIS LINE
       _showMessage(
-        'Minimum amount is 10. Please enter a valid amount of 10 or more.', // <-- MODIFIED THIS LINE
+        'Minimum amount is 10. Please enter a valid amount of 10 or more.',
         isError: true,
       );
       return;

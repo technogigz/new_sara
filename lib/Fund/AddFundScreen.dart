@@ -3,11 +3,10 @@ import 'dart:developer';
 import 'dart:math' hide log;
 
 import 'package:flutter/material.dart';
-// Import the main manager and model classes
 import 'package:flutter_pay_upi/flutter_pay_upi_manager.dart';
 import 'package:flutter_pay_upi/model/upi_app_model.dart';
-// UpiTransactionResponse is also needed, ensure it's imported correctly
 import 'package:flutter_pay_upi/model/upi_response.dart';
+import 'package:get/get.dart'; // Import Get package
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
@@ -15,11 +14,13 @@ import 'package:new_sara/Fund/QRPaymentScreen.dart';
 import 'package:new_sara/ulits/Constents.dart';
 
 import '../Helper/TranslationHelper.dart';
+// Import the UserController
+import '../Helper/UserController.dart';
 
 class CreateTransactionLinkResponse {
   final String msg;
   final bool status;
-  final String? paymentLink; // payment_link can be null if status is false
+  final String? paymentLink;
 
   CreateTransactionLinkResponse({
     required this.msg,
@@ -44,46 +45,43 @@ class AddFundScreen extends StatefulWidget {
 
 class _AddFundScreenState extends State<AddFundScreen>
     with WidgetsBindingObserver {
+  // Use Get.find to get the UserController instance
+  final UserController userController = Get.find<UserController>();
+
   final amountController = TextEditingController();
   final Random _random = Random();
   final Map<String, String> _translationCache = {};
 
-  late String accessToken = GetStorage().read('accessToken') ?? '';
-  late String registerId = GetStorage().read('registerId') ?? '';
-  late String walletBalance =
-      GetStorage().read('walletBalance')?.toString() ?? '0';
+  // Get current language from GetStorage, or set a default
   late String currentLangCode = GetStorage().read('language') ?? 'en';
-  late String mobile = GetStorage().read('mobileNo') ?? '';
 
-  final upiPay = FlutterPayUpiManager(); // Correct instantiation
+  late String minDepositAmount = userController.minDeposit.value;
+
+  final upiPay = FlutterPayUpiManager();
   final String _apiBaseUrl = Constant.apiEndpoint;
   static const _hardcodedUpiPayeeVPA = "OMENTERPRISES.10018009@csbpay";
   static const _hardcodedUpiPayeeName = "Arvind Lodha";
   static const String _merchantCode = "";
-
-  final GetStorage _storage = GetStorage();
-
-  final String deviceId = GetStorage().read('deviceId') ?? '';
-  final String deviceName = GetStorage().read('deviceName') ?? '';
-
-  late final int _minAmount =
-      int.tryParse(_storage.read('minDeposit')?.toString() ?? '1000') ?? 1000;
 
   bool _isProcessingPayment = false;
   int _currentTransactionAmount = 0;
   String _currentTransactionId = '';
   String _currentPaymentMethodType = '';
 
-  // Initialize _apps as an empty list and populate it in _fetchUpiApps
   List<UpiApp> _apps = [];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _fetchAndSaveUserDetails(registerId);
-    _loadWalletBalance();
-    _fetchUpiApps(); // Call this to populate _apps
+    // Call the controller method to load and fetch data
+    // No need for _fetchAndSaveUserDetails(), controller handles it
+    userController.fetchAndUpdateUserDetails();
+    userController.fetchAndUpdateFeeSettings();
+
+    log("Minimum amount: ${userController.minDeposit.value}");
+
+    _fetchUpiApps();
   }
 
   @override
@@ -93,47 +91,6 @@ class _AddFundScreenState extends State<AddFundScreen>
     super.dispose();
   }
 
-  Future<void> _fetchAndSaveUserDetails(String registerId) async {
-    final url = Uri.parse('${Constant.apiEndpoint}user-details-by-register-id');
-    final String currentAccessToken = _storage.read('accessToken') ?? '';
-    log("Fetching user details for Register Id: $registerId");
-    log("Using Access Token: $currentAccessToken");
-    try {
-      final response = await http.post(
-        url,
-        headers: {
-          'deviceId': 'qwert',
-          'deviceName': 'sm2233',
-          'accessStatus': '1',
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $currentAccessToken',
-        },
-        body: jsonEncode({"registerId": registerId}),
-      );
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        final info = responseData['info'];
-        log("User details received: $info");
-        _storage.write('userId', info['userId']);
-        _storage.write('fullName', info['fullName']);
-        _storage.write('emailId', info['emailId']);
-        _storage.write('mobileNo', info['mobileNo']);
-        _storage.write('mobileNoEnc', info['mobileNoEnc']);
-        _storage.write('walletBalance', info['walletBalance']);
-        _storage.write('profilePicture', info['profilePicture']);
-        _storage.write('accountStatus', info['accountStatus']);
-        _storage.write('betStatus', info['betStatus']);
-        log("✅ User details saved to GetStorage.");
-      } else {
-        log(
-          "❌ Failed to fetch user details: ${response.statusCode} => ${response.body}",
-        );
-      }
-    } catch (e) {
-      log("❌ Exception fetching user details: $e");
-    }
-  }
-
   Future<String> _t(String text) async {
     if (_translationCache.containsKey(text)) return _translationCache[text]!;
     final t = await TranslationHelper.translate(text, currentLangCode);
@@ -141,19 +98,11 @@ class _AddFundScreenState extends State<AddFundScreen>
     return t;
   }
 
-  void _loadWalletBalance() {
-    final raw = GetStorage().read('walletBalance');
-    if (mounted) setState(() => walletBalance = raw?.toString() ?? '0');
-  }
-
   void _fetchUpiApps() async {
     try {
-      // Correct way to get UPI apps with FlutterPayUpiManager
       final apps = await FlutterPayUpiManager.getListOfAndroidUpiApps();
-      log(
-        'Discovered UPI apps: ${apps.map((a) => a.name).toList()}',
-      ); // Access appName directly
-      if (mounted) setState(() => _apps = apps); // Populate _apps
+      log('Discovered UPI apps: ${apps.map((a) => a.name).toList()}');
+      if (mounted) setState(() => _apps = apps);
     } catch (e) {
       log('Failed to load UPI apps: $e');
     }
@@ -162,11 +111,17 @@ class _AddFundScreenState extends State<AddFundScreen>
   Future<void> _validateAndPreparePayment() async {
     final text = amountController.text.trim();
     final amt = int.tryParse(text);
-    if (amt == null || amt < _minAmount) {
+    final minAmountDouble = double.tryParse(minDepositAmount);
+    final minAmountInt = minAmountDouble?.toInt();
+
+    log("Minimum UPI amount: ${minDepositAmount}");
+    if (amt == null || minAmountInt == null || amt < minAmountInt) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            await _t("Please enter a valid amount (min ₹$_minAmount)."),
+            await _t(
+              "Please enter a valid amount (min ₹${userController.minDeposit.value}).",
+            ),
           ),
         ),
       );
@@ -243,7 +198,6 @@ class _AddFundScreenState extends State<AddFundScreen>
                 return InkWell(
                   onTap: () {
                     Navigator.pop(context);
-                    // Accessing the app name and launching the payment
                     _currentPaymentMethodType = app.name!;
                     _launchUpiWithApp(_apps[i]);
                   },
@@ -276,73 +230,6 @@ class _AddFundScreenState extends State<AddFundScreen>
     });
   }
 
-  // Future<void> _launchUpiWithApp(UpiApp app) async {
-  //   if (mounted) {
-  //     setState(() {
-  //       _isProcessingPayment = true;
-  //       _currentPaymentMethodType = app.name.toString(); // Use app.appName here
-  //     });
-  //   }
-  //
-  //   try {
-  //     FlutterPayUpiManager.startPayment(
-  //       paymentApp: app.app!,
-  //       // Use app.packageName here for the identifier
-  //       payeeVpa: _hardcodedUpiPayeeVPA,
-  //       payeeName: _hardcodedUpiPayeeName,
-  //       transactionId: _currentTransactionId,
-  //       payeeMerchantCode: _merchantCode,
-  //       description: "Add funds",
-  //       amount: amountController.text,
-  //       response: (UpiResponse, String) {
-  //         log(
-  //           'UPI Response before: $UpiResponse.status: ${UpiResponse.status}',
-  //         );
-  //
-  //         if (mounted) {
-  //           setState(() {
-  //             _isProcessingPayment = false;
-  //             _currentPaymentMethodType = app.name!;
-  //             log(
-  //               'UPI Response after: $UpiResponse.status: ${UpiResponse.status}',
-  //             );
-  //             _reportPaymentStatusToBackend(UpiResponse);
-  //           });
-  //         }
-  //       },
-  //       error: (String) {
-  //         log('UPI Response error: $String.status: $String');
-  //
-  //         if (mounted) {
-  //           setState(() {
-  //             _isProcessingPayment = false;
-  //             _currentPaymentMethodType = '';
-  //             _reportPaymentStatusToBackend(UpiResponse as UpiResponse);
-  //           });
-  //         }
-  //       }, // amountController.text is already a String
-  //     );
-  //   } catch (e) {
-  //     log('UPI Launch Error: $e');
-  //     // Report failure to backend if an exception occurs
-  //     if (mounted) {
-  //       setState(() {
-  //         _isProcessingPayment = false;
-  //         _currentPaymentMethodType = '';
-  //         _reportPaymentStatusToBackend(UpiResponse as UpiResponse);
-  //       });
-  //     }
-  //   } finally {
-  //     // Always reset processing state in finally block to ensure it happens regardless of success or error
-  //     if (mounted) {
-  //       setState(() {
-  //         _isProcessingPayment = false;
-  //         _currentPaymentMethodType = '';
-  //       });
-  //     }
-  //   }
-  // }
-
   Future<void> _launchUpiWithApp(UpiApp app) async {
     if (mounted) {
       setState(() {
@@ -368,7 +255,6 @@ class _AddFundScreenState extends State<AddFundScreen>
               _isProcessingPayment = false;
               _currentPaymentMethodType = app.name!;
 
-              // Check if the payment was a success before reporting to backend
               if (upiResponse.status == 'success') {
                 _reportPaymentStatusToBackend(upiResponse);
               } else {
@@ -427,9 +313,8 @@ class _AddFundScreenState extends State<AddFundScreen>
       depositType = 'bank';
     }
 
-    // --- STEP 1: Make the first API call to create the fund request ---
     final createFundRequestBody = {
-      "registerId": registerId,
+      "registerId": userController.registerId.value, // Use controller
       "depositType": depositType,
       "amount": _currentTransactionAmount,
       "hashKey": paymentHashKey,
@@ -441,10 +326,11 @@ class _AddFundScreenState extends State<AddFundScreen>
       final createFundRequestResponse = await http.post(
         Uri.parse('${_apiBaseUrl}deposit-create-upi-fund-request'),
         headers: {
-          'Authorization': 'Bearer $accessToken',
+          'Authorization':
+              'Bearer ${userController.accessToken.value}', // Use controller
           'Content-Type': 'application/json',
-          'deviceId': deviceId,
-          'deviceName': deviceName,
+          'deviceId': GetStorage().read('deviceId'), // Use controller
+          'deviceName': GetStorage().read('deviceName'), // Use controller
           'accessStatus': '1',
         },
         body: json.encode(createFundRequestBody),
@@ -455,21 +341,18 @@ class _AddFundScreenState extends State<AddFundScreen>
       );
       log('Create fund request response: $createFundRequestResult');
 
-      // Check if the first API call was successful
       if (createFundRequestResult['status'] == true) {
-        // --- STEP 2: Extract data from the first response ---
         final info = createFundRequestResult['info'];
         final String paymentHash = info['paymentHash'];
         final int remark = info['remark'];
         final int timestamp = info['timestamp'];
 
-        // --- STEP 3: Make the second API call with the extracted data ---
         final addFundRequestBody = {
-          "registerId": registerId,
+          "registerId": userController.registerId.value, // Use controller
           "depositType": depositType,
           "amount": _currentTransactionAmount,
           "hashKey": paymentHashKey,
-          "timestamp": timestamp, // Keep as int
+          "timestamp": timestamp,
           "paymentHash": paymentHash,
           "remark": remark,
         };
@@ -479,10 +362,11 @@ class _AddFundScreenState extends State<AddFundScreen>
         final addFundRequestResponse = await http.post(
           Uri.parse('${_apiBaseUrl}add-upi-deposit-fund-request'),
           headers: {
-            'Authorization': 'Bearer $accessToken',
+            'Authorization':
+                'Bearer ${userController.accessToken.value}', // Use controller
             'Content-Type': 'application/json',
-            'deviceId': deviceId,
-            'deviceName': deviceName,
+            'deviceId': GetStorage().read('deviceId'), // Use controller
+            'deviceName': GetStorage().read('deviceName'), // Use controller
             'accessStatus': '1',
           },
           body: json.encode(addFundRequestBody),
@@ -491,18 +375,16 @@ class _AddFundScreenState extends State<AddFundScreen>
         final addFundRequestResult = json.decode(addFundRequestResponse.body);
         log('Add fund request response: $addFundRequestResult');
 
-        // Now, you can handle the final result from the second API call
         if (addFundRequestResult['status'] == true) {
-          // Final success logic
           if (mounted) {
             setState(() {
               _isProcessingPayment = false;
               _currentPaymentMethodType = '';
             });
           }
-          _loadWalletBalance();
+          // Call the controller method to fetch the new balance
+          userController.fetchAndUpdateUserDetails();
           amountController.clear();
-          // Show success dialog
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -512,7 +394,6 @@ class _AddFundScreenState extends State<AddFundScreen>
             ),
           );
         } else {
-          // Handle failure of the second API call
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -523,7 +404,6 @@ class _AddFundScreenState extends State<AddFundScreen>
           );
         }
       } else {
-        // Handle failure of the first API call
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -552,32 +432,43 @@ class _AddFundScreenState extends State<AddFundScreen>
     }
   }
 
-  // Refactored and corrected method for the QR payment gateway
   Future<void> _createTransactionLink() async {
-    // Validate input before making the API call
     final amountText = amountController.text.trim();
     final parsedAmount = int.tryParse(amountText);
-    final parsedMobile = int.tryParse(mobile);
+    final parsedMobile = int.tryParse(userController.mobileNo.value);
 
-    if (parsedAmount == null || parsedAmount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter a valid amount.")),
+    final minAmountDouble = double.tryParse(userController.minDeposit.value);
+    final minAmountInt = minAmountDouble?.toInt();
+
+    // --- Validation Checks ---
+    if (parsedAmount == null) {
+      _showSnackBar("Please enter a valid amount.");
+      return;
+    }
+
+    if (minAmountInt == null) {
+      _showSnackBar("Minimum deposit amount is not configured.");
+      return;
+    }
+
+    if (parsedAmount < minAmountInt) {
+      _showSnackBar(
+        "Please enter an amount greater than or equal to ₹$minAmountInt.",
       );
       return;
     }
 
     if (parsedMobile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Invalid mobile number found.")),
-      );
+      _showSnackBar("Invalid mobile number found.");
       return;
     }
+    // --- End Validation Checks ---
 
-    if (mounted) {
-      setState(() {
-        _isProcessingPayment = true;
-      });
-    }
+    if (!mounted) return;
+
+    setState(() {
+      _isProcessingPayment = true;
+    });
 
     try {
       final String apiUrl = '${Constant.apiEndpoint}create-transaction-link';
@@ -585,14 +476,14 @@ class _AddFundScreenState extends State<AddFundScreen>
       final response = await http.post(
         Uri.parse(apiUrl),
         headers: <String, String>{
-          'deviceId': deviceId,
-          'deviceName': deviceName,
+          'deviceId': GetStorage().read('deviceId') ?? '',
+          'deviceName': GetStorage().read('deviceName') ?? '',
           'accessStatus': '1',
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $accessToken',
+          'Authorization': 'Bearer ${userController.accessToken.value}',
         },
         body: jsonEncode(<String, dynamic>{
-          'registerId': registerId,
+          'registerId': userController.registerId.value,
           'amount': parsedAmount,
           'mobile': parsedMobile,
         }),
@@ -602,14 +493,12 @@ class _AddFundScreenState extends State<AddFundScreen>
 
       if (response.statusCode == 200 && responseData['status'] == true) {
         log('API Response (Success): ${response.body}');
-        // If the API call is successful, extract the payment link
         final transactionResponse = CreateTransactionLinkResponse.fromJson(
           responseData,
         );
         final paymentLink = transactionResponse.paymentLink;
 
         if (paymentLink != null) {
-          // Navigate to the QR Payment Screen
           if (mounted) {
             Navigator.push(
               context,
@@ -626,22 +515,28 @@ class _AddFundScreenState extends State<AddFundScreen>
         }
       } else {
         log('API Response (Error): ${response.body}');
-        // Throw an exception for any API-level errors
         throw Exception(
           responseData['msg'] ?? 'Failed to create transaction link.',
         );
       }
     } catch (e) {
       log('Error creating transaction link: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+      _showSnackBar('Error: ${e.toString()}');
     } finally {
       if (mounted) {
         setState(() {
           _isProcessingPayment = false;
         });
       }
+    }
+  }
+
+  // Show SnackBar
+  void _showSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -664,7 +559,6 @@ class _AddFundScreenState extends State<AddFundScreen>
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          // Wrap the Padding with SingleChildScrollView
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -713,12 +607,15 @@ class _AddFundScreenState extends State<AddFundScreen>
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    "\u20b9 $walletBalance",
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.orange,
+                                  // Use Obx to listen for changes to the wallet balance
+                                  Obx(
+                                    () => Text(
+                                      "\u20b9 ${userController.walletBalance.value}",
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.orange,
+                                      ),
                                     ),
                                   ),
                                   FutureBuilder<String>(
@@ -786,7 +683,6 @@ class _AddFundScreenState extends State<AddFundScreen>
                   ),
                 ),
                 const SizedBox(height: 200),
-
                 SizedBox(
                   width: double.infinity,
                   height: 50,
@@ -849,7 +745,6 @@ class _AddFundScreenState extends State<AddFundScreen>
                   height: 50,
                   child: ElevatedButton(
                     onPressed: () {
-                      // TODO: Implement action for "SARA777" button
                       print('SARA777 button pressed!');
                     },
                     style: ElevatedButton.styleFrom(

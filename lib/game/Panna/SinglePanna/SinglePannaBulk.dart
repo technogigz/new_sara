@@ -68,8 +68,8 @@ class _SinglePannaBulkBoardScreenState
   bool _isWalletLoading = true; // Indicates if wallet balance is being loaded
 
   // Device information for API headers
-  final String _deviceId = 'test_device_id_flutter';
-  final String _deviceName = 'test_device_name_flutter';
+  final String _deviceId = GetStorage().read('deviceId');
+  final String _deviceName = GetStorage().read('deviceName');
 
   // --- AnimatedMessageBar State Management ---
   String? _messageToShow; // Message to display in the custom message bar
@@ -215,7 +215,13 @@ class _SinglePannaBulkBoardScreenState
       _isApiCalling = true;
     });
 
-    final url = Uri.parse('${Constant.apiEndpoint}single-pana-bulk');
+    late final Uri url;
+    if (widget.title.contains('Single')) {
+      url = Uri.parse('${Constant.apiEndpoint}single-pana-bulk');
+    } else if (widget.title.contains('Double')) {
+      url = Uri.parse('${Constant.apiEndpoint}double-pana-bulk');
+    }
+
     final headers = {
       'deviceId': _deviceId,
       'deviceName': _deviceName,

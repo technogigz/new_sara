@@ -36,6 +36,8 @@ class _PassbookPageState extends State<PassbookPage> {
     final token = GetStorage().read("accessToken") ?? '';
     String registerId =
         GetStorage().read("registerId") ?? ""; // New static registerId
+    final String deviceId = GetStorage().read('deviceId');
+    final String deviceName = GetStorage().read('deviceName');
 
     log("Fetching Passbook entries...");
     log("Register Id: $registerId");
@@ -53,8 +55,8 @@ class _PassbookPageState extends State<PassbookPage> {
       final res = await http.post(
         Uri.parse(url),
         headers: {
-          'deviceId': 'qwert',
-          'deviceName': 'sm2233',
+          'deviceId': deviceId,
+          'deviceName': deviceName,
           'accessStatus': '1',
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -210,7 +212,7 @@ class _PassbookPageState extends State<PassbookPage> {
           _DataCell(e.description, width: 250), // Use e.description
           _DataCell("₹ ${e.previousAmount}", width: 150),
           _DataCell(
-            "${e.type == 'credit' ? '₹' : '-₹'}${e.transactionAmount}", // Use e.type for sign
+            "${e.type == 'credit' ? '₹' : '₹'}${e.transactionAmount}", // Use e.type for sign
             width: 150,
             isCredit: e.isCredit,
           ),

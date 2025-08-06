@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 
+import 'Helper/UserController.dart';
 import 'Splash.dart';
 
 void main() async {
   // Ensure that Flutter bindings are initialized before any plugin calls
   WidgetsFlutterBinding.ensureInitialized();
   await GetStorage.init();
+  Get.put(UserController());
   // The app now starts directly with the SplashScreen
   runApp(const MyApp());
 }

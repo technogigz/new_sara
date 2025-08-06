@@ -366,233 +366,251 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
 
                           // Dynamic routing based on gameType
                           Widget? destinationScreen;
-                          switch (gameType) {
-                            case 'singleDigits':
-                              destinationScreen = SingleDigitBetScreen(
-                                title:
-                                    "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
-                                gameId: widget.gameId,
-                                gameName: item.name,
-                                gameCategoryType: item.type,
-                                selectionStatus: widget.openSessionStatus,
-                              );
-                              break;
+                          try {
+                            switch (gameType) {
+                              case 'singleDigits':
+                                destinationScreen = SingleDigitBetScreen(
+                                  title:
+                                      "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
+                                  gameId: widget.gameId,
+                                  gameName: item.name,
+                                  gameCategoryType: item.type,
+                                  selectionStatus: widget.openSessionStatus,
+                                );
+                                break;
 
-                            case 'spMotor':
-                              destinationScreen = SPMotorsBetScreen(
-                                title:
-                                    "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
-                                gameId: widget.gameId,
-                                gameName: item.name,
-                                gameCategoryType: item.type,
-                                selectionStatus: widget.openSessionStatus,
-                              );
-                              break;
+                              case 'spMotor':
+                                destinationScreen = SPMotorsBetScreen(
+                                  title:
+                                      "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
+                                  gameId: widget.gameId,
+                                  gameName: item.name,
+                                  gameCategoryType: item.type,
+                                  selectionStatus: widget.openSessionStatus,
+                                );
+                                break;
 
-                            case 'doublePana':
-                            case 'dpMotor':
-                              destinationScreen = DPMotorsBetScreen(
-                                title:
-                                    "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
-                                gameId: widget.gameId,
-                                gameName: item.name,
-                                gameCategoryType: item.type,
-                                selectionStatus: widget.openSessionStatus,
-                              );
-                              break;
+                              case 'doublePana':
+                              case 'dpMotor':
+                                destinationScreen = DPMotorsBetScreen(
+                                  title:
+                                      "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
+                                  gameId: widget.gameId,
+                                  gameName: item.name,
+                                  gameCategoryType: item.type,
+                                  selectionStatus: widget.openSessionStatus,
+                                );
+                                break;
 
-                            case 'triplePana':
-                              destinationScreen = TPMotorsBetScreen(
-                                title:
-                                    "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
-                                gameId: widget.gameId,
-                                gameName: item.name,
-                                gameCategoryType: item.type,
-                                selectionStatus: widget.openSessionStatus,
-                              );
-                              break;
+                              case 'triplePana':
+                                destinationScreen = TPMotorsBetScreen(
+                                  title:
+                                      "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
+                                  gameId: widget.gameId,
+                                  gameName: item.name,
+                                  gameCategoryType: item.type,
+                                  selectionStatus: widget.openSessionStatus,
+                                );
+                                break;
 
-                            case 'singleDigitsBulk':
-                              destinationScreen = SingleDigitsBulkScreen(
-                                title:
-                                    "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
-                                gameId: widget.gameId,
-                                gameType: item.type,
-                                gameName: item.name,
-                                selectionStatus: widget.openSessionStatus,
-                              );
-                              break;
+                              case 'singleDigitsBulk':
+                                destinationScreen = SingleDigitsBulkScreen(
+                                  title:
+                                      "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
+                                  gameId: widget.gameId,
+                                  gameType: item.type,
+                                  gameName: item.name,
+                                  selectionStatus: widget.openSessionStatus,
+                                );
+                                break;
 
-                            case 'doublePanaBulk':
-                            case 'singlePanaBulk':
-                              destinationScreen = SinglePannaBulkBoardScreen(
-                                title:
-                                    "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
-                                gameId: widget.gameId,
-                                gameType: item.type,
-                                gameName: item.name,
-                                selectionStatus: widget.openSessionStatus,
-                              );
-                              break;
+                              case 'doublePanaBulk':
+                              case 'singlePanaBulk':
+                                destinationScreen = SinglePannaBulkBoardScreen(
+                                  title:
+                                      "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
+                                  gameId: widget.gameId,
+                                  gameType: item.type,
+                                  gameName: item.name,
+                                  selectionStatus: widget.openSessionStatus,
+                                );
+                                break;
 
-                            case 'panelGroup':
-                              destinationScreen = PanelGroupScreen(
-                                title:
-                                    "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
-                                gameId: widget.gameId,
-                                gameName: item.name,
-                                gameCategoryType: item.type,
-                                selectionStatus: widget.openSessionStatus,
-                              );
-                              break;
+                              case 'panelGroup':
+                                destinationScreen = PanelGroupScreen(
+                                  title:
+                                      "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
+                                  gameId: widget.gameId,
+                                  gameName: item.name,
+                                  gameCategoryType: item.type,
+                                );
+                                break;
 
-                            case 'jodi':
-                            case 'groupDigit':
-                            case 'twoDigitPanna':
-                              destinationScreen = JodiBidScreen(
-                                title:
-                                    "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
-                                gameId: widget.gameId,
-                                gameType: item.type,
-                                gameName: item.name,
-                              );
-                              break;
+                              case 'jodi':
+                              case 'groupDigit':
+                              case 'twoDigitPanna':
+                                destinationScreen = JodiBidScreen(
+                                  title:
+                                      "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
+                                  gameId: widget.gameId,
+                                  gameType: item.type,
+                                  gameName: item.name,
+                                );
+                                break;
 
-                            case 'jodiBulk':
-                              destinationScreen = JodiBulkScreen(
-                                screenTitle:
-                                    "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
-                                gameId: widget.gameId,
-                                gameType: item.type,
-                                gameName: item.name,
-                              );
-                              break;
+                              case 'jodiBulk':
+                                destinationScreen = JodiBulkScreen(
+                                  screenTitle:
+                                      "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
+                                  gameId: widget.gameId,
+                                  gameType: item.type,
+                                  gameName: item.name,
+                                );
+                                break;
 
-                            case 'singlePana':
-                              destinationScreen = SinglePannaScreen(
-                                title:
-                                    "$parentScreenTranslatedTitle ${item.currentDisplayName}",
-                                gameId: widget.gameId,
-                                gameType: item.type,
-                                selectionStatus: widget.openSessionStatus,
-                              );
-                              break;
+                              case 'singlePana':
+                                destinationScreen = SinglePannaScreen(
+                                  title:
+                                      "$parentScreenTranslatedTitle ${item.currentDisplayName}",
+                                  gameId: widget.gameId,
+                                  gameType: item.type,
+                                  selectionStatus: widget.openSessionStatus,
+                                );
+                                break;
 
-                            case 'twoDigitsPanel':
-                              destinationScreen = TwoDigitPanelScreen(
-                                title:
-                                    "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
-                                gameId: widget.gameId,
-                                gameType: item.type,
-                              );
-                              break;
+                              case 'twoDigitsPanel':
+                                destinationScreen = TwoDigitPanelScreen(
+                                  title:
+                                      "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
+                                  gameId: widget.gameId,
+                                  gameType: item.type,
+                                );
+                                break;
 
-                            case 'groupJodi':
-                              destinationScreen = GroupJodiScreen(
-                                title:
-                                    "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
-                                gameId: widget.gameId,
-                                gameType: item.type,
-                              );
-                              break;
+                              case 'groupJodi':
+                                destinationScreen = GroupJodiScreen(
+                                  title:
+                                      "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
+                                  gameId: widget.gameId,
+                                  gameType: item.type,
+                                );
+                                break;
 
-                            case 'digitBasedJodi':
-                              destinationScreen = DigitBasedBoardScreen(
-                                title:
-                                    "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
-                                gameId: item.id
-                                    .toString(), // Ensure gameId is String if expected by this screen
-                                gameType: item.type,
-                                gameName: item.name,
-                              );
-                              break;
+                              case 'digitBasedJodi':
+                                destinationScreen = DigitBasedBoardScreen(
+                                  title:
+                                      "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
+                                  gameId: widget.gameId
+                                      .toString(), // Changed to match others
+                                  gameType: item.type,
+                                  gameName: item.name,
+                                );
+                                break;
 
-                            case 'oddEven':
-                              destinationScreen = OddEvenBoardScreen(
-                                title:
-                                    "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
-                                gameId: widget.gameId,
-                                gameType: item.type,
-                                selectionStatus: widget.openSessionStatus,
-                              );
-                              break;
+                              case 'oddEven':
+                                destinationScreen = OddEvenBoardScreen(
+                                  title:
+                                      "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
+                                  gameId: widget.gameId,
+                                  gameType: item.type,
+                                  selectionStatus: widget.openSessionStatus,
+                                );
+                                break;
 
-                            case 'choicePannaSPDP':
-                              destinationScreen = ChoiceSpDpTpBoardScreen(
-                                screenTitle:
-                                    "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
-                                gameId: widget.gameId,
-                                gameType: item.type,
-                                gameName: item.name,
-                                selectionStatus: widget.openSessionStatus,
-                              );
-                              break;
+                              case 'choicePannaSPDP':
+                                destinationScreen = ChoiceSpDpTpBoardScreen(
+                                  screenTitle:
+                                      "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
+                                  gameId: widget.gameId,
+                                  gameType: item.type,
+                                  gameName: item.name,
+                                  selectionStatus: widget.openSessionStatus,
+                                );
+                                break;
 
-                            case 'SPDPTP':
-                              destinationScreen = SpDpTpBoardScreen(
-                                screenTitle:
-                                    "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
-                                gameId: widget.gameId,
-                                gameType: item.type,
-                                openSessionStatus: widget.openSessionStatus,
-                              );
-                              break;
+                              case 'SPDPTP':
+                                destinationScreen = SpDpTpBoardScreen(
+                                  screenTitle:
+                                      "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
+                                  gameId: widget.gameId,
+                                  gameType: item.type,
+                                  openSessionStatus: widget.openSessionStatus,
+                                );
+                                break;
 
-                            case 'redBracket':
-                              destinationScreen = RedBracketBoardScreen(
-                                screenTitle:
-                                    "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
-                                gameId: widget.gameId,
-                                gameType: item.type,
-                              );
-                              break;
+                              case 'redBracket':
+                                destinationScreen = RedBracketBoardScreen(
+                                  screenTitle:
+                                      "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
+                                  gameId: widget.gameId,
+                                  gameType: item.type,
+                                );
+                                break;
 
-                            case 'halfSangamA':
-                              destinationScreen = HalfSangamABoardScreen(
-                                screenTitle:
-                                    "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
-                                gameId: widget.gameId,
-                                gameType: item.type,
-                                gameName: item.name,
-                              );
-                              break;
-                            case 'halfSangamB':
-                              destinationScreen = HalfSangamBBoardScreen(
-                                screenTitle:
-                                    "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
-                                gameId: widget.gameId,
-                                gameType: item.type,
-                                gameName: item.name,
-                              );
-                              break;
-                            case 'fullSangam':
-                              destinationScreen = FullSangamBoardScreen(
-                                screenTitle:
-                                    "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
-                                gameId: widget.gameId,
-                                gameType: item.type,
-                              );
-                              break;
-                            default:
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    "No screen available for ${item.currentDisplayName}",
+                              case 'halfSangamA':
+                                destinationScreen = HalfSangamABoardScreen(
+                                  screenTitle:
+                                      "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
+                                  gameId: widget.gameId,
+                                  gameType: item.type,
+                                  gameName: item.name,
+                                );
+                                break;
+
+                              case 'halfSangamB':
+                                destinationScreen = HalfSangamBBoardScreen(
+                                  screenTitle:
+                                      "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
+                                  gameId: widget.gameId,
+                                  gameType: item.type,
+                                  gameName: item.name,
+                                );
+                                break;
+
+                              case 'fullSangam':
+                                destinationScreen = FullSangamBoardScreen(
+                                  screenTitle:
+                                      "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
+                                  gameId: widget.gameId,
+                                  gameType: item.type,
+                                );
+                                break;
+
+                              default:
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      "No screen available for ${item.currentDisplayName}",
+                                    ),
                                   ),
+                                );
+                                log(
+                                  "Unhandled game type: ${item.type}",
+                                  name: 'GameMenuScreen.Navigation',
+                                );
+                                break;
+                            }
+
+                            // Navigation
+                            if (destinationScreen != null) {
+                              print("Navigating to $gameType");
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => destinationScreen!,
                                 ),
                               );
-                              log(
-                                "Unhandled game type: ${item.type}",
-                                name: 'GameMenuScreen.Navigation',
-                              );
-                              break;
-                          }
-
-                          if (destinationScreen != null) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => destinationScreen!,
+                            } else {
+                              print("destinationScreen is null for $gameType");
+                            }
+                          } catch (e, st) {
+                            print("Error navigating to screen: $e");
+                            print("Stack trace: $st");
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  "Failed to navigate: ${e.toString()}",
+                                ),
                               ),
                             );
                           }

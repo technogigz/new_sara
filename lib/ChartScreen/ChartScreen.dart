@@ -1,8 +1,10 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:new_sara/ChartScreen/ChartTableScreen.dart';
+import 'package:new_sara/ulits/Constents.dart';
 
 class Game {
   final int gameId;
@@ -39,18 +41,21 @@ class _ChartScreenState extends State<ChartScreen> {
   }
 
   Future<void> fetchGames() async {
-    const url = 'https://sara777.win/api/v1/chart-game-list';
+    final url = '${Constant.apiEndpoint}chart-game-list';
+    final String accessToken = GetStorage().read('accessToken');
+    final String registerId = GetStorage().read('registerId');
+    final String deviceId = GetStorage().read('deviceId');
+    final String deviceName = GetStorage().read('deviceName');
 
     try {
       final response = await http.get(
         Uri.parse(url),
         headers: {
-          'deviceId': 'qwert',
-          'deviceName': 'sm2233',
+          'deviceId': deviceId,
+          'deviceName': deviceName,
           'accessStatus': '1',
           'Content-Type': 'application/json',
-          'Authorization':
-              'Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9....', // truncated for brevity
+          'Authorization': 'Bearer $accessToken', // truncated for brevity
         },
       );
 

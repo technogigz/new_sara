@@ -154,6 +154,8 @@ class _HomePageState extends State<HomePage> {
       _preTranslateUI();
     });
 
+    _storage.write('isLoggedIn', true);
+
     // Listen for account status changes
     _storage.listenKey('accountStatus', (value) {
       _accountStatus = value ?? false;

@@ -31,15 +31,17 @@ class _ChartTableScreenState extends State<ChartTableScreen> {
   }
 
   Future<void> fetchChartData() async {
-    String token = GetStorage().read(
-      "accessToken",
+    final String token = GetStorage().read("accessToken");
+    final String deviceId = GetStorage().read('deviceId');
+    final String deviceName = GetStorage().read(
+      'deviceName',
     ); // Replace with actual token
 
     final response = await http.post(
       Uri.parse('${Constant.apiEndpoint}table-chart'),
       headers: {
-        'deviceId': 'qwert',
-        'deviceName': 'sm2233',
+        'deviceId': deviceId,
+        'deviceName': deviceName,
         'accessStatus': '1',
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',

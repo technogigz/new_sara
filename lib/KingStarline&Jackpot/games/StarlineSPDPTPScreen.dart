@@ -1,18 +1,20 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer'; // For log
-import 'dart:math' hide log; // For Random number generation
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For TextInputFormatter
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart'; // For GoogleFonts
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart'; // Import for date formatting
 import 'package:new_sara/KingStarline&Jackpot/StarlineBidService.dart';
 
 import '../../components/AnimatedMessageBar.dart'; // Ensure this path is correct
 import '../../components/BidConfirmationDialog.dart'; // Ensure this path is correct
 import '../../components/BidFailureDialog.dart'; // For API failure dialog (ensure this path is correct)
-import '../../components/BidSuccessDialog.dart'; // For API success dialog (ensure this path is correct)
+import '../../components/BidSuccessDialog.dart';
+import '../../ulits/Constents.dart'; // For API success dialog (ensure this path is correct)
 
 class StarlineSpDpTpScreen extends StatefulWidget {
   final String screenTitle;
@@ -42,7 +44,6 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
   final String _selectedGameTypeOption = 'OPEN';
 
   List<Map<String, String>> _bids = [];
-  final Random _random = Random();
 
   late int walletBalance;
   late String accessToken;
@@ -53,8 +54,8 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
 
   late StarlineBidService _bidService;
 
-  final String _deviceId = 'test_device_id_flutter';
-  final String _deviceName = 'test_device_name_flutter';
+  final String _deviceId = GetStorage().read('deviceId');
+  final String _deviceName = GetStorage().read('deviceName');
 
   String? _messageToShow;
   bool _isErrorForMessage = false;
@@ -356,87 +357,201 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
     });
   }
 
-  void _addBid() {
+  Future<List<String>> singlePanaBulk({
+    required int digit,
+    required int amount,
+    required String sessionType,
+    required String gameId,
+    required String registerId,
+  }) async {
+    return await _fetchBulkPannaBids(
+      digit: digit,
+      amount: amount,
+      sessionType: sessionType,
+      apiEndpoint: '${Constant.apiEndpoint}single-pana-bulk',
+      gameId: gameId,
+      registerId: registerId,
+    );
+  }
+
+  Future<List<String>> doublePanaBulk({
+    required int digit,
+    required int amount,
+    required String sessionType,
+    required String gameId,
+    required String registerId,
+  }) async {
+    return await _fetchBulkPannaBids(
+      digit: digit,
+      amount: amount,
+      sessionType: sessionType,
+      apiEndpoint: '${Constant.apiEndpoint}double-pana-bulk',
+      gameId: gameId,
+      registerId: registerId,
+    );
+  }
+
+  Future<List<String>> triplePanaBulk({
+    required int digit,
+    required int amount,
+    required String sessionType,
+    required String gameId,
+    required String registerId,
+  }) async {
+    return await _fetchBulkPannaBids(
+      digit: digit,
+      amount: amount,
+      sessionType: sessionType,
+      apiEndpoint: '${Constant.apiEndpoint}triple-pana-bulk',
+      gameId: gameId,
+      registerId: registerId,
+    );
+  }
+
+  // ✅ Common Fetch Function
+  Future<List<String>> _fetchBulkPannaBids({
+    required int digit,
+    required int amount,
+    required String sessionType,
+    required String apiEndpoint,
+    required String gameId,
+    required String registerId,
+  }) async {
+    final uri = Uri.parse(apiEndpoint);
+
+    final deviceId = GetStorage().read('deviceId')?.toString() ?? '';
+    final deviceName = GetStorage().read('deviceName')?.toString() ?? '';
+    final accessToken = GetStorage().read('accessToken')?.toString() ?? '';
+    final accessStatus = GetStorage().read('accountStatus') == true ? '1' : '0';
+
+    final headers = <String, String>{
+      'deviceId': deviceId,
+      'deviceName': deviceName,
+      'accessStatus': accessStatus,
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $accessToken',
+    };
+
+    final body = jsonEncode({
+      "game_id": gameId,
+      "register_id": registerId,
+      "session_type": sessionType,
+      "digit": digit,
+      "amount": amount,
+    });
+
+    try {
+      final response = await http.post(uri, headers: headers, body: body);
+      final responseData = json.decode(response.body);
+
+      log("API Response from $apiEndpoint: $responseData");
+
+      if (response.statusCode == 200 && responseData['status'] == true) {
+        final List<dynamic> info = responseData['info'] ?? [];
+        return info.map<String>((item) => item['pana'].toString()).toList();
+      } else {
+        throw 'API Error: ${responseData['msg'] ?? 'Unknown error'}';
+      }
+    } catch (e) {
+      log("Error fetching panna bids from $apiEndpoint: $e");
+      throw 'Network/API Error: $e';
+    }
+  }
+
+  void _addBid() async {
     _clearMessage();
     if (_isApiCalling) return;
 
-    final panna = _pannaController.text.trim();
-    final points = _pointsController.text.trim();
+    final digitText = _pannaController.text.trim();
+    final pointsText = _pointsController.text.trim();
 
-    String gameCategory = '';
-    int selectedCount = 0;
-    if (_isSPSelected) {
-      gameCategory = 'SP';
-      selectedCount++;
-    }
-    if (_isDPSelected) {
-      gameCategory = 'DP';
-      selectedCount++;
-    }
-    if (_isTPSelected) {
-      gameCategory = 'TP';
-      selectedCount++;
-    }
+    // Determine selected Game Category
+    String? gameCategory;
+    if (_isSPSelected) gameCategory = 'SP';
+    if (_isDPSelected) gameCategory = 'DP';
+    if (_isTPSelected) gameCategory = 'TP';
 
-    if (selectedCount == 0) {
+    if (gameCategory == null) {
       _showMessage('Please select SP, DP, or TP.', isError: true);
       return;
     }
-    if (selectedCount > 1) {
-      _showMessage('Please select only one of SP, DP, or TP.', isError: true);
+
+    if (digitText.isEmpty || digitText.length != 1) {
+      _showMessage('Please enter a valid single digit (0-9).', isError: true);
       return;
     }
 
-    if (panna.isEmpty) {
-      _showMessage('Please enter a Panna.', isError: true);
+    final digit = int.tryParse(digitText);
+    if (digit == null || digit < 0 || digit > 9) {
+      _showMessage('Digit must be a number from 0 to 9.', isError: true);
       return;
     }
 
-    if (panna.length != 3) {
-      _showMessage('Panna must be 3 digits.', isError: true);
-      return;
-    }
-
-    bool isValidPanna = false;
-    if (gameCategory == 'SP') {
-      isValidPanna = _isValidSpPanna(panna);
-    } else if (gameCategory == 'DP') {
-      isValidPanna = _isValidDpPanna(panna);
-    } else if (gameCategory == 'TP') {
-      isValidPanna = _isValidTpPanna(panna);
-    }
-
-    if (!isValidPanna) {
-      _showMessage(
-        'Invalid Panna for $gameCategory. Please check the digits.',
-        isError: true,
-      );
-      return;
-    }
-
-    int? parsedPoints = int.tryParse(points);
-    if (parsedPoints == null || parsedPoints < 10) {
+    final points = int.tryParse(pointsText);
+    if (points == null || points < 10) {
       _showMessage('Points must be at least 10.', isError: true);
       return;
     }
 
-    final existingIndex = _bids.indexWhere(
-      (bid) => bid['digit'] == panna && bid['gameType'] == gameCategory,
-    );
+    final sessionType = gameCategory.toLowerCase(); // 'sp', 'dp', 'tp'
 
-    setState(() {
-      if (existingIndex != -1) {
-        int existingPoints = int.parse(_bids[existingIndex]['amount']!);
-        _bids[existingIndex]['amount'] = (existingPoints + parsedPoints)
-            .toString();
-        _showMessage("Updated bid for $gameCategory $panna.");
-      } else {
-        _bids.add({"digit": panna, "amount": points, "gameType": gameCategory});
-        _showMessage('Bid for $gameCategory $panna added successfully.');
-      }
-      _pannaController.clear();
-      _pointsController.clear();
-    });
+    setState(() => _isApiCalling = true);
+
+    try {
+      final apiMap = {
+        'SP': '${Constant.apiEndpoint}single-pana-bulk',
+        'DP': '${Constant.apiEndpoint}double-pana-bulk',
+        'TP': '${Constant.apiEndpoint}triple-pana-bulk',
+      };
+
+      final selectedEndpoint = apiMap[gameCategory]!;
+
+      final pannaList = await _fetchBulkPannaBids(
+        digit: digit,
+        amount: points,
+        sessionType: sessionType,
+        apiEndpoint: selectedEndpoint,
+        gameId: widget.gameId.toString(),
+        registerId:
+            '', // You can replace it with GetStorage().read('registerId') if needed
+      );
+
+      int addedCount = 0;
+
+      setState(() {
+        for (String item in pannaList) {
+          bool alreadyExists = _bids.any(
+            (bid) =>
+                bid['digit'] == item &&
+                bid['amount'] == points.toString() &&
+                bid['gameType'] == gameCategory,
+          );
+
+          if (!alreadyExists) {
+            _bids.add({
+              'digit': item,
+              'amount': points.toString(),
+              'gameType':
+                  _selectedGameTypeOption, // ✅ FIXED: Use selected game category directly
+            });
+            addedCount++;
+          }
+        }
+
+        _pannaController.clear();
+        _pointsController.clear();
+
+        if (addedCount > 0) {
+          _showMessage('$addedCount bids added for $gameCategory.');
+        } else {
+          _showMessage('All bids already exist.', isError: true);
+        }
+      });
+    } catch (e) {
+      _showMessage('Error: ${e.toString()}', isError: true);
+    } finally {
+      setState(() => _isApiCalling = false);
+    }
   }
 
   @override
@@ -581,7 +696,7 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
-                            'Enter Panna:',
+                            'Enter Single Digit:',
                             style: TextStyle(fontSize: 16),
                           ),
                           SizedBox(
@@ -596,7 +711,7 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
                                 FilteringTextInputFormatter.digitsOnly,
                               ],
                               decoration: const InputDecoration(
-                                hintText: 'Enter Panna',
+                                hintText: 'Enter Single Digit',
                                 contentPadding: EdgeInsets.symmetric(
                                   horizontal: 12,
                                 ),

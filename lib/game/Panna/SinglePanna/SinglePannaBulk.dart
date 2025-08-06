@@ -68,8 +68,8 @@ class _SinglePannaBulkBoardScreenState
   bool _isWalletLoading = true; // Indicates if wallet balance is being loaded
 
   // Device information for API headers
-  final String _deviceId = GetStorage().read('deviceId');
-  final String _deviceName = GetStorage().read('deviceName');
+  final String _deviceId = GetStorage().read('deviceId') ?? '';
+  final String _deviceName = GetStorage().read('deviceName') ?? '';
 
   // --- AnimatedMessageBar State Management ---
   String? _messageToShow; // Message to display in the custom message bar

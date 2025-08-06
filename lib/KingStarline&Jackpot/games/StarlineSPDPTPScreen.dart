@@ -54,8 +54,8 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
 
   late StarlineBidService _bidService;
 
-  final String _deviceId = GetStorage().read('deviceId');
-  final String _deviceName = GetStorage().read('deviceName');
+  final String _deviceId = GetStorage().read('deviceId') ?? '';
+  final String _deviceName = GetStorage().read('deviceName') ?? '';
 
   String? _messageToShow;
   bool _isErrorForMessage = false;

@@ -45,8 +45,8 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
   final TextEditingController digitController = TextEditingController();
   final TextEditingController pointsController = TextEditingController();
 
-  final String deviceId = GetStorage().read('deviceId');
-  final String deviceName = GetStorage().read('deviceName');
+  final String _deviceId = GetStorage().read('deviceId') ?? '';
+  final String _deviceName = GetStorage().read('deviceName') ?? '';
 
   List<Map<String, String>> addedEntries = []; // List to store the added bids
 
@@ -281,9 +281,6 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
   bool accountStatus = false;
   late String preferredLanguage;
 
-  late final String _deviceId;
-  late final String _deviceName;
-
   // State management for AnimatedMessageBar
   String? _messageToShow;
   bool _isErrorForMessage = false;
@@ -305,8 +302,6 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
     registerId = _storage.read('registerId') ?? '';
     accountStatus = _storage.read('accountStatus') ?? false;
     preferredLanguage = _storage.read('selectedLanguage') ?? 'en';
-    _deviceId = GetStorage().read('deviceId');
-    _deviceName = GetStorage().read('deviceName');
 
     final dynamic storedWalletBalance = _storage.read('walletBalance');
     if (storedWalletBalance is int) {
@@ -411,7 +406,7 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
       return;
     }
 
-    if (deviceId == null || deviceId.isEmpty) {
+    if (_deviceId == null || _deviceId.isEmpty) {
       log(
         'Warning: Device ID is missing in _addEntry. API call might fail.',
         name: 'PanelGroupAddEntry',
@@ -459,8 +454,8 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
     required int points,
   }) async {
     final headers = {
-      'deviceId': deviceId ?? '',
-      'deviceName': deviceName ?? '',
+      'deviceId': _deviceId ?? '',
+      'deviceName': _deviceName ?? '',
       'accessStatus': accountStatus == true ? '1' : '0',
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $accessToken',

@@ -56,8 +56,8 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
 
   late BidService _bidService;
 
-  final String _deviceId = GetStorage().read('deviceId');
-  final String _deviceName = GetStorage().read('deviceName');
+  final String _deviceId = GetStorage().read('deviceId') ?? '';
+  final String _deviceName = GetStorage().read('deviceName') ?? '';
 
   String? _messageToShow;
   bool _isErrorForMessage = false;
@@ -913,12 +913,10 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
     required String registerId,
   }) async {
     final uri = Uri.parse(apiEndpoint);
-
-    final storage = GetStorage();
-    final deviceId = storage.read('deviceId')?.toString() ?? '';
-    final deviceName = storage.read('deviceName')?.toString() ?? '';
-    final accessToken = storage.read('accessToken')?.toString() ?? '';
-    final accessStatus = storage.read('accountStatus') == true ? '1' : '0';
+    var deviceId = storage.read('deviceId')?.toString() ?? '';
+    var deviceName = storage.read('deviceName')?.toString() ?? '';
+    accessToken = storage.read('accessToken')?.toString() ?? '';
+    var accessStatus = storage.read('accountStatus') == true ? '1' : '0';
 
     final headers = {
       'deviceId': deviceId,
@@ -994,9 +992,9 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
       return;
     }
 
-    final String sessionType = gameCategory.toLowerCase();
-    final String gameId = widget.gameId?.toString() ?? '';
-    final String registerId = GetStorage().read('registerId')?.toString() ?? '';
+    var sessionType = gameCategory.toLowerCase();
+    var gameId = widget.gameId.toString();
+    registerId = storage.read('registerId')?.toString() ?? '';
 
     if (gameId.isEmpty || registerId.isEmpty) {
       _showMessage(

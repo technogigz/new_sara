@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart'; // For date and time formatting
+import 'package:intl/intl.dart';
+
+import '../../ulits/Constents.dart'; // For date and time formatting
 
 class KingStarlineBidHistoryScreen extends StatefulWidget {
   const KingStarlineBidHistoryScreen({Key? key}) : super(key: key);
@@ -29,8 +31,7 @@ class _KingStarlineBidHistoryScreenState
 
   Future<void> fetchEntries() async {
     setState(() => loading = true);
-    const url =
-        'https://sara777.win/api/v1/bet-history'; // API URL for bet history
+    final url = '${Constant.apiEndpoint}bet-history'; // API URL for bet history
     final token = GetStorage().read("accessToken") ?? '';
     String registerId =
         GetStorage().read("registerId") ?? ""; // Example registerId
@@ -47,7 +48,7 @@ class _KingStarlineBidHistoryScreenState
     final requestBody = jsonEncode({
       'registerId': registerId,
       'pageIndex': 1, // Hardcoded as pagination is removed
-      'recordLimit': 10, // Hardcoded as pagination is removed
+      'recordLimit': 10000, // Hardcoded as pagination is removed
       'placeType': 'starline', // Specific for King Starline
       'fromDate': formattedFromDate, // Made dynamic
     });
@@ -231,19 +232,25 @@ class _KingStarlineBidHistoryScreenState
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  entry.gameName
-                      .toUpperCase(), // Game Name (e.g., RAJDHANI DAY CLOSE)
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                Column(
+                  children: [
+                    Text(
+                      entry.gameName
+                          .toUpperCase(), // Game Name (e.g., RAJDHANI DAY CLOSE)
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+
+                    Text(
+                      '${entry.betType} (${entry.digit})', // Bet Type (e.g., Single Digit)
+                      style: const TextStyle(color: Colors.black, fontSize: 14),
+                    ),
+                  ],
                 ),
-                Text(
-                  entry.betType, // Bet Type (e.g., Single Digit)
-                  style: const TextStyle(color: Colors.black, fontSize: 14),
-                ),
+
                 Text(
                   "Amount\n${entry.amount}", // Amount
                   textAlign: TextAlign.right,
@@ -310,11 +317,12 @@ class _KingStarlineBidHistoryScreenState
                   ),
                 ),
                 const SizedBox(height: 16),
+                Divider(),
                 Text(
                   // Changed to Text to use dynamic status
                   entry.status, // Display the status text from API
                   style: TextStyle(
-                    color: entry.status.toLowerCase().contains('good luck')
+                    color: entry.status.toLowerCase().contains('Best')
                         ? Colors.green
                         : Colors.black, // Green for "Good Luck"
                     fontWeight: FontWeight.bold,

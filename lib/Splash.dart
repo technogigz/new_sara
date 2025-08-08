@@ -27,6 +27,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 /// Notification display logic
+@pragma('vm:entry-point')
 Future<void> _showFlutterNotification(RemoteMessage message) async {
   RemoteNotification? notification = message.notification;
   AndroidNotification? android = message.notification?.android;
@@ -37,7 +38,7 @@ Future<void> _showFlutterNotification(RemoteMessage message) async {
           'default_channel',
           'Default Channel',
           channelDescription: 'This channel is used for default notifications.',
-          icon: 'ic_launcher',
+          icon: 'notification_icon', // <- आइकन का नाम
           importance: Importance.max,
           priority: Priority.high,
           playSound: true,

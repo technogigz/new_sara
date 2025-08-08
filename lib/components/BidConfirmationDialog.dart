@@ -204,26 +204,38 @@ class BidConfirmationDialog extends StatelessWidget {
         itemBuilder: (context, index) {
           final bid = bids[index];
           final displayPoints = bid['points'] ?? bid['amount'] ?? '';
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: Text(bid['digit'] ?? '', style: GoogleFonts.poppins()),
+          return SizedBox(
+            width: double.infinity,
+            child: Container(
+              color: Colors.grey[200],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8.0,
+                  vertical: 4.0,
                 ),
-                Expanded(
-                  flex: 2,
-                  child: Text(displayPoints, style: GoogleFonts.poppins()),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        bid['digit'] ?? '',
+                        style: GoogleFonts.poppins(),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(displayPoints, style: GoogleFonts.poppins()),
+                    ),
+                    Expanded(
+                      flex: 1,
+                      child: Text(
+                        bid['type'] ?? '',
+                        style: GoogleFonts.poppins(color: Colors.green[700]),
+                      ),
+                    ),
+                  ],
                 ),
-                Expanded(
-                  flex: 1,
-                  child: Text(
-                    bid['type'] ?? '',
-                    style: GoogleFonts.poppins(color: Colors.green[700]),
-                  ),
-                ),
-              ],
+              ),
             ),
           );
         },

@@ -6,8 +6,10 @@ import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
 // Import your game screens
 import 'package:new_sara/game/Jodi/JodiBulkScreen.dart';
+import 'package:new_sara/game/Panna/DoublePana/DoublePana.dart';
 import 'package:new_sara/game/Panna/SinglePanna/SinglePanna.dart';
-import 'package:new_sara/game/Panna/SinglePanna/SinglePannaBulk.dart';
+import 'package:new_sara/game/Panna/SinglePanna/SinglePannaBulk.dart'
+    hide SingleDigitsBulkScreen;
 import 'package:new_sara/game/RedBracket/RedBracketScreen.dart';
 import 'package:new_sara/game/SPDPTPScreen/ChoiceSpDpTpBoardScreen.dart';
 import 'package:new_sara/game/SPDPTPScreen/SPMotors.dart';
@@ -391,6 +393,15 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                                 break;
 
                               case 'doublePana':
+                                destinationScreen = DoublePanaBetScreen(
+                                  title:
+                                      "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
+                                  gameId: widget.gameId,
+                                  gameName: item.name,
+                                  gameCategoryType: item.type,
+                                  selectionStatus: widget.openSessionStatus,
+                                );
+                                break;
                               case 'dpMotor':
                                 destinationScreen = DPMotorsBetScreen(
                                   title:
@@ -469,7 +480,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                                 break;
 
                               case 'singlePana':
-                                destinationScreen = SinglePannaScreen(
+                                destinationScreen = SinglePanaScreen(
                                   title:
                                       "$parentScreenTranslatedTitle ${item.currentDisplayName}",
                                   gameId: widget.gameId,
@@ -573,6 +584,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                                       "$parentScreenTranslatedTitle, ${item.currentDisplayName}",
                                   gameId: widget.gameId,
                                   gameType: item.type,
+                                  gameName: item.name,
                                 );
                                 break;
 

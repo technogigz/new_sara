@@ -46,7 +46,7 @@ class _BidHistoryPageState extends State<BidHistoryPage> {
     final requestBody = jsonEncode({
       'registerId': registerId,
       'pageIndex': 1, // Hardcoded as pagination is removed
-      'recordLimit': 10, // Hardcoded as pagination is removed
+      'recordLimit': 10000, // Hardcoded as pagination is removed
       'placeType': 'game', // Specific for general game history
       'fromDate': formattedFromDate, // Made dynamic
     });
@@ -241,7 +241,7 @@ class _BidHistoryPageState extends State<BidHistoryPage> {
                     ),
 
                     Text(
-                      entry.betType, // Bet Type (e.g., Single Digit)
+                      '${entry.betType} (${entry.digit})', // Bet Type (e.g., Single Digit)
                       style: const TextStyle(color: Colors.black, fontSize: 14),
                     ),
                   ],

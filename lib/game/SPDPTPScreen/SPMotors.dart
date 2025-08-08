@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
 import '../../BidService.dart';
@@ -34,136 +36,10 @@ class SPMotorsBetScreen extends StatefulWidget {
 }
 
 class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
-  // Removed fixed gameTypesOptions list
   late String selectedGameBetType;
 
   final TextEditingController bidController = TextEditingController();
   final TextEditingController pointsController = TextEditingController();
-
-  List<String> digitOptions = [
-    "120",
-    "123",
-    "124",
-    "125",
-    "126",
-    "127",
-    "128",
-    "129",
-    "130",
-    "134",
-    "135",
-    "136",
-    "137",
-    "138",
-    "139",
-    "140",
-    "145",
-    "146",
-    "147",
-    "148",
-    "149",
-    "150",
-    "156",
-    "157",
-    "158",
-    "159",
-    "160",
-    "167",
-    "168",
-    "169",
-    "170",
-    "178",
-    "179",
-    "180",
-    "189",
-    "190",
-    "230",
-    "234",
-    "235",
-    "236",
-    "237",
-    "238",
-    "239",
-    "240",
-    "245",
-    "246",
-    "247",
-    "248",
-    "249",
-    "250",
-    "256",
-    "257",
-    "258",
-    "259",
-    "260",
-    "267",
-    "268",
-    "269",
-    "270",
-    "278",
-    "279",
-    "280",
-    "289",
-    "290",
-    "340",
-    "345",
-    "346",
-    "347",
-    "348",
-    "349",
-    "350",
-    "356",
-    "357",
-    "358",
-    "359",
-    "360",
-    "367",
-    "368",
-    "369",
-    "370",
-    "378",
-    "379",
-    "380",
-    "389",
-    "390",
-    "450",
-    "456",
-    "457",
-    "458",
-    "459",
-    "460",
-    "467",
-    "468",
-    "469",
-    "470",
-    "478",
-    "479",
-    "480",
-    "489",
-    "490",
-    "560",
-    "567",
-    "568",
-    "569",
-    "570",
-    "578",
-    "579",
-    "580",
-    "589",
-    "590",
-    "670",
-    "678",
-    "679",
-    "680",
-    "689",
-    "690",
-    "780",
-    "789",
-    "790",
-    "890",
-  ];
-  List<String> filteredDigitOptions = [];
-  bool _isDigitSuggestionsVisible = false;
 
   List<Map<String, String>> addedEntries = [];
   late GetStorage storage;
@@ -175,8 +51,8 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 
   late BidService _bidService;
 
-  final String _deviceId = 'test_device_id_flutter';
-  final String _deviceName = 'test_device_name_flutter';
+  final String _deviceId = 'qwert';
+  final String _deviceName = 'sm2233';
 
   String? _messageToShow;
   bool _isErrorForMessage = false;
@@ -193,30 +69,10 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
     _loadInitialData();
     _setupStorageListeners();
 
-    bidController.addListener(_onDigitChanged);
-
-    // Initialize selectedGameBetType based on selectionStatus
     if (widget.selectionStatus) {
       selectedGameBetType = "Open";
     } else {
       selectedGameBetType = "Close";
-    }
-  }
-
-  void _onDigitChanged() {
-    final query = bidController.text.trim();
-    if (query.isNotEmpty) {
-      setState(() {
-        filteredDigitOptions = digitOptions
-            .where((digit) => digit.startsWith(query))
-            .toList();
-        _isDigitSuggestionsVisible = filteredDigitOptions.isNotEmpty;
-      });
-    } else {
-      setState(() {
-        filteredDigitOptions = [];
-        _isDigitSuggestionsVisible = false;
-      });
     }
   }
 
@@ -266,7 +122,6 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 
   @override
   void dispose() {
-    bidController.removeListener(_onDigitChanged);
     bidController.dispose();
     pointsController.dispose();
     _messageDismissTimer?.cancel();
@@ -294,7 +149,8 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
     }
   }
 
-  void _addEntry() {
+  // --- Updated _addEntry() to call the API and add all returned bids ---
+  Future<void> _addEntry() async {
     _clearMessage();
     if (_isApiCalling) return;
 
@@ -302,62 +158,90 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
     final amount = pointsController.text.trim();
 
     if (digit.isEmpty) {
-      _showMessage('Please enter a 3-digit number.', isError: true);
+      _showMessage('Please enter a number.', isError: true);
       return;
     }
-
-    if (digit.length != 3 || int.tryParse(digit) == null) {
-      _showMessage('Please enter a valid 3-digit number.', isError: true);
-      return;
-    }
-
-    if (!digitOptions.contains(digit)) {
+    // Added validation for minimum 3 digits
+    if (digit.length < 3 || digit.length > 7 || int.tryParse(digit) == null) {
       _showMessage(
-        'Invalid 3-digit number. Not in Single Patti list.',
+        'Please enter a valid number (minimum 3 digits).',
         isError: true,
       );
       return;
     }
-
     if (amount.isEmpty) {
       _showMessage('Please enter an Amount.', isError: true);
       return;
     }
-
     int? parsedAmount = int.tryParse(amount);
     if (parsedAmount == null || parsedAmount < 10 || parsedAmount > 1000) {
       _showMessage('Points must be between 10 and 1000.', isError: true);
       return;
     }
 
-    final existingIndex = addedEntries.indexWhere(
-      (entry) =>
-          entry['digit'] == digit && entry['type'] == selectedGameBetType,
-    );
-
     setState(() {
-      if (existingIndex != -1) {
-        final currentAmount = int.parse(addedEntries[existingIndex]['amount']!);
-        addedEntries[existingIndex]['amount'] = (currentAmount + parsedAmount)
-            .toString();
-        _showMessage(
-          'Updated points for Motor Patti: $digit, Type: $selectedGameBetType.',
-        );
+      _isApiCalling = true;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('https://sara777.win/api/v1/sp-motor-pana'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+          'deviceId': _deviceId,
+          'deviceName': _deviceName,
+          'accessStatus': accountStatus ? '1' : '0',
+        },
+        body: jsonEncode({
+          "digit": int.parse(digit),
+          "sessionType": selectedGameBetType.toLowerCase(),
+          "amount": parsedAmount,
+        }),
+      );
+
+      if (!mounted) return;
+
+      final responseData = jsonDecode(response.body);
+      if (response.statusCode == 200 && responseData['status'] == true) {
+        final List<dynamic> info = responseData['info'] ?? [];
+        if (info.isEmpty) {
+          _showMessage('No valid bids found for this number.', isError: true);
+        } else {
+          List<Map<String, String>> newBids = [];
+          for (var bidInfo in info) {
+            newBids.add({
+              "digit": bidInfo['pana'].toString(),
+              "amount": bidInfo['amount'].toString(),
+              "type": selectedGameBetType,
+              "gameType": widget.gameCategoryType,
+            });
+          }
+
+          setState(() {
+            addedEntries.addAll(newBids);
+            _showMessage('All bids added successfully from API response.');
+            bidController.clear();
+            pointsController.clear();
+          });
+        }
       } else {
-        addedEntries.add({
-          "digit": digit,
-          "amount": amount,
-          "type": selectedGameBetType,
-          "gameType": widget.gameCategoryType,
-        });
         _showMessage(
-          'Added bid: Motor Patti $digit, Points $amount, Type $selectedGameBetType.',
+          responseData['msg'] ??
+              'Bid request failed with status: ${response.statusCode}',
+          isError: true,
         );
       }
-      bidController.clear();
-      pointsController.clear();
-      _isDigitSuggestionsVisible = false;
-    });
+    } catch (e) {
+      log('Error fetching bids: $e', name: 'SPMotorsBetScreenAPIError');
+      _showMessage('An unexpected error occurred: $e', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isApiCalling = false;
+        });
+      }
+    }
   }
 
   void _removeEntry(int index) {
@@ -368,7 +252,7 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
       final removedEntry = addedEntries[index];
       addedEntries.removeAt(index);
       _showMessage(
-        'Removed bid: Motor Patti ${removedEntry['digit']}, Type ${removedEntry['type']}.',
+        'Removed bid: Number ${removedEntry['digit']}, Type ${removedEntry['type']}.',
       );
     });
   }
@@ -451,7 +335,6 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
           gameId: widget.gameId.toString(),
           gameType: widget.gameCategoryType,
           onConfirm: () async {
-            // Navigator.pop(dialogContext);
             setState(() {
               _isApiCalling = true;
             });
@@ -483,15 +366,6 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
         }
       }
     }
-
-    log(
-      'bidPayload (Map<String,String>) being sent to BidService: $bidPayload',
-      name: 'SPMotorsBetScreen',
-    );
-    log(
-      'currentBatchTotalPoints: $currentBatchTotalPoints',
-      name: 'SPMotorsBetScreen',
-    );
 
     if (bidPayload.isEmpty) {
       if (!mounted) return false;
@@ -585,12 +459,11 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Dynamically build gameTypesOptions based on widget.selectionStatus
     List<String> dynamicGameTypesOptions = [];
     if (widget.selectionStatus) {
       dynamicGameTypesOptions.add("Open");
     }
-    dynamicGameTypesOptions.add("Close"); // "Close" is always an option
+    dynamicGameTypesOptions.add("Close");
 
     return Scaffold(
       backgroundColor: Colors.grey.shade200,
@@ -643,51 +516,10 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
                     children: [
                       _inputRow(
                         "Select Game Type:",
-                        _buildDropdown(
-                          dynamicGameTypesOptions,
-                        ), // Pass the dynamic list
+                        _buildDropdown(dynamicGameTypesOptions),
                       ),
                       const SizedBox(height: 12),
-                      _inputRow("Enter 3-Digit Number:", _buildBidInputField()),
-                      if (_isDigitSuggestionsVisible &&
-                          filteredDigitOptions.isNotEmpty)
-                        Container(
-                          margin: const EdgeInsets.only(top: 8),
-                          constraints: const BoxConstraints(maxHeight: 200),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withOpacity(0.2),
-                                spreadRadius: 2,
-                                blurRadius: 5,
-                              ),
-                            ],
-                          ),
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            itemCount: filteredDigitOptions.length,
-                            itemBuilder: (context, index) {
-                              final suggestion = filteredDigitOptions[index];
-                              return ListTile(
-                                title: Text(suggestion),
-                                onTap: () {
-                                  setState(() {
-                                    bidController.text = suggestion;
-                                    _isDigitSuggestionsVisible = false;
-                                    bidController.selection =
-                                        TextSelection.fromPosition(
-                                          TextPosition(
-                                            offset: bidController.text.length,
-                                          ),
-                                        );
-                                  });
-                                },
-                              );
-                            },
-                          ),
-                        ),
+                      _inputRow("Enter Number:", _buildBidInputField()),
                       const SizedBox(height: 12),
                       _inputRow(
                         "Enter Points:",
@@ -714,7 +546,9 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
                           onPressed: _isApiCalling ? null : _addEntry,
                           child: _isApiCalling
                               ? const CircularProgressIndicator(
-                                  color: Colors.white,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                   strokeWidth: 2,
                                 )
                               : const Text(
@@ -862,7 +696,6 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
     );
   }
 
-  // Modified _buildDropdown to accept dynamic options
   Widget _buildDropdown(List<String> options) {
     return SizedBox(
       width: 150,
@@ -909,19 +742,13 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
         keyboardType: TextInputType.number,
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: [
-          LengthLimitingTextInputFormatter(3),
+          LengthLimitingTextInputFormatter(7),
           FilteringTextInputFormatter.digitsOnly,
         ],
-        onTap: () {
-          _clearMessage();
-          _onDigitChanged();
-        },
-        onChanged: (value) {
-          _onDigitChanged();
-        },
+        onTap: _clearMessage,
         enabled: !_isApiCalling,
         decoration: InputDecoration(
-          hintText: "Enter 3-Digit Number",
+          hintText: "Enter Number",
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 0,
@@ -990,6 +817,8 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
     int totalBids = addedEntries.length;
     int totalPoints = _getTotalPoints();
 
+    int totalPointsForSelectedType = _getTotalPointsForSelectedGameType();
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -1045,13 +874,12 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
             ],
           ),
           ElevatedButton(
-            onPressed:
-                (_isApiCalling || _getTotalPointsForSelectedGameType() == 0)
+            onPressed: (_isApiCalling || totalPointsForSelectedType == 0)
                 ? null
                 : _showConfirmationDialog,
             style: ElevatedButton.styleFrom(
               backgroundColor:
-                  (_isApiCalling || _getTotalPointsForSelectedGameType() == 0)
+                  (_isApiCalling || totalPointsForSelectedType == 0)
                   ? Colors.grey
                   : Colors.orange,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -1080,12 +908,14 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 }
 
 // import 'dart:async';
+// import 'dart:convert';
 // import 'dart:developer';
 //
 // import 'package:flutter/material.dart';
 // import 'package:flutter/services.dart';
 // import 'package:get_storage/get_storage.dart';
 // import 'package:google_fonts/google_fonts.dart';
+// import 'package:http/http.dart' as http;
 // import 'package:intl/intl.dart';
 //
 // import '../../BidService.dart';
@@ -1115,136 +945,10 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 // }
 //
 // class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
-//   final List<String> gameTypesOptions = ["Open", "Close"];
 //   late String selectedGameBetType;
 //
 //   final TextEditingController bidController = TextEditingController();
 //   final TextEditingController pointsController = TextEditingController();
-//
-//   List<String> digitOptions = [
-//     "120",
-//     "123",
-//     "124",
-//     "125",
-//     "126",
-//     "127",
-//     "128",
-//     "129",
-//     "130",
-//     "134",
-//     "135",
-//     "136",
-//     "137",
-//     "138",
-//     "139",
-//     "140",
-//     "145",
-//     "146",
-//     "147",
-//     "148",
-//     "149",
-//     "150",
-//     "156",
-//     "157",
-//     "158",
-//     "159",
-//     "160",
-//     "167",
-//     "168",
-//     "169",
-//     "170",
-//     "178",
-//     "179",
-//     "180",
-//     "189",
-//     "190",
-//     "230",
-//     "234",
-//     "235",
-//     "236",
-//     "237",
-//     "238",
-//     "239",
-//     "240",
-//     "245",
-//     "246",
-//     "247",
-//     "248",
-//     "249",
-//     "250",
-//     "256",
-//     "257",
-//     "258",
-//     "259",
-//     "260",
-//     "267",
-//     "268",
-//     "269",
-//     "270",
-//     "278",
-//     "279",
-//     "280",
-//     "289",
-//     "290",
-//     "340",
-//     "345",
-//     "346",
-//     "347",
-//     "348",
-//     "349",
-//     "350",
-//     "356",
-//     "357",
-//     "358",
-//     "359",
-//     "360",
-//     "367",
-//     "368",
-//     "369",
-//     "370",
-//     "378",
-//     "379",
-//     "380",
-//     "389",
-//     "390",
-//     "450",
-//     "456",
-//     "457",
-//     "458",
-//     "459",
-//     "460",
-//     "467",
-//     "468",
-//     "469",
-//     "470",
-//     "478",
-//     "479",
-//     "480",
-//     "489",
-//     "490",
-//     "560",
-//     "567",
-//     "568",
-//     "569",
-//     "570",
-//     "578",
-//     "579",
-//     "580",
-//     "589",
-//     "590",
-//     "670",
-//     "678",
-//     "679",
-//     "680",
-//     "689",
-//     "690",
-//     "780",
-//     "789",
-//     "790",
-//     "890",
-//   ];
-//   List<String> filteredDigitOptions = [];
-//   bool _isDigitSuggestionsVisible = false;
 //
 //   List<Map<String, String>> addedEntries = [];
 //   late GetStorage storage;
@@ -1256,8 +960,8 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 //
 //   late BidService _bidService;
 //
-//   final String _deviceId = 'test_device_id_flutter';
-//   final String _deviceName = 'test_device_name_flutter';
+//   final String _deviceId = 'qwert';
+//   final String _deviceName = 'sm2233';
 //
 //   String? _messageToShow;
 //   bool _isErrorForMessage = false;
@@ -1274,24 +978,10 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 //     _loadInitialData();
 //     _setupStorageListeners();
 //
-//     bidController.addListener(_onDigitChanged);
-//     selectedGameBetType = gameTypesOptions[0];
-//   }
-//
-//   void _onDigitChanged() {
-//     final query = bidController.text.trim();
-//     if (query.isNotEmpty) {
-//       setState(() {
-//         filteredDigitOptions = digitOptions
-//             .where((digit) => digit.startsWith(query))
-//             .toList();
-//         _isDigitSuggestionsVisible = filteredDigitOptions.isNotEmpty;
-//       });
+//     if (widget.selectionStatus) {
+//       selectedGameBetType = "Open";
 //     } else {
-//       setState(() {
-//         filteredDigitOptions = [];
-//         _isDigitSuggestionsVisible = false;
-//       });
+//       selectedGameBetType = "Close";
 //     }
 //   }
 //
@@ -1341,7 +1031,6 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 //
 //   @override
 //   void dispose() {
-//     bidController.removeListener(_onDigitChanged);
 //     bidController.dispose();
 //     pointsController.dispose();
 //     _messageDismissTimer?.cancel();
@@ -1369,7 +1058,8 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 //     }
 //   }
 //
-//   void _addEntry() {
+//   // --- Updated _addEntry() to call the API and add all returned bids ---
+//   Future<void> _addEntry() async {
 //     _clearMessage();
 //     if (_isApiCalling) return;
 //
@@ -1377,62 +1067,87 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 //     final amount = pointsController.text.trim();
 //
 //     if (digit.isEmpty) {
-//       _showMessage('Please enter a 3-digit number.', isError: true);
+//       _showMessage('Please enter a number.', isError: true);
 //       return;
 //     }
-//
-//     if (digit.length != 3 || int.tryParse(digit) == null) {
-//       _showMessage('Please enter a valid 3-digit number.', isError: true);
+//     if (digit.length < 1 || digit.length > 7 || int.tryParse(digit) == null) {
+//       _showMessage('Please enter a valid number (1-7 digits).', isError: true);
 //       return;
 //     }
-//
-//     if (!digitOptions.contains(digit)) {
-//       _showMessage(
-//         'Invalid 3-digit number. Not in Single Patti list.',
-//         isError: true,
-//       );
-//       return;
-//     }
-//
 //     if (amount.isEmpty) {
 //       _showMessage('Please enter an Amount.', isError: true);
 //       return;
 //     }
-//
 //     int? parsedAmount = int.tryParse(amount);
 //     if (parsedAmount == null || parsedAmount < 10 || parsedAmount > 1000) {
 //       _showMessage('Points must be between 10 and 1000.', isError: true);
 //       return;
 //     }
 //
-//     final existingIndex = addedEntries.indexWhere(
-//       (entry) =>
-//           entry['digit'] == digit && entry['type'] == selectedGameBetType,
-//     );
-//
 //     setState(() {
-//       if (existingIndex != -1) {
-//         final currentAmount = int.parse(addedEntries[existingIndex]['amount']!);
-//         addedEntries[existingIndex]['amount'] = (currentAmount + parsedAmount)
-//             .toString();
-//         _showMessage(
-//           'Updated points for Motor Patti: $digit, Type: $selectedGameBetType.',
-//         );
+//       _isApiCalling = true;
+//     });
+//
+//     try {
+//       final response = await http.post(
+//         Uri.parse('https://sara777.win/api/v1/sp-motor-pana'),
+//         headers: {
+//           'Content-Type': 'application/json',
+//           'Authorization': 'Bearer $accessToken',
+//           'deviceId': _deviceId,
+//           'deviceName': _deviceName,
+//           'accessStatus': accountStatus ? '1' : '0',
+//         },
+//         body: jsonEncode({
+//           "digit": int.parse(digit),
+//           "sessionType": selectedGameBetType.toLowerCase(),
+//           "amount": parsedAmount,
+//         }),
+//       );
+//
+//       if (!mounted) return;
+//
+//       final responseData = jsonDecode(response.body);
+//       if (response.statusCode == 200 && responseData['status'] == true) {
+//         final List<dynamic> info = responseData['info'] ?? [];
+//         if (info.isEmpty) {
+//           _showMessage('No valid bids found for this number.', isError: true);
+//         } else {
+//           // Corrected logic: Use addAll() to append new items
+//           List<Map<String, String>> newBids = [];
+//           for (var bidInfo in info) {
+//             newBids.add({
+//               "digit": bidInfo['pana'].toString(),
+//               "amount": bidInfo['amount'].toString(),
+//               "type": selectedGameBetType,
+//               "gameType": widget.gameCategoryType,
+//             });
+//           }
+//
+//           setState(() {
+//             addedEntries.addAll(newBids);
+//             _showMessage('All bids added successfully from API response.');
+//             bidController.clear();
+//             pointsController.clear();
+//           });
+//         }
 //       } else {
-//         addedEntries.add({
-//           "digit": digit,
-//           "amount": amount,
-//           "type": selectedGameBetType,
-//           "gameType": widget.gameCategoryType,
-//         });
 //         _showMessage(
-//           'Added bid: Motor Patti $digit, Points $amount, Type $selectedGameBetType.',
+//           responseData['msg'] ??
+//               'Bid request failed with status: ${response.statusCode}',
+//           isError: true,
 //         );
 //       }
-//       bidController.clear();
-//       pointsController.clear();
-//       _isDigitSuggestionsVisible = false;
-//     });
+//     } catch (e) {
+//       log('Error fetching bids: $e', name: 'SPMotorsBetScreenAPIError');
+//       _showMessage('An unexpected error occurred: $e', isError: true);
+//     } finally {
+//       if (mounted) {
+//         setState(() {
+//           _isApiCalling = false;
+//         });
+//       }
+//     }
 //   }
 //
 //   void _removeEntry(int index) {
@@ -1443,7 +1158,7 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 //       final removedEntry = addedEntries[index];
 //       addedEntries.removeAt(index);
 //       _showMessage(
-//         'Removed bid: Motor Patti ${removedEntry['digit']}, Type ${removedEntry['type']}.',
+//         'Removed bid: Number ${removedEntry['digit']}, Type ${removedEntry['type']}.',
 //       );
 //     });
 //   }
@@ -1526,7 +1241,6 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 //           gameId: widget.gameId.toString(),
 //           gameType: widget.gameCategoryType,
 //           onConfirm: () async {
-//             // Navigator.pop(dialogContext);
 //             setState(() {
 //               _isApiCalling = true;
 //             });
@@ -1558,15 +1272,6 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 //         }
 //       }
 //     }
-//
-//     log(
-//       'bidPayload (Map<String,String>) being sent to BidService: $bidPayload',
-//       name: 'SPMotorsBetScreen',
-//     );
-//     log(
-//       'currentBatchTotalPoints: $currentBatchTotalPoints',
-//       name: 'SPMotorsBetScreen',
-//     );
 //
 //     if (bidPayload.isEmpty) {
 //       if (!mounted) return false;
@@ -1660,6 +1365,12 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 //
 //   @override
 //   Widget build(BuildContext context) {
+//     List<String> dynamicGameTypesOptions = [];
+//     if (widget.selectionStatus) {
+//       dynamicGameTypesOptions.add("Open");
+//     }
+//     dynamicGameTypesOptions.add("Close");
+//
 //     return Scaffold(
 //       backgroundColor: Colors.grey.shade200,
 //       appBar: AppBar(
@@ -1678,8 +1389,10 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 //           ),
 //         ),
 //         actions: [
-//           const Icon(
-//             Icons.account_balance_wallet_outlined,
+//           Image.asset(
+//             "assets/images/ic_wallet.png",
+//             width: 22,
+//             height: 22,
 //             color: Colors.black,
 //           ),
 //           const SizedBox(width: 6),
@@ -1695,202 +1408,170 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 //           const SizedBox(width: 12),
 //         ],
 //       ),
-//       body: Stack(
-//         children: [
-//           Column(
-//             children: [
-//               Padding(
-//                 padding: const EdgeInsets.symmetric(
-//                   horizontal: 16,
-//                   vertical: 12,
-//                 ),
-//                 child: Column(
-//                   children: [
-//                     _inputRow("Select Game Type:", _buildDropdown()),
-//                     const SizedBox(height: 12),
-//                     _inputRow("Enter 3-Digit Number:", _buildBidInputField()),
-//                     if (_isDigitSuggestionsVisible &&
-//                         filteredDigitOptions.isNotEmpty)
-//                       Container(
-//                         margin: const EdgeInsets.only(top: 8),
-//                         constraints: const BoxConstraints(maxHeight: 200),
-//                         decoration: BoxDecoration(
-//                           color: Colors.white,
-//                           borderRadius: BorderRadius.circular(8),
-//                           boxShadow: [
-//                             BoxShadow(
-//                               color: Colors.grey.withOpacity(0.2),
-//                               spreadRadius: 2,
-//                               blurRadius: 5,
-//                             ),
-//                           ],
-//                         ),
-//                         child: ListView.builder(
-//                           shrinkWrap: true,
-//                           itemCount: filteredDigitOptions.length,
-//                           itemBuilder: (context, index) {
-//                             final suggestion = filteredDigitOptions[index];
-//                             return ListTile(
-//                               title: Text(suggestion),
-//                               onTap: () {
-//                                 setState(() {
-//                                   bidController.text = suggestion;
-//                                   _isDigitSuggestionsVisible = false;
-//                                   bidController.selection =
-//                                       TextSelection.fromPosition(
-//                                         TextPosition(
-//                                           offset: bidController.text.length,
-//                                         ),
-//                                       );
-//                                 });
-//                               },
-//                             );
-//                           },
-//                         ),
-//                       ),
-//                     const SizedBox(height: 12),
-//                     _inputRow(
-//                       "Enter Points:",
-//                       _buildTextField(
-//                         pointsController,
-//                         "Enter Amount",
-//                         inputFormatters: [
-//                           FilteringTextInputFormatter.digitsOnly,
-//                           LengthLimitingTextInputFormatter(4),
-//                         ],
-//                       ),
-//                     ),
-//                     const SizedBox(height: 20),
-//                     SizedBox(
-//                       width: double.infinity,
-//                       height: 45,
-//                       child: ElevatedButton(
-//                         style: ElevatedButton.styleFrom(
-//                           backgroundColor: Colors.orange,
-//                           shape: RoundedRectangleBorder(
-//                             borderRadius: BorderRadius.circular(6),
-//                           ),
-//                         ),
-//                         onPressed: _isApiCalling ? null : _addEntry,
-//                         child: _isApiCalling
-//                             ? const CircularProgressIndicator(
-//                                 color: Colors.white,
-//                                 strokeWidth: 2,
-//                               )
-//                             : const Text(
-//                                 "ADD BID",
-//                                 style: TextStyle(
-//                                   color: Colors.white,
-//                                   fontWeight: FontWeight.w600,
-//                                 ),
-//                               ),
-//                       ),
-//                     ),
-//                     const SizedBox(height: 18),
-//                   ],
-//                 ),
-//               ),
-//               const Divider(thickness: 1),
-//               if (addedEntries.isNotEmpty)
+//       body: SafeArea(
+//         child: Stack(
+//           children: [
+//             Column(
+//               children: [
 //                 Padding(
 //                   padding: const EdgeInsets.symmetric(
 //                     horizontal: 16,
-//                     vertical: 8,
+//                     vertical: 12,
 //                   ),
-//                   child: Row(
+//                   child: Column(
 //                     children: [
-//                       Expanded(
-//                         child: Text(
-//                           "Digit",
-//                           style: GoogleFonts.poppins(
-//                             fontWeight: FontWeight.bold,
-//                           ),
+//                       _inputRow(
+//                         "Select Game Type:",
+//                         _buildDropdown(dynamicGameTypesOptions),
+//                       ),
+//                       const SizedBox(height: 12),
+//                       _inputRow("Enter Number:", _buildBidInputField()),
+//                       const SizedBox(height: 12),
+//                       _inputRow(
+//                         "Enter Points:",
+//                         _buildTextField(
+//                           pointsController,
+//                           "Enter Amount",
+//                           inputFormatters: [
+//                             FilteringTextInputFormatter.digitsOnly,
+//                             LengthLimitingTextInputFormatter(4),
+//                           ],
 //                         ),
 //                       ),
-//                       Expanded(
-//                         child: Text(
-//                           "Amount",
-//                           style: GoogleFonts.poppins(
-//                             fontWeight: FontWeight.bold,
+//                       const SizedBox(height: 20),
+//                       SizedBox(
+//                         width: double.infinity,
+//                         height: 45,
+//                         child: ElevatedButton(
+//                           style: ElevatedButton.styleFrom(
+//                             backgroundColor: Colors.orange,
+//                             shape: RoundedRectangleBorder(
+//                               borderRadius: BorderRadius.circular(6),
+//                             ),
 //                           ),
+//                           onPressed: _isApiCalling ? null : _addEntry,
+//                           child: _isApiCalling
+//                               ? const CircularProgressIndicator(
+//                                   valueColor: AlwaysStoppedAnimation<Color>(
+//                                     Colors.white,
+//                                   ),
+//                                   strokeWidth: 2,
+//                                 )
+//                               : const Text(
+//                                   "ADD BID",
+//                                   style: TextStyle(
+//                                     color: Colors.white,
+//                                     fontWeight: FontWeight.w600,
+//                                   ),
+//                                 ),
 //                         ),
 //                       ),
-//                       Expanded(
-//                         child: Text(
-//                           "Game Type",
-//                           style: GoogleFonts.poppins(
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                       const SizedBox(width: 48),
+//                       const SizedBox(height: 18),
 //                     ],
 //                   ),
 //                 ),
-//               if (addedEntries.isNotEmpty) const Divider(thickness: 1),
-//               Expanded(
-//                 child: addedEntries.isEmpty
-//                     ? const Center(child: Text("No data added yet"))
-//                     : ListView.builder(
-//                         itemCount: addedEntries.length,
-//                         itemBuilder: (_, index) {
-//                           final entry = addedEntries[index];
-//                           return Padding(
-//                             padding: const EdgeInsets.symmetric(
-//                               horizontal: 16,
-//                               vertical: 6,
+//                 const Divider(thickness: 1),
+//                 if (addedEntries.isNotEmpty)
+//                   Padding(
+//                     padding: const EdgeInsets.symmetric(
+//                       horizontal: 16,
+//                       vertical: 8,
+//                     ),
+//                     child: Row(
+//                       children: [
+//                         Expanded(
+//                           child: Text(
+//                             "Digit",
+//                             style: GoogleFonts.poppins(
+//                               fontWeight: FontWeight.bold,
 //                             ),
-//                             child: Row(
-//                               children: [
-//                                 Expanded(
-//                                   child: Text(
-//                                     entry['digit']!,
-//                                     style: GoogleFonts.poppins(),
-//                                   ),
-//                                 ),
-//                                 Expanded(
-//                                   child: Text(
-//                                     entry['amount']!,
-//                                     style: GoogleFonts.poppins(),
-//                                   ),
-//                                 ),
-//                                 Expanded(
-//                                   child: Text(
-//                                     '${entry['gameType']} (${entry['type']})',
-//                                     style: GoogleFonts.poppins(),
-//                                   ),
-//                                 ),
-//                                 IconButton(
-//                                   icon: const Icon(
-//                                     Icons.delete,
-//                                     color: Colors.red,
-//                                   ),
-//                                   onPressed: _isApiCalling
-//                                       ? null
-//                                       : () => _removeEntry(index),
-//                                 ),
-//                               ],
+//                           ),
+//                         ),
+//                         Expanded(
+//                           child: Text(
+//                             "Amount",
+//                             style: GoogleFonts.poppins(
+//                               fontWeight: FontWeight.bold,
 //                             ),
-//                           );
-//                         },
-//                       ),
-//               ),
-//               if (addedEntries.isNotEmpty) _buildBottomBar(),
-//             ],
-//           ),
-//           if (_messageToShow != null)
-//             Positioned(
-//               top: 0,
-//               left: 0,
-//               right: 0,
-//               child: AnimatedMessageBar(
-//                 key: _messageBarKey,
-//                 message: _messageToShow!,
-//                 isError: _isErrorForMessage,
-//                 onDismissed: _clearMessage,
-//               ),
+//                           ),
+//                         ),
+//                         Expanded(
+//                           child: Text(
+//                             "Game Type",
+//                             style: GoogleFonts.poppins(
+//                               fontWeight: FontWeight.bold,
+//                             ),
+//                           ),
+//                         ),
+//                         const SizedBox(width: 48),
+//                       ],
+//                     ),
+//                   ),
+//                 if (addedEntries.isNotEmpty) const Divider(thickness: 1),
+//                 Expanded(
+//                   child: addedEntries.isEmpty
+//                       ? const Center(child: Text("No data added yet"))
+//                       : ListView.builder(
+//                           itemCount: addedEntries.length,
+//                           itemBuilder: (_, index) {
+//                             final entry = addedEntries[index];
+//                             return Padding(
+//                               padding: const EdgeInsets.symmetric(
+//                                 horizontal: 16,
+//                                 vertical: 6,
+//                               ),
+//                               child: Row(
+//                                 children: [
+//                                   Expanded(
+//                                     child: Text(
+//                                       entry['digit']!,
+//                                       style: GoogleFonts.poppins(),
+//                                     ),
+//                                   ),
+//                                   Expanded(
+//                                     child: Text(
+//                                       entry['amount']!,
+//                                       style: GoogleFonts.poppins(),
+//                                     ),
+//                                   ),
+//                                   Expanded(
+//                                     child: Text(
+//                                       '${entry['gameType']} (${entry['type']})',
+//                                       style: GoogleFonts.poppins(),
+//                                     ),
+//                                   ),
+//                                   IconButton(
+//                                     icon: const Icon(
+//                                       Icons.delete,
+//                                       color: Colors.red,
+//                                     ),
+//                                     onPressed: _isApiCalling
+//                                         ? null
+//                                         : () => _removeEntry(index),
+//                                   ),
+//                                 ],
+//                               ),
+//                             );
+//                           },
+//                         ),
+//                 ),
+//                 if (addedEntries.isNotEmpty) _buildBottomBar(),
+//               ],
 //             ),
-//         ],
+//             if (_messageToShow != null)
+//               Positioned(
+//                 top: 0,
+//                 left: 0,
+//                 right: 0,
+//                 child: AnimatedMessageBar(
+//                   key: _messageBarKey,
+//                   message: _messageToShow!,
+//                   isError: _isErrorForMessage,
+//                   onDismissed: _clearMessage,
+//                 ),
+//               ),
+//           ],
+//         ),
 //       ),
 //     );
 //   }
@@ -1921,7 +1602,7 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 //     );
 //   }
 //
-//   Widget _buildDropdown() {
+//   Widget _buildDropdown(List<String> options) {
 //     return SizedBox(
 //       width: 150,
 //       height: 35,
@@ -1945,9 +1626,7 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 //                       _clearMessage();
 //                     });
 //                   },
-//             items: gameTypesOptions.map<DropdownMenuItem<String>>((
-//               String value,
-//             ) {
+//             items: options.map<DropdownMenuItem<String>>((String value) {
 //               return DropdownMenuItem<String>(
 //                 value: value,
 //                 child: Text(value, style: GoogleFonts.poppins(fontSize: 14)),
@@ -1969,19 +1648,13 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 //         keyboardType: TextInputType.number,
 //         style: GoogleFonts.poppins(fontSize: 14),
 //         inputFormatters: [
-//           LengthLimitingTextInputFormatter(3),
+//           LengthLimitingTextInputFormatter(7),
 //           FilteringTextInputFormatter.digitsOnly,
 //         ],
-//         onTap: () {
-//           _clearMessage();
-//           _onDigitChanged();
-//         },
-//         onChanged: (value) {
-//           _onDigitChanged();
-//         },
+//         onTap: _clearMessage,
 //         enabled: !_isApiCalling,
 //         decoration: InputDecoration(
-//           hintText: "Enter 3-Digit Number",
+//           hintText: "Enter 7-Digit Number",
 //           contentPadding: const EdgeInsets.symmetric(
 //             horizontal: 16,
 //             vertical: 0,
@@ -2050,6 +1723,8 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 //     int totalBids = addedEntries.length;
 //     int totalPoints = _getTotalPoints();
 //
+//     int totalPointsForSelectedType = _getTotalPointsForSelectedGameType();
+//
 //     return Container(
 //       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
 //       decoration: BoxDecoration(
@@ -2105,13 +1780,12 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 //             ],
 //           ),
 //           ElevatedButton(
-//             onPressed:
-//                 (_isApiCalling || _getTotalPointsForSelectedGameType() == 0)
+//             onPressed: (_isApiCalling || totalPointsForSelectedType == 0)
 //                 ? null
 //                 : _showConfirmationDialog,
 //             style: ElevatedButton.styleFrom(
 //               backgroundColor:
-//                   (_isApiCalling || _getTotalPointsForSelectedGameType() == 0)
+//                   (_isApiCalling || totalPointsForSelectedType == 0)
 //                   ? Colors.grey
 //                   : Colors.orange,
 //               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -2138,3 +1812,4 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
 //     );
 //   }
 // }
+//

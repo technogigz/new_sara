@@ -23,17 +23,7 @@ class BidService {
     required String gameType,
     required int totalBidAmount,
   }) async {
-    String apiUrl;
-    if (gameName.toLowerCase().contains('jackpot')) {
-      apiUrl = '${Constant.apiEndpoint}place-jackpot-bid';
-      log("Jackpot API URL: $apiUrl, \n $gameName");
-    } else if (gameName.toLowerCase().contains('starline')) {
-      apiUrl = '${Constant.apiEndpoint}place-starline-bid';
-      log("Starline API URL: $apiUrl, \n $gameName");
-    } else {
-      apiUrl = '${Constant.apiEndpoint}place-bid';
-      log("Default API URL: $apiUrl, \n $gameName");
-    }
+    String apiUrl = '${Constant.apiEndpoint}place-bid';
 
     if (accessToken.isEmpty || registerId.isEmpty) {
       return {

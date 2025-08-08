@@ -1,6 +1,11 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import '../../Helper/UserController.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -10,13 +15,22 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
-  GetStorage storage = GetStorage();
+  late final UserController userController;
+  final GetStorage box = GetStorage();
+
+  String phoneNumber = '';
+  bool hasLaunched = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _launchWhatsAppChat();
+    userController = Get.find<UserController>();
+    phoneNumber = box.read('whatsappNumber') ?? '';
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _launchWhatsAppChat();
+    });
   }
 
   @override
@@ -28,14 +42,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      // Close the screen when user returns from WhatsApp
       if (mounted) {
         Navigator.of(context).pop();
       }
     }
   }
 
-  void _launchWhatsAppChat() async {
-    String phoneNumber = storage.read('whatsappNumber') ?? '';
+  Future<void> _launchWhatsAppChat() async {
+    if (hasLaunched) return; // Prevent duplicate calls
+    hasLaunched = true;
+
     if (phoneNumber.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -47,7 +64,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       }
       return;
     }
-    final cleanNumber = phoneNumber.replaceAll(RegExp(r'[+\s-]'), '');
+
+    final cleanNumber = phoneNumber.replaceAll('+', '').trim();
+    log('Launching WhatsApp with number: $cleanNumber');
 
     final Uri whatsappUrl = Uri.parse('https://wa.me/$cleanNumber');
 

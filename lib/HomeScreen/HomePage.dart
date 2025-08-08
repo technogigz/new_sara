@@ -2,12 +2,15 @@ import 'dart:convert';
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
+import 'package:get/get_core/src/get_main.dart';
+import 'package:get/get_instance/get_instance.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:marquee/marquee.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../Helper/UserController.dart';
 import '../KingStarline&Jackpot/KingJackpotDashboard.dart';
 import '../KingStarline&Jackpot/KingStarlineDashboard.dart';
 import '../components/closeBidDialogue.dart';
@@ -111,6 +114,7 @@ class _HomePageState extends State<HomePage> {
   late String _preferredLanguage;
   final Map<String, String> _translatedUiStrings = {};
   final GetStorage _storage = GetStorage();
+  UserController userController = Get.put(UserController());
 
   late String mobile;
   late String mobileNumber;
@@ -147,6 +151,8 @@ class _HomePageState extends State<HomePage> {
     walletBallence = _storage.read('walletBalance') ?? '';
     _preferredLanguage = _storage.read('selectedLanguage') ?? 'en';
     _accountStatus = _storage.read('accountStatus') ?? false;
+
+    userController.accountStatus.value = _accountStatus;
 
     // Listen for language changes and refresh UI strings
     _storage.listenKey('selectedLanguage', (value) {
@@ -272,6 +278,7 @@ class _HomePageState extends State<HomePage> {
         _storage.write('profilePicture', info['profilePicture']);
         _storage.write('accountStatus', info['accountStatus']);
         _storage.write('betStatus', info['betStatus']);
+
         log("✅ User details saved to GetStorage.");
       } else {
         log(
@@ -579,7 +586,7 @@ class _ContactItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () async {
-        final cleanNumber = number.replaceAll('+', '').replaceAll(' ', '');
+        final cleanNumber = number.replaceAll('+91', '').replaceAll(' ', '');
         final url = Uri.parse("https://wa.me/$cleanNumber");
 
         if (await canLaunchUrl(url)) {

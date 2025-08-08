@@ -133,8 +133,8 @@ class _LoginWithMpinScreenState extends State<LoginWithMpinScreen> {
     // Retrieve registerId and accessToken from GetStorage
     final String registerId = storage.read('registerId');
     final String accessToken = storage.read('accessToken');
-    final String deviceId = storage.read('deviceId');
-    final String deviceName = storage.read('deviceName');
+    final String deviceId = storage.read('deviceId') ?? '';
+    final String deviceName = storage.read('deviceName') ?? '';
 
     log("Register Id: $registerId");
     log("Access Token: $accessToken");

@@ -36,7 +36,7 @@ class _KingJackpotHistoryScreenState extends State<KingJackpotHistoryScreen> {
     String registerId =
         GetStorage().read("registerId") ?? ""; // Example registerId
 
-    log("Fetching King Jackpot History entries...");
+    log("Fetching King Starline Bid History entries...");
     log("Register Id: $registerId");
     log("Access Token: $token");
 
@@ -48,7 +48,7 @@ class _KingJackpotHistoryScreenState extends State<KingJackpotHistoryScreen> {
     final requestBody = jsonEncode({
       'registerId': registerId,
       'pageIndex': 1, // Hardcoded as pagination is removed
-      'recordLimit': 10, // Hardcoded as pagination is removed
+      'recordLimit': 10000, // Hardcoded as pagination is removed
       'placeType': 'jackpot', // Specific for King Jackpot
       'fromDate': formattedFromDate, // Made dynamic
     });
@@ -87,14 +87,14 @@ class _KingJackpotHistoryScreenState extends State<KingJackpotHistoryScreen> {
           setState(() {
             entries = list.map((e) => BetHistoryEntry.fromJson(e)).toList();
           });
-          log("Parsed King Jackpot History entries count: ${entries.length}");
+          log(
+            "Parsed King Starline Bid History entries count: ${entries.length}",
+          );
         } else {
           setState(() {
             entries = [];
           });
-          debugPrint(
-            'Info field is null or empty in API response',
-          ); // Updated message
+          debugPrint('Info field is null or empty in API response');
         }
       } else {
         debugPrint('Error ${res.statusCode}: ${res.body}');
@@ -232,19 +232,25 @@ class _KingJackpotHistoryScreenState extends State<KingJackpotHistoryScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  entry.gameName
-                      .toUpperCase(), // Game Name (e.g., RAJDHANI DAY CLOSE)
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                Column(
+                  children: [
+                    Text(
+                      entry.gameName
+                          .toUpperCase(), // Game Name (e.g., RAJDHANI DAY CLOSE)
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+
+                    Text(
+                      '${entry.betType} (${entry.digit})', // Bet Type (e.g., Single Digit)
+                      style: const TextStyle(color: Colors.black, fontSize: 14),
+                    ),
+                  ],
                 ),
-                Text(
-                  entry.betType, // Bet Type (e.g., Single Digit)
-                  style: const TextStyle(color: Colors.black, fontSize: 14),
-                ),
+
                 Text(
                   "Amount\n${entry.amount}", // Amount
                   textAlign: TextAlign.right,
@@ -311,11 +317,12 @@ class _KingJackpotHistoryScreenState extends State<KingJackpotHistoryScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
+                Divider(),
                 Text(
                   // Changed to Text to use dynamic status
                   entry.status, // Display the status text from API
                   style: TextStyle(
-                    color: entry.status.toLowerCase().contains('good luck')
+                    color: entry.status.toLowerCase().contains('Best')
                         ? Colors.green
                         : Colors.black, // Green for "Good Luck"
                     fontWeight: FontWeight.bold,

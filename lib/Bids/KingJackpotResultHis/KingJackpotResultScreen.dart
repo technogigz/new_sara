@@ -1,14 +1,18 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:http/http.dart' as http;
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+
+import '../../ulits/Constents.dart';
 
 class KingJackpotResultScreen extends StatefulWidget {
   const KingJackpotResultScreen({super.key});
 
   @override
-  State<KingJackpotResultScreen> createState() => _KingJackpotResultScreenState();
+  State<KingJackpotResultScreen> createState() =>
+      _KingJackpotResultScreenState();
 }
 
 class _KingJackpotResultScreenState extends State<KingJackpotResultScreen> {
@@ -17,9 +21,18 @@ class _KingJackpotResultScreenState extends State<KingJackpotResultScreen> {
   bool isLoading = false;
 
   List<String> hours = [
-    "10:00 AM", "11:00 AM", "12:00 PM", "01:00 PM",
-    "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM",
-    "06:00 PM", "07:00 PM", "08:00 PM", "09:00 PM"
+    "10:00 AM",
+    "11:00 AM",
+    "12:00 PM",
+    "01:00 PM",
+    "02:00 PM",
+    "03:00 PM",
+    "04:00 PM",
+    "05:00 PM",
+    "06:00 PM",
+    "07:00 PM",
+    "08:00 PM",
+    "09:00 PM",
   ];
 
   @override
@@ -32,13 +45,13 @@ class _KingJackpotResultScreenState extends State<KingJackpotResultScreen> {
     setState(() => isLoading = true);
 
     try {
-      final url = Uri.parse('https://your-api-url.com/get-results');
+      final url = Uri.parse('${Constant.apiEndpoint}get-results');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           "env_type": "Prod",
-          "date": DateFormat("yyyy-MM-dd").format(date)
+          "date": DateFormat("yyyy-MM-dd").format(date),
         }),
       );
 
@@ -46,11 +59,10 @@ class _KingJackpotResultScreenState extends State<KingJackpotResultScreen> {
         final jsonData = json.decode(response.body);
         final List resultList = jsonData['result'];
 
-        List<Map<String, String>> mapped = resultList.map<Map<String, String>>((item) {
-          return {
-            "time": item["time"] ?? "",
-            "result": item["result"] ?? "**",
-          };
+        List<Map<String, String>> mapped = resultList.map<Map<String, String>>((
+          item,
+        ) {
+          return {"time": item["time"] ?? "", "result": item["result"] ?? "**"};
         }).toList();
 
         setState(() {
@@ -97,7 +109,7 @@ class _KingJackpotResultScreenState extends State<KingJackpotResultScreen> {
 
   String getResultForTime(String time) {
     final match = fullResults.firstWhere(
-          (item) => item["time"] == time,
+      (item) => item["time"] == time,
       orElse: () => {"result": "**"},
     );
     return match["result"]!;
@@ -136,88 +148,100 @@ class _KingJackpotResultScreenState extends State<KingJackpotResultScreen> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.orange))
           : Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
               children: [
-                Text(
-                  "Select Date",
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black87,
-                  ),
-                ),
-                const Spacer(),
-                GestureDetector(
-                  onTap: _selectDate,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade400),
-                    ),
-                    child: Text(
-                      DateFormat("dd/MM/yyyy").format(selectedDate),
-                      style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              itemCount: hours.length,
-              itemBuilder: (context, index) {
-                final time = hours[index];
-                final result = getResultForTime(time);
-
-                return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 3,
-                        offset: Offset(0, 2),
-                      )
-                    ],
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
                   ),
                   child: Row(
                     children: [
                       Text(
-                        time,
+                        "Select Date",
                         style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFFF9B233),
-                          fontSize: sw * 0.045,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
                         ),
                       ),
                       const Spacer(),
-                      Text(
-                        result,
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600,
-                          fontSize: sw * 0.045,
+                      GestureDetector(
+                        onTap: _selectDate,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade400),
+                          ),
+                          child: Text(
+                            DateFormat("dd/MM/yyyy").format(selectedDate),
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              color: Colors.black87,
+                            ),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                );
-              },
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: hours.length,
+                    itemBuilder: (context, index) {
+                      final time = hours[index];
+                      final result = getResultForTime(time);
+
+                      return Container(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black12,
+                              blurRadius: 3,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Text(
+                              time,
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFFF9B233),
+                                fontSize: sw * 0.045,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              result,
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w600,
+                                fontSize: sw * 0.045,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }

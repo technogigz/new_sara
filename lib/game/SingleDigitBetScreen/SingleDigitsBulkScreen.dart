@@ -12,6 +12,16 @@ import '../../components/BidConfirmationDialog.dart';
 import '../../components/BidFailureDialog.dart';
 import '../../components/BidSuccessDialog.dart';
 
+// Create a simple model for a single bid entry.
+// This is a good practice to keep data structured.
+class BidEntry {
+  final String digit;
+  final String points;
+  final String type;
+
+  BidEntry({required this.digit, required this.points, required this.type});
+}
+
 class SingleDigitsBulkScreen extends StatefulWidget {
   final String title;
   final int gameId;
@@ -42,8 +52,10 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
   Color dropdownBorderColor = Colors.black;
   Color textFieldBorderColor = Colors.black;
 
-  // bidAmounts maps digit (e.g., "7") to amount (e.g., "100")
-  Map<String, String> bidAmounts = {};
+  // Change bidAmounts to store a list of BidEntry objects
+  // This new structure stores all the necessary data for each bid.
+  List<BidEntry> bidEntries = [];
+
   late GetStorage storage;
   late BidService _bidService; // Declare BidService
 
@@ -183,14 +195,20 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
       return;
     }
 
+    // Check if a bid for this digit already exists with the SAME type
+    final existingBidIndex = bidEntries.indexWhere(
+      (bid) =>
+          bid.digit == number && bid.type == selectedGameType.toUpperCase(),
+    );
+
     // Calculate total points with the new bid to check against wallet balance
     int currentTotalPoints = _getTotalPoints();
     int pointsForThisBid = parsedAmount;
 
-    // If the digit already exists, we'll replace its old points with new ones.
-    // So, subtract the old points for this digit if it exists before adding new ones.
-    if (bidAmounts.containsKey(number)) {
-      currentTotalPoints -= (int.tryParse(bidAmounts[number]!) ?? 0);
+    // If the bid already exists, subtract its old points before adding new ones
+    if (existingBidIndex != -1) {
+      currentTotalPoints -=
+          int.tryParse(bidEntries[existingBidIndex].points) ?? 0;
     }
 
     int totalPointsWithNewBid = currentTotalPoints + pointsForThisBid;
@@ -203,37 +221,39 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
       return;
     }
 
-    // Check if bid for this digit already exists to update or add
-    if (bidAmounts.containsKey(number)) {
-      setState(() {
-        bidAmounts[number] = amount; // Update existing bid
-      });
-      _showMessage(
-        'Bid for Digit $number updated to $amount points.',
-        isError: false,
-      );
-    } else {
-      setState(() {
-        bidAmounts[number] = amount; // Add new bid
-      });
-      _showMessage('Added bid for Digit: $number, Amount: $amount');
-    }
+    // Create a new bid entry
+    final newBid = BidEntry(
+      digit: number,
+      points: amount,
+      type: selectedGameType.toUpperCase(),
+    );
 
-    // DO NOT CLEAR pointsController here.
-    // This allows the user to apply the same points to multiple digits.
-    // pointsController.clear(); // This line is intentionally commented/removed
+    setState(() {
+      if (existingBidIndex != -1) {
+        // Update the existing bid entry
+        bidEntries[existingBidIndex] = newBid;
+        _showMessage(
+          'Bid for Digit $number (${selectedGameType.toUpperCase()}) updated to $amount points.',
+          isError: false,
+        );
+      } else {
+        // Add a new bid entry
+        bidEntries.add(newBid);
+        _showMessage('Added bid for Digit: $number, Amount: $amount');
+      }
+    });
   }
 
   int _getTotalPoints() {
-    return bidAmounts.values
-        .map((e) => int.tryParse(e) ?? 0)
+    return bidEntries
+        .map((e) => int.tryParse(e.points) ?? 0)
         .fold(0, (a, b) => a + b);
   }
 
   // --- Confirmation Dialog and Final Bid Submission (Modified) ---
   void _showConfirmationDialog() {
     _clearMessage();
-    if (bidAmounts.isEmpty) {
+    if (bidEntries.isEmpty) {
       _showMessage(
         'Please add at least one bid before submitting.',
         isError: true,
@@ -257,16 +277,16 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
       'dd MMM yyyy, hh:mm a',
     ).format(DateTime.now());
 
-    // --- IMPORTANT: Transform bidAmounts Map into a List of Maps for the dialog ---
-    List<Map<String, String>> bidsForDialog = bidAmounts.entries.map((entry) {
+    // Transform bidEntries into a List of Maps for the dialog.
+    // This will include all bids, regardless of their type.
+    List<Map<String, String>> bidsForDialog = bidEntries.map((bid) {
       return {
-        "digit": entry.key,
-        "points": entry.value,
-        "type": selectedGameType, // Use the dynamically selected game type
+        "digit": bid.digit,
+        "points": bid.points,
+        "type": bid.type, // Use the stored type
         "pana": "", // pana should be empty for single digits
       };
     }).toList();
-    // --- End Transformation ---
 
     showDialog(
       context: context,
@@ -275,8 +295,8 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
         return BidConfirmationDialog(
           gameTitle: "${widget.gameName} - ${widget.gameType}",
           gameDate: formattedDate,
-          bids: bidsForDialog, // Pass the transformed list
-          totalBids: bidAmounts.length,
+          bids: bidsForDialog, // Pass the entire list of bids
+          totalBids: bidEntries.length,
           totalBidsAmount: totalPoints,
           walletBalanceBeforeDeduction: currentWalletBalance,
           walletBalanceAfterDeduction: (currentWalletBalance - totalPoints)
@@ -298,18 +318,16 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
       _isApiCalling = true; // Set loading state to true
     });
 
-    // --- IMPORTANT: Transform bidAmounts Map into a List of Maps for the BidService ---
-    List<Map<String, String>> formattedBidsForService = bidAmounts.entries.map((
-      entry,
-    ) {
-      return {
-        "digit": entry.key,
-        "points": entry.value,
-        "type": selectedGameType, // Use the dynamically selected game type
-        "pana": "", // For single digits, pana should be empty
-      };
-    }).toList();
-    // --- End Transformation ---
+    // Create the Map<String, String> in the correct format: digit -> points
+    // The key should be the digit, and the value should be the points.
+    final Map<String, String> bidsForService = {};
+    for (var bid in bidEntries) {
+      // The key is the digit, the value is the points.
+      // The type is not part of the key here.
+      bidsForService[bid.digit] = bid.points;
+    }
+
+    // Call the bid service with the formatted map and the selectedGameType.
     final result = await _bidService.placeFinalBids(
       gameName: widget.gameName,
       accessToken: _accessToken,
@@ -317,25 +335,20 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
       deviceId: _deviceId,
       deviceName: _deviceName,
       accountStatus: _accountStatus,
-      bidAmounts: bidAmounts, // CORRECTED: Pass the correctly formatted list
-      selectedGameType:
-          selectedGameType, // Use the dynamically selected game type
+      bidAmounts: bidsForService, // Passing the corrected map of bids
       gameId: widget.gameId,
       gameType: widget.gameType,
       totalBidAmount: _getTotalPoints(),
+      selectedGameType:
+          selectedGameType, // This parameter is handled correctly by your BidService
     );
 
     if (!mounted) {
-      // If the widget is disposed before the async operation completes,
-      // ensure _isApiCalling is reset to prevent UI issues if the screen
-      // is re-entered later.
-      _isApiCalling = false;
+      setState(() {
+        _isApiCalling = false;
+      });
       return false;
     }
-
-    setState(() {
-      _isApiCalling = false; // Set loading state to false after API call
-    });
 
     // Ensure context is still valid before showing final dialog
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -353,12 +366,17 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
         final int newBalance = _walletBalance - _getTotalPoints();
         setState(() {
           _walletBalance = newBalance;
-          bidAmounts.clear(); // Clear bids on successful submission
+          bidEntries.clear(); // Clear bids on successful submission
           pointsController.clear(); // Clear points text field
         });
         await _bidService.updateWalletBalance(newBalance);
         _showMessage('Bids submitted successfully!'); // Show success message
       }
+    });
+
+    // Update loading state after the dialog is shown
+    setState(() {
+      _isApiCalling = false;
     });
 
     return result['status'] == true;
@@ -485,6 +503,13 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
       runSpacing: 10,
       alignment: WrapAlignment.center,
       children: numbers.map((number) {
+        // Find if a bid for this number exists in the current session type
+        final bid = bidEntries.firstWhereOrNull(
+          (element) =>
+              element.digit == number &&
+              element.type == selectedGameType.toUpperCase(),
+        );
+
         return GestureDetector(
           onTap: _isApiCalling
               ? null // Disable tap if an API call is in progress
@@ -521,7 +546,7 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
                   ),
                 ),
               ),
-              if (bidAmounts[number] != null)
+              if (bid != null) // Check if a bid exists for this number and type
                 Positioned(
                   top: 4,
                   right: 6,
@@ -535,7 +560,7 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      bidAmounts[number]!,
+                      bid.points, // Display the points from the stored BidEntry
                       style: GoogleFonts.poppins(
                         fontSize: 13,
                         color: Colors.white, // Amount text color
@@ -633,7 +658,7 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
                   const SizedBox(height: 30),
                   _buildNumberPad(), // Number pad internally handles _isApiCalling visual state
                   const SizedBox(height: 20),
-                  if (bidAmounts.isNotEmpty) // Only show headers if bids exist
+                  if (bidEntries.isNotEmpty) // Only show headers if bids exist
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 0.0),
                       child: Row(
@@ -676,7 +701,7 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
                       ),
                     ),
                   Expanded(
-                    child: bidAmounts.isEmpty
+                    child: bidEntries.isEmpty
                         ? Center(
                             child: Text(
                               'No bids placed yet. Click a number to add a bid!',
@@ -684,14 +709,13 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
                             ),
                           )
                         : ListView.builder(
-                            itemCount: bidAmounts.length,
+                            itemCount: bidEntries.length,
                             itemBuilder: (context, index) {
-                              final digit = bidAmounts.keys.elementAt(index);
-                              final amount = bidAmounts[digit]!;
+                              final bid = bidEntries[index];
                               return _buildBidEntryItem(
-                                digit,
-                                amount,
-                                selectedGameType,
+                                bid.digit,
+                                bid.points,
+                                bid.type,
                               );
                             },
                           ),
@@ -747,7 +771,7 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
                           ),
                         ),
                         Text(
-                          "${bidAmounts.length}",
+                          "${bidEntries.length}",
                           style: GoogleFonts.poppins(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -775,11 +799,11 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
                       ],
                     ),
                     ElevatedButton(
-                      onPressed: (_isApiCalling || bidAmounts.isEmpty)
+                      onPressed: (_isApiCalling || bidEntries.isEmpty)
                           ? null // Disable button while API is calling OR if no bids
                           : _showConfirmationDialog,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: (_isApiCalling || bidAmounts.isEmpty)
+                        backgroundColor: (_isApiCalling || bidEntries.isEmpty)
                             ? Colors.grey
                             : Colors.orange, // Grey out when disabled
                         padding: const EdgeInsets.symmetric(
@@ -854,7 +878,7 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
             Expanded(
               flex: 2,
               child: Text(
-                type.toUpperCase(), // Display type in uppercase
+                type.toUpperCase(), // Display the stored type in uppercase
                 style: GoogleFonts.poppins(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
@@ -870,10 +894,14 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
                   ? null // Disable delete button while API is calling
                   : () {
                       setState(() {
-                        final removedAmount = bidAmounts.remove(digit);
-                        if (removedAmount != null) {
+                        // Find the specific bid to remove
+                        final indexToRemove = bidEntries.indexWhere(
+                          (bid) => bid.digit == digit && bid.type == type,
+                        );
+                        if (indexToRemove != -1) {
+                          final removedBid = bidEntries.removeAt(indexToRemove);
                           _showMessage(
-                            'Removed bid for Digit: $digit, Amount: $removedAmount.',
+                            'Removed bid for Digit: ${removedBid.digit}, Amount: ${removedBid.points}.',
                           );
                         }
                       });
@@ -883,5 +911,17 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
         ),
       ),
     );
+  }
+}
+
+// Add this extension for convenience to find an element or return null
+extension IterableExtension<E> on Iterable<E> {
+  E? firstWhereOrNull(bool Function(E element) test) {
+    for (var element in this) {
+      if (test(element)) {
+        return element;
+      }
+    }
+    return null;
   }
 }

@@ -136,14 +136,14 @@ const List<String> Single_Pana = [
   "890",
 ];
 
-class SinglePannaScreen extends StatefulWidget {
+class SinglePanaScreen extends StatefulWidget {
   final String title;
   final int gameId;
   final String gameType;
   final String gameName;
   final bool selectionStatus;
 
-  const SinglePannaScreen({
+  const SinglePanaScreen({
     Key? key,
     required this.title,
     required this.gameId,
@@ -153,10 +153,10 @@ class SinglePannaScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<SinglePannaScreen> createState() => _SinglePannaScreenState();
+  State<SinglePanaScreen> createState() => _SinglePanaScreenState();
 }
 
-class _SinglePannaScreenState extends State<SinglePannaScreen> {
+class _SinglePanaScreenState extends State<SinglePanaScreen> {
   final TextEditingController digitController = TextEditingController();
   final TextEditingController amountController = TextEditingController();
   final LayerLink _layerLink = LayerLink();
@@ -165,10 +165,11 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
   final FocusNode _digitFocusNode = FocusNode();
 
   final List<String> gameTypes = ['Open', 'Close'];
-  String selectedGameType = 'Close';
-  late String deviceId = "flutter_device"; // Placeholder, get actual value
-  late String deviceName = "Flutter_App"; // Placeholder, get actual value;
+  String selectedGameType = 'Open';
+  late final String deviceId; // Placeholder, get actual value
+  late final String deviceName; // Placeholder, get actual value;
   late bool accountActiveStatus;
+  GetStorage storage = GetStorage();
 
   List<Map<String, String>> bids = [];
   int walletBalance = 0;
@@ -186,9 +187,11 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
     _loadInitialData();
     _loadSavedBids();
     digitController.addListener(_onDigitChanged);
+    deviceId = 'test_device_id_flutter';
+    deviceName = 'test_device_name_flutter';
 
     // Add listener for walletBalance
-    GetStorage().listenKey('walletBalance', (value) {
+    storage.listenKey('walletBalance', (value) {
       if (value is int) {
         walletBalance = value;
       } else if (value is String) {
@@ -199,17 +202,17 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
     });
 
     // Add listener for accessToken
-    GetStorage().listenKey('accessToken', (value) {
+    storage.listenKey('accessToken', (value) {
       accessToken = value ?? '';
     });
 
     // Add listener for registerId
-    GetStorage().listenKey('registerId', (value) {
+    storage.listenKey('registerId', (value) {
       registerId = value ?? '';
     });
 
     // Add listener for accountStatus
-    GetStorage().listenKey('accountStatus', (value) {
+    storage.listenKey('accountStatus', (value) {
       accountStatus = value ?? false;
     });
   }
@@ -240,6 +243,54 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
         }
       });
     }
+  }
+
+  Widget buildDropdownButton() {
+    return SizedBox(
+      height: 35,
+      width: 150,
+      child: InputDecorator(
+        decoration: InputDecoration(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 0,
+          ),
+          filled: true,
+          fillColor: Colors.white,
+          hintText: 'Select',
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(30),
+            borderSide: const BorderSide(color: Colors.black),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(30),
+            borderSide: const BorderSide(color: Colors.black),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(30),
+            borderSide: const BorderSide(color: Colors.orange, width: 2),
+          ),
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: selectedGameType,
+            isExpanded: true,
+            icon: const Icon(Icons.arrow_drop_down),
+            style: GoogleFonts.poppins(fontSize: 14, color: Colors.black),
+            onChanged: (String? newValue) {
+              setState(() {
+                selectedGameType = newValue!;
+              });
+            },
+            items: <String>['Open', 'Close'].map<DropdownMenuItem<String>>((
+              String value,
+            ) {
+              return DropdownMenuItem<String>(value: value, child: Text(value));
+            }).toList(),
+          ),
+        ),
+      ),
+    );
   }
 
   // SHOW SUGGESTIONS
@@ -351,8 +402,7 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
   }
 
   void _loadSavedBids() {
-    final box = GetStorage();
-    final dynamic savedBidsRaw = box.read('placedBids');
+    final dynamic savedBidsRaw = storage.read('placedBids');
     if (savedBidsRaw is List) {
       if (mounted) {
         setState(() {
@@ -375,10 +425,6 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
         });
       }
     }
-  }
-
-  void _saveBids() {
-    GetStorage().write('placedBids', bids);
   }
 
   void _showMessage(String message, {bool isError = false}) {
@@ -412,7 +458,7 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
     }
 
     if (!Single_Pana.contains(digit)) {
-      _showMessage('Please enter a valid Single Panna number.', isError: true);
+      _showMessage('Please enter a valid Single Pana number.', isError: true);
       return;
     }
 
@@ -437,7 +483,7 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
           bids[existingIndex]['amount'] = (currentAmount + intAmount)
               .toString();
           _showMessage(
-            'Updated amount for Panna: $digit, Type: $selectedGameType.',
+            'Updated amount for Pana: $digit, Type: $selectedGameType.',
           );
         } else {
           bids.add({
@@ -446,10 +492,10 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
             'type': selectedGameType,
           });
           _showMessage(
-            'Added bid: Panna $digit, Amount $amount, Type $selectedGameType.',
+            'Added bid: Pana $digit, Amount $amount, Type $selectedGameType.',
           );
         }
-        _saveBids();
+
         digitController.clear();
         amountController.clear();
         FocusScope.of(context).unfocus();
@@ -500,7 +546,6 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
                   bids.clear();
                 });
               }
-              _saveBids();
             }
           },
         );
@@ -509,8 +554,9 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
   }
 
   Future<bool> _placeFinalBids() async {
-    final _bidService = BidService(GetStorage());
+    if (!mounted) return false;
 
+    final _bidService = BidService(GetStorage());
     final Map<String, String> bidPayload = {};
     int currentBatchTotalPoints = 0;
 
@@ -527,9 +573,8 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
       }
     }
 
-    // 🟥 Validate empty payload
     if (bidPayload.isEmpty) {
-      if (!context.mounted) return false;
+      if (!mounted) return false;
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -540,9 +585,8 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
       return false;
     }
 
-    // 🟥 Validate auth
     if (accessToken.isEmpty || registerId.isEmpty) {
-      if (!context.mounted) return false;
+      if (!mounted) return false;
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -553,7 +597,10 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
       return false;
     }
 
-    // 🟩 Try placing bid
+    // --- Start of the main logic block ---
+    bool bidPlacementSuccessful = false;
+    String? errorMessage;
+
     try {
       final result = await _bidService.placeFinalBids(
         gameName: widget.title,
@@ -569,68 +616,69 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
         totalBidAmount: currentBatchTotalPoints,
       );
 
-      if (!context.mounted) return false;
+      // CRITICAL: Check mounted after the network call
+      if (!mounted) return false;
 
-      final isSuccess = result['status'] == true;
-
-      if (isSuccess) {
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => const BidSuccessDialog(),
-        );
-
-        if (!context.mounted) return false;
-
-        final newWalletBalance = walletBalance - currentBatchTotalPoints;
-
-        setState(() {
-          walletBalance = newWalletBalance;
-        });
-        await _bidService.updateWalletBalance(newWalletBalance);
-
-        setState(() {
-          bids.removeWhere(
-            (element) =>
-                (element["type"] ?? "").toUpperCase() ==
-                selectedGameType.toUpperCase(),
-          );
-          _saveBids();
-        });
-
-        return true;
-      } else {
-        if (!context.mounted) return false;
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => BidFailureDialog(
-            errorMessage: result['msg'] ?? 'Something went wrong',
-          ),
-        );
-
-        setState(() {
-          bids.removeWhere(
-            (element) =>
-                (element["type"] ?? "").toUpperCase() ==
-                selectedGameType.toUpperCase(),
-          );
-          _saveBids();
-        });
-        return false;
+      bidPlacementSuccessful = result['status'] == true;
+      if (!bidPlacementSuccessful) {
+        errorMessage = result['msg'] ?? 'Something went wrong';
       }
     } catch (e) {
-      log('Error during bid placement: $e', name: 'SinglePannaScreenBidError');
+      log(
+        'Error during bid placement: $e',
+        name: 'StarlineSinglePannaScreenBidError',
+      );
+      // CRITICAL: Check mounted before setting the error message
+      if (!mounted) return false;
+      errorMessage = 'An unexpected error occurred during bid submission.';
+    }
 
-      if (!context.mounted) return false;
+    // Handle the UI logic based on the outcome of the network call.
+    // This separates the network logic from the UI logic.
+    if (!mounted) return false;
 
+    if (bidPlacementSuccessful) {
       await showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => const BidFailureDialog(
-          errorMessage: 'An unexpected error occurred during bid submission.',
+        builder: (_) => const BidSuccessDialog(),
+      );
+
+      // After dialog, check mounted again
+      if (!mounted) return false;
+
+      final newWalletBalance = walletBalance - currentBatchTotalPoints;
+      setState(() {
+        walletBalance = newWalletBalance;
+        bids.removeWhere(
+          (element) =>
+              (element["type"] ?? "").toUpperCase() ==
+              selectedGameType.toUpperCase(),
+        );
+      });
+      await _bidService.updateWalletBalance(newWalletBalance);
+      return true;
+    } else {
+      // Bid failed or an error occurred, show the failure dialog
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => BidFailureDialog(
+          errorMessage: errorMessage ?? 'An unknown error occurred.',
         ),
       );
+
+      // After dialog, check mounted again
+      if (!mounted) return false;
+
+      // Clean up bids regardless of network failure, as the user should retry.
+      setState(() {
+        bids.removeWhere(
+          (element) =>
+              (element["type"] ?? "").toUpperCase() ==
+              selectedGameType.toUpperCase(),
+        );
+      });
       return false;
     }
   }
@@ -707,7 +755,6 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
     );
   }
 
-  // INPUT FIELD BUILDER
   // INPUT FIELD BUILDER
   Widget _buildInputField(TextEditingController controller, String hint) {
     // If the controller is not the digit controller, use a standard TextFormField.
@@ -861,7 +908,7 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
           Expanded(
             flex: 2,
             child: Text(
-              "Panna",
+              "Pana",
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
             ),
@@ -895,7 +942,6 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
         bids.removeAt(index);
       });
     }
-    _saveBids();
     _showMessage('Bid removed from list.');
   }
 
@@ -970,9 +1016,12 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
                 ),
                 child: Column(
                   children: [
+                    // create the selected game type dropdown
+                    _inputRow("Select Game Type:", buildDropdownButton()),
+
                     _inputRow(
-                      "Enter Single Panna:",
-                      _buildInputField(digitController, "Bid Panna"),
+                      "Enter Single Pana:",
+                      _buildInputField(digitController, "Bid Pana"),
                     ),
                     _inputRow(
                       "Enter Points:",
@@ -1097,20 +1146,44 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              "Total Points:",
-                              style: GoogleFonts.poppins(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
+                            Column(
+                              children: [
+                                Text(
+                                  "Total Bids:",
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  "${bids.length}",
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.green.shade700,
+                                  ),
+                                ),
+                              ],
                             ),
-                            Text(
-                              "${_getTotalPoints()}",
-                              style: GoogleFonts.poppins(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.green.shade700,
-                              ),
+
+                            Column(
+                              children: [
+                                Text(
+                                  "Total Points:",
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  "${_getTotalPoints()}",
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.green.shade700,
+                                  ),
+                                ),
+                              ],
                             ),
                             SizedBox(
                               height: 40,
@@ -1123,7 +1196,7 @@ class _SinglePannaScreenState extends State<SinglePannaScreen> {
                                   ),
                                 ),
                                 child: Text(
-                                  "CONFIRM",
+                                  "Submit",
                                   style: GoogleFonts.poppins(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,

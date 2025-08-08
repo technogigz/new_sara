@@ -65,7 +65,6 @@ class _SinglePannaBulkBoardScreenState
   // UI state indicators
   bool _isApiCalling =
       false; // Indicates if an API call (like adding a bulk bid or final submission) is in progress
-  bool _isWalletLoading = true; // Indicates if wallet balance is being loaded
 
   // Device information for API headers
   final String _deviceId = GetStorage().read('deviceId') ?? '';
@@ -113,10 +112,6 @@ class _SinglePannaBulkBoardScreenState
     } else {
       _walletBalance = 0;
     }
-
-    setState(() {
-      _isWalletLoading = false; // Mark wallet loading as complete
-    });
   }
 
   // Sets up listeners for changes in specific GetStorage keys, updating UI state
@@ -152,7 +147,6 @@ class _SinglePannaBulkBoardScreenState
           } else {
             _walletBalance = 0;
           }
-          _isWalletLoading = false;
         });
       }
     });
@@ -805,22 +799,10 @@ class _SinglePannaBulkBoardScreenState
                   color: Colors.black,
                 ),
                 const SizedBox(width: 4),
-                _isWalletLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.black,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : Text(
-                        _walletBalance.toString(),
-                        style: GoogleFonts.poppins(
-                          color: Colors.black,
-                          fontSize: 16,
-                        ),
-                      ),
+                Text(
+                  _walletBalance.toString(),
+                  style: GoogleFonts.poppins(color: Colors.black, fontSize: 16),
+                ),
               ],
             ),
           ),

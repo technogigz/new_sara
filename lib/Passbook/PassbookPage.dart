@@ -22,6 +22,12 @@ class _PassbookPageState extends State<PassbookPage> {
   bool isLandscape = false;
   bool loading = false;
   int _totalPages = 1; // New state variable for total pages
+  GetStorage storage = GetStorage();
+  String deviceId = '';
+  String deviceName = '';
+  String registerId = '';
+  late String token = '';
+  final url = '${Constant.apiEndpoint}passbook-history';
 
   @override
   void initState() {
@@ -32,12 +38,10 @@ class _PassbookPageState extends State<PassbookPage> {
   Future<void> fetchEntries() async {
     setState(() => loading = true);
     // Corrected API URL to match the domain used in other API calls
-    final url = '${Constant.apiEndpoint}passbook-history';
-    final token = GetStorage().read("accessToken") ?? '';
-    String registerId =
-        GetStorage().read("registerId") ?? ""; // New static registerId
-    final String deviceId = GetStorage().read('deviceId');
-    final String deviceName = GetStorage().read('deviceName');
+    token = storage.read("accessToken") ?? '';
+    registerId = storage.read("registerId") ?? ''; // New static registerId
+    deviceId = storage.read('deviceId') ?? '';
+    deviceName = storage.read('deviceName') ?? '';
 
     log("Fetching Passbook entries...");
     log("Register Id: $registerId");

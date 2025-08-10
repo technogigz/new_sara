@@ -2,10 +2,12 @@ import 'dart:async'; // Import for Timer
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:new_sara/components/BidFailureDialog.dart';
 
 import '../../BidService.dart';
+import '../../Helper/UserController.dart';
 import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
 import '../../components/BidSuccessDialog.dart';
@@ -38,6 +40,8 @@ class _GroupJodiScreenState extends State<GroupJodiScreen> {
   late bool _accountActiveStatus;
   late int _walletBalance; // Changed to int for consistency
 
+  final UserController userController = Get.put(UserController());
+
   // Device info (typically from a utility or initial fetch)
   String _deviceId = "flutter_device"; // Placeholder, get actual value
   String _deviceName = "Flutter_App"; // Placeholder, get actual value
@@ -56,60 +60,17 @@ class _GroupJodiScreenState extends State<GroupJodiScreen> {
   void initState() {
     super.initState();
     _initializeStorageValues();
-    _listenToStorageChanges();
+    double walletBalance = double.parse(userController.walletBalance.value);
+    _walletBalance = walletBalance.toInt();
   }
 
   void _initializeStorageValues() {
-    _mobile = _storage.read('mobileNoEnc') ?? '';
-    _name = _storage.read('fullName') ?? '';
-    _accountActiveStatus = _storage.read('accountStatus') ?? false;
+    _mobile = userController.mobileNo.value;
+    _name = userController.fullName.value;
+    _accountActiveStatus = userController.accountStatus.value;
     _accessToken =
         _storage.read('accessToken') ?? ''; // Initialize access token
     _registerId = _storage.read('registerId') ?? ''; // Initialize register ID
-
-    final storedWallet = _storage.read('walletBalance');
-    if (storedWallet is int) {
-      _walletBalance = storedWallet;
-    } else if (storedWallet is String) {
-      _walletBalance = int.tryParse(storedWallet) ?? 0;
-    } else {
-      _walletBalance = 0;
-    }
-  }
-
-  void _listenToStorageChanges() {
-    _storage.listenKey('mobileNoEnc', (value) {
-      if (mounted) setState(() => _mobile = value ?? '');
-    });
-
-    _storage.listenKey('fullName', (value) {
-      if (mounted) setState(() => _name = value ?? '');
-    });
-
-    _storage.listenKey('accountStatus', (value) {
-      if (mounted) setState(() => _accountActiveStatus = value ?? false);
-    });
-
-    _storage.listenKey('walletBalance', (value) {
-      if (mounted) {
-        if (value is int) {
-          _walletBalance = value;
-        } else if (value is String) {
-          _walletBalance = int.tryParse(value) ?? 0;
-        } else {
-          _walletBalance = 0;
-        }
-      }
-    });
-
-    _storage.listenKey('accessToken', (value) {
-      if (mounted) setState(() => _accessToken = value ?? '');
-    });
-    _storage.listenKey('registerId', (value) {
-      if (mounted) setState(() => _registerId = value ?? '');
-    });
-
-    setState(() {});
   }
 
   @override

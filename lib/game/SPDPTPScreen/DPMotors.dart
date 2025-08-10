@@ -4,12 +4,14 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
 import '../../BidService.dart';
+import '../../Helper/UserController.dart';
 import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
 import '../../components/BidFailureDialog.dart';
@@ -62,13 +64,14 @@ class _DPMotorsBetScreenState extends State<DPMotorsBetScreen> {
 
   bool _isApiCalling = false;
 
+  final UserController userController = Get.put(UserController());
+
   @override
   void initState() {
     super.initState();
     storage = GetStorage();
     _bidService = BidService(storage);
     _loadInitialData();
-    _setupStorageListeners();
 
     if (widget.selectionStatus) {
       selectedGameBetType = "Open";
@@ -80,45 +83,11 @@ class _DPMotorsBetScreenState extends State<DPMotorsBetScreen> {
   Future<void> _loadInitialData() async {
     accessToken = storage.read('accessToken') ?? '';
     registerId = storage.read('registerId') ?? '';
-    accountStatus = storage.read('accountStatus') ?? false;
+    accountStatus = userController.accountStatus.value;
     preferredLanguage = storage.read('selectedLanguage') ?? 'en';
 
-    final dynamic storedWalletBalance = storage.read('walletBalance');
-    if (storedWalletBalance is int) {
-      walletBalance = storedWalletBalance;
-    } else if (storedWalletBalance is String) {
-      walletBalance = int.tryParse(storedWalletBalance) ?? 0;
-    } else {
-      walletBalance = 0;
-    }
-  }
-
-  void _setupStorageListeners() {
-    storage.listenKey('accessToken', (value) {
-      if (mounted) setState(() => accessToken = value ?? '');
-    });
-    storage.listenKey('registerId', (value) {
-      if (mounted) setState(() => registerId = value ?? '');
-    });
-    storage.listenKey('accountStatus', (value) {
-      if (mounted) setState(() => accountStatus = value ?? false);
-    });
-    storage.listenKey('selectedLanguage', (value) {
-      if (mounted) setState(() => preferredLanguage = value ?? 'en');
-    });
-    storage.listenKey('walletBalance', (value) {
-      if (mounted) {
-        setState(() {
-          if (value is int) {
-            walletBalance = value;
-          } else if (value is String) {
-            walletBalance = int.tryParse(value) ?? 0;
-          } else {
-            walletBalance = 0;
-          }
-        });
-      }
-    });
+    double _walletBalance = double.parse(userController.walletBalance.value);
+    walletBalance = _walletBalance.toInt();
   }
 
   @override
@@ -501,7 +470,7 @@ class _DPMotorsBetScreenState extends State<DPMotorsBetScreen> {
           const SizedBox(width: 6),
           Center(
             child: Text(
-              walletBalance.toString(),
+              userController.walletBalance.value,
               style: const TextStyle(
                 color: Colors.black,
                 fontWeight: FontWeight.bold,

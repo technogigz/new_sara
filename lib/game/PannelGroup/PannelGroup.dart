@@ -4,6 +4,7 @@ import 'dart:developer'; // For log
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For TextInputFormatter
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart'; // Required for wallet balance and tokens
 import 'package:google_fonts/google_fonts.dart'; // For GoogleFonts
 import 'package:http/http.dart' as http; // Import for making HTTP requests
@@ -16,7 +17,8 @@ import '../../../../components/AnimatedMessageBar.dart';
 import '../../../../components/BidConfirmationDialog.dart';
 import '../../../../components/BidFailureDialog.dart';
 import '../../../../components/BidSuccessDialog.dart';
-import '../../../ulits/Constents.dart'; // Retained your original import path
+import '../../../ulits/Constents.dart';
+import '../../Helper/UserController.dart'; // Retained your original import path
 
 class PanelGroupScreen extends StatefulWidget {
   final String title; // e.g., "RADHA MORNING"
@@ -47,6 +49,8 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
 
   final String _deviceId = GetStorage().read('deviceId') ?? '';
   final String _deviceName = GetStorage().read('deviceName') ?? '';
+
+  final UserController userController = Get.put(UserController());
 
   List<Map<String, String>> addedEntries = []; // List to store the added bids
 
@@ -294,51 +298,16 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
     super.initState();
     selectedGameBetType = gameTypesOptions[0]; // Default to "Open"
     _loadInitialData();
-    _setupStorageListeners();
   }
 
   Future<void> _loadInitialData() async {
     accessToken = _storage.read('accessToken') ?? '';
     registerId = _storage.read('registerId') ?? '';
-    accountStatus = _storage.read('accountStatus') ?? false;
+    accountStatus = userController.accountStatus.value;
     preferredLanguage = _storage.read('selectedLanguage') ?? 'en';
 
-    final dynamic storedWalletBalance = _storage.read('walletBalance');
-    if (storedWalletBalance is int) {
-      walletBalance = storedWalletBalance;
-    } else if (storedWalletBalance is String) {
-      walletBalance = int.tryParse(storedWalletBalance) ?? 0;
-    } else {
-      walletBalance = 0;
-    }
-  }
-
-  void _setupStorageListeners() {
-    _storage.listenKey('accessToken', (value) {
-      if (mounted) setState(() => accessToken = value ?? '');
-    });
-    _storage.listenKey('registerId', (value) {
-      if (mounted) setState(() => registerId = value ?? '');
-    });
-    _storage.listenKey('accountStatus', (value) {
-      if (mounted) setState(() => accountStatus = value ?? false);
-    });
-    _storage.listenKey('selectedLanguage', (value) {
-      if (mounted) setState(() => preferredLanguage = value ?? 'en');
-    });
-    _storage.listenKey('walletBalance', (value) {
-      if (mounted) {
-        setState(() {
-          if (value is int) {
-            walletBalance = value;
-          } else if (value is String) {
-            walletBalance = int.tryParse(value) ?? 0;
-          } else {
-            walletBalance = 0;
-          }
-        });
-      }
-    });
+    double _walletBalance = double.parse(userController.walletBalance.value);
+    walletBalance = _walletBalance.toInt();
   }
 
   @override
@@ -758,7 +727,7 @@ class _PanelGroupScreenState extends State<PanelGroupScreen> {
           const SizedBox(width: 6),
           Center(
             child: Text(
-              walletBalance.toString(),
+              userController.walletBalance.value,
               style: const TextStyle(
                 color: Colors.black,
                 fontWeight: FontWeight.bold,

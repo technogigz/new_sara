@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:intl/intl.dart';
 
+import '../../Helper/UserController.dart';
 import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
 import '../../components/BidFailureDialog.dart';
@@ -54,6 +56,7 @@ class _StarlineOddEvenBoardScreenState
   String? _messageToShow;
   bool _isErrorForMessage = false;
   Key _messageBarKey = UniqueKey();
+  final UserController userController = Get.put(UserController());
 
   late final StarlineBidService _bidService;
 
@@ -64,16 +67,12 @@ class _StarlineOddEvenBoardScreenState
 
     _accessToken = storage.read('accessToken') ?? '';
     _registerId = storage.read('registerId') ?? '';
-    _accountStatus = storage.read('accountStatus') ?? false;
+    _accountStatus = userController.accountStatus.value;
 
-    final dynamic storedWalletBalance = storage.read('walletBalance');
-    if (storedWalletBalance is String) {
-      _walletBalance = int.tryParse(storedWalletBalance) ?? 0;
-    } else if (storedWalletBalance is int) {
-      _walletBalance = storedWalletBalance;
-    } else {
-      _walletBalance = 0;
-    }
+    double walletBalanceDouble = double.parse(
+      userController.walletBalance.value,
+    );
+    _walletBalance = walletBalanceDouble.toInt();
 
     _selectedLataDayType = widget.selectionStatus
         ? LataDayType.open
@@ -328,7 +327,7 @@ class _StarlineOddEvenBoardScreenState
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  _walletBalance.toString(),
+                  userController.walletBalance.value,
                   style: const TextStyle(color: Colors.black, fontSize: 16),
                 ),
               ],

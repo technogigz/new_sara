@@ -3,10 +3,12 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import '../../Helper/UserController.dart';
 import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
 import '../../components/BidFailureDialog.dart';
@@ -69,12 +71,18 @@ class _StarlineSingleDigitBetScreenState
   Key _messageBarKey = UniqueKey();
   Timer? _messageDismissTimer;
 
+  final UserController userController = Get.put(UserController());
+
   @override
   void initState() {
     super.initState();
+
     _bidService = StarlineBidService(storage);
     _loadInitialData();
-    _setupStorageListeners();
+    double walletBalanceDouble = double.parse(
+      userController.walletBalance.value,
+    );
+    walletBalance = walletBalanceDouble.toInt();
     digitController.addListener(_onDigitChanged);
   }
 
@@ -98,42 +106,8 @@ class _StarlineSingleDigitBetScreenState
 
   Future<void> _loadInitialData() async {
     registerId = storage.read('registerId') ?? '';
-    accountStatus = storage.read('accountStatus') ?? false;
+    accountStatus = userController.accountStatus.value;
     preferredLanguage = storage.read('selectedLanguage') ?? 'en';
-
-    final dynamic storedWalletBalance = storage.read('walletBalance');
-    if (storedWalletBalance is int) {
-      walletBalance = storedWalletBalance;
-    } else if (storedWalletBalance is String) {
-      walletBalance = int.tryParse(storedWalletBalance) ?? 0;
-    } else {
-      walletBalance = 0;
-    }
-  }
-
-  void _setupStorageListeners() {
-    storage.listenKey('registerId', (value) {
-      if (mounted) setState(() => registerId = value ?? '');
-    });
-    storage.listenKey('accountStatus', (value) {
-      if (mounted) setState(() => accountStatus = value ?? false);
-    });
-    storage.listenKey('selectedLanguage', (value) {
-      if (mounted) setState(() => preferredLanguage = value ?? 'en');
-    });
-    storage.listenKey('walletBalance', (value) {
-      if (mounted) {
-        setState(() {
-          if (value is int) {
-            walletBalance = value;
-          } else if (value is String) {
-            walletBalance = int.tryParse(value) ?? 0;
-          } else {
-            walletBalance = 0;
-          }
-        });
-      }
-    });
   }
 
   @override
@@ -455,7 +429,7 @@ class _StarlineSingleDigitBetScreenState
           const SizedBox(width: 6),
           Center(
             child: Text(
-              walletBalance.toString(),
+              userController.walletBalance.value,
               style: const TextStyle(
                 color: Colors.black,
                 fontWeight: FontWeight.bold,

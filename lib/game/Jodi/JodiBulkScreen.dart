@@ -3,11 +3,13 @@ import 'dart:async'; // For Timer
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For TextInputFormatter
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart'; // For GoogleFonts
 import 'package:intl/intl.dart';
 
 import '../../BidService.dart'; // Assuming BidService.dart is in the parent directory
+import '../../Helper/UserController.dart';
 import '../../components/AnimatedMessageBar.dart'; // Assuming this component is separate
 import '../../components/BidConfirmationDialog.dart';
 import '../../components/BidFailureDialog.dart';
@@ -50,15 +52,18 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
   Timer? _messageDismissTimer;
   bool _isSubmitting = false;
 
-  final String _deviceId = 'test_device_id_flutter_jodibulk';
-  final String _deviceName = 'test_device_name_flutter_jodibulk';
+  final UserController userController = Get.put(UserController());
+
+  final String _deviceId = 'test_device';
+  final String _deviceName = 'test_device';
 
   @override
   void initState() {
     super.initState();
     _bidService = BidService(storage);
+    double walletBalance = double.parse(userController.walletBalance.value);
+    _walletBalance = walletBalance.toInt();
     _loadInitialData();
-    _setupStorageListeners();
   }
 
   @override
@@ -72,49 +77,7 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
   Future<void> _loadInitialData() async {
     _accessToken = storage.read('accessToken') ?? '';
     _registerId = storage.read('registerId') ?? '';
-    _accountStatus = storage.read('accountStatus') ?? false;
-
-    final dynamic storedWalletBalance = storage.read('walletBalance');
-    if (storedWalletBalance is String) {
-      _walletBalance = int.tryParse(storedWalletBalance) ?? 0;
-    } else if (storedWalletBalance is int) {
-      _walletBalance = storedWalletBalance;
-    } else {
-      _walletBalance = 0;
-    }
-
-    setState(() {
-      _isWalletLoading = false;
-    });
-  }
-
-  void _setupStorageListeners() {
-    storage.listenKey('accessToken', (value) {
-      if (mounted) setState(() => _accessToken = value ?? '');
-    });
-
-    storage.listenKey('registerId', (value) {
-      if (mounted) setState(() => _registerId = value ?? '');
-    });
-
-    storage.listenKey('accountStatus', (value) {
-      if (mounted) setState(() => _accountStatus = value ?? false);
-    });
-
-    storage.listenKey('walletBalance', (value) {
-      if (mounted) {
-        setState(() {
-          if (value is String) {
-            _walletBalance = int.tryParse(value) ?? 0;
-          } else if (value is int) {
-            _walletBalance = value;
-          } else {
-            _walletBalance = 0;
-          }
-          _isWalletLoading = false;
-        });
-      }
-    });
+    _accountStatus = userController.accountStatus.value;
   }
 
   void _showMessage(String message, {bool isError = false}) {
@@ -405,25 +368,16 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
             color: Colors.black,
           ),
           const SizedBox(width: 6),
-          _isWalletLoading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    color: Colors.black,
-                    strokeWidth: 2,
-                  ),
-                )
-              : Center(
-                  child: Text(
-                    '$_walletBalance',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                ),
+          Center(
+            child: Text(
+              userController.walletBalance.value,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+          ),
           const SizedBox(width: 12),
         ],
       ),

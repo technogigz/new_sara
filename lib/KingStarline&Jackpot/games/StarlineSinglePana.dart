@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -11,6 +12,7 @@ import '../../../components/AnimatedMessageBar.dart';
 import '../../../components/BidConfirmationDialog.dart';
 import '../../../components/BidFailureDialog.dart';
 import '../../../components/BidSuccessDialog.dart';
+import '../../Helper/UserController.dart';
 
 // Define the Single_Pana list globally or as a static member
 const List<String> Single_Pana = [
@@ -182,43 +184,18 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
   bool _isErrorForMessage = false;
   Key _messageBarKey = UniqueKey();
 
+  final UserController userController = Get.put(UserController());
+
   @override
   void initState() {
     super.initState();
     _loadInitialData();
     _loadSavedBids();
     digitController.addListener(_onDigitChanged);
-
-    // Add listeners for GetStorage
-    GetStorage().listenKey('walletBalance', (value) {
-      if (mounted) {
-        if (value is int) {
-          setState(() => walletBalance = value);
-        } else if (value is String) {
-          setState(() => walletBalance = int.tryParse(value) ?? 0);
-        } else {
-          setState(() => walletBalance = 0);
-        }
-      }
-    });
-
-    GetStorage().listenKey('accessToken', (value) {
-      if (mounted) {
-        setState(() => accessToken = value ?? '');
-      }
-    });
-
-    GetStorage().listenKey('registerId', (value) {
-      if (mounted) {
-        setState(() => registerId = value ?? '');
-      }
-    });
-
-    GetStorage().listenKey('accountStatus', (value) {
-      if (mounted) {
-        setState(() => accountStatus = value ?? false);
-      }
-    });
+    double walletBalanceDouble = double.parse(
+      userController.walletBalance.value,
+    );
+    walletBalance = walletBalanceDouble.toInt();
   }
 
   // DIGIT CHANGE HANDLER
@@ -326,19 +303,6 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
     final box = GetStorage();
     accessToken = box.read('accessToken') ?? '';
     registerId = box.read('registerId') ?? '';
-    final dynamic storedValue = box.read('walletBalance');
-
-    if (storedValue != null) {
-      if (storedValue is int) {
-        walletBalance = storedValue;
-      } else if (storedValue is String) {
-        walletBalance = int.tryParse(storedValue) ?? 0;
-      } else {
-        walletBalance = 0;
-      }
-    } else {
-      walletBalance = 0;
-    }
   }
 
   @override

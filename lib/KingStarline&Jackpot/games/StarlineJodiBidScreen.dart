@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:intl/intl.dart';
 
+import '../../Helper/UserController.dart';
 import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
 import '../../components/BidFailureDialog.dart';
@@ -46,6 +48,7 @@ class _StarlineJodiBidScreenState extends State<StarlineJodiBidScreen> {
   String? _messageToShow;
   bool _isErrorForMessage = false;
   Key _messageBarKey = UniqueKey();
+  final UserController userController = Get.put(UserController());
 
   final List<String> allJodiOptions = List.generate(
     100,
@@ -58,7 +61,10 @@ class _StarlineJodiBidScreenState extends State<StarlineJodiBidScreen> {
     storage = GetStorage();
     _bidService = StarlineBidService(storage);
     // Initialize walletBalance from storage as String
-    walletBalance = storage.read('walletBalance')?.toString() ?? '0';
+    double walletBalanceDouble = double.parse(
+      userController.walletBalance.value,
+    );
+    walletBalance = walletBalanceDouble.toInt().toString();
     _loadInitialData();
     _setupStorageListeners();
   }
@@ -66,11 +72,7 @@ class _StarlineJodiBidScreenState extends State<StarlineJodiBidScreen> {
   Future<void> _loadInitialData() async {
     accessToken = storage.read('accessToken') ?? '';
     registerId = storage.read('registerId') ?? '';
-    accountStatus = storage.read('accountStatus') ?? false;
-    // Load walletBalance from storage as String
-    setState(() {
-      walletBalance = storage.read('walletBalance')?.toString() ?? '0';
-    });
+    accountStatus = userController.accountStatus.value;
   }
 
   void _setupStorageListeners() {

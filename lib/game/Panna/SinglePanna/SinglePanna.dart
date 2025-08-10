@@ -2,11 +2,13 @@ import 'dart:async'; // Added for Timer in AnimatedMessageBar logic
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../../BidService.dart';
+import '../../../Helper/UserController.dart';
 import '../../../components/AnimatedMessageBar.dart';
 import '../../../components/BidConfirmationDialog.dart';
 import '../../../components/BidFailureDialog.dart'; // Import BidFailureDialog
@@ -170,6 +172,7 @@ class _SinglePanaScreenState extends State<SinglePanaScreen> {
   late final String deviceName; // Placeholder, get actual value;
   late bool accountActiveStatus;
   GetStorage storage = GetStorage();
+  final UserController userController = Get.put(UserController());
 
   List<Map<String, String>> bids = [];
   int walletBalance = 0;
@@ -189,32 +192,12 @@ class _SinglePanaScreenState extends State<SinglePanaScreen> {
     digitController.addListener(_onDigitChanged);
     deviceId = 'test_device_id_flutter';
     deviceName = 'test_device_name_flutter';
+    double _walletBalance = double.parse(userController.walletBalance.value);
+    walletBalance = _walletBalance.toInt();
 
-    // Add listener for walletBalance
-    storage.listenKey('walletBalance', (value) {
-      if (value is int) {
-        walletBalance = value;
-      } else if (value is String) {
-        walletBalance = int.tryParse(value) ?? 0;
-      } else {
-        walletBalance = 0;
-      }
-    });
-
-    // Add listener for accessToken
-    storage.listenKey('accessToken', (value) {
-      accessToken = value ?? '';
-    });
-
-    // Add listener for registerId
-    storage.listenKey('registerId', (value) {
-      registerId = value ?? '';
-    });
-
-    // Add listener for accountStatus
-    storage.listenKey('accountStatus', (value) {
-      accountStatus = value ?? false;
-    });
+    accessToken = storage.read('accessToken') ?? '';
+    registerId = storage.read('registerId') ?? '';
+    accountStatus = userController.accountStatus.value;
   }
 
   // DIGIT CHANGE HANDLER
@@ -377,19 +360,11 @@ class _SinglePanaScreenState extends State<SinglePanaScreen> {
     final box = GetStorage();
     accessToken = box.read('accessToken') ?? '';
     registerId = box.read('registerId') ?? '';
-    final dynamic storedValue = box.read('walletBalance');
 
-    if (storedValue != null) {
-      if (storedValue is int) {
-        walletBalance = storedValue;
-      } else if (storedValue is String) {
-        walletBalance = int.tryParse(storedValue) ?? 0;
-      } else {
-        walletBalance = 0;
-      }
-    } else {
-      walletBalance = 0;
-    }
+    double _walletBalance = double.parse(userController.walletBalance.value);
+    walletBalance = _walletBalance.toInt();
+
+    accountStatus = userController.accountStatus.value;
   }
 
   @override
@@ -994,7 +969,7 @@ class _SinglePanaScreenState extends State<SinglePanaScreen> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    "$walletBalance",
+                    userController.walletBalance.value,
                     style: GoogleFonts.poppins(
                       color: Colors.black,
                       fontWeight: FontWeight.w600,

@@ -4,12 +4,14 @@ import 'dart:developer'; // For log
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For TextInputFormatter
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart'; // For GoogleFonts
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart'; // Import for date formatting
 import 'package:new_sara/KingStarline&Jackpot/StarlineBidService.dart';
 
+import '../../Helper/UserController.dart';
 import '../../components/AnimatedMessageBar.dart'; // Ensure this path is correct
 import '../../components/BidConfirmationDialog.dart'; // Ensure this path is correct
 import '../../components/BidFailureDialog.dart'; // For API failure dialog (ensure this path is correct)
@@ -64,18 +66,23 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
 
   bool _isApiCalling = false;
 
+  final UserController userController = Get.put(UserController());
+
   @override
   void initState() {
     super.initState();
     _bidService = StarlineBidService(storage);
     _loadInitialData();
-    _setupStorageListeners();
+    double walletBalanceDouble = double.parse(
+      userController.walletBalance.value,
+    );
+    walletBalance = walletBalanceDouble.toInt();
   }
 
   Future<void> _loadInitialData() async {
     accessToken = storage.read('accessToken') ?? '';
     registerId = storage.read('registerId') ?? '';
-    accountStatus = storage.read('accountStatus') ?? false;
+    accountStatus = userController.accountStatus.value;
     preferredLanguage = storage.read('selectedLanguage') ?? 'en';
 
     final dynamic storedWalletBalance = storage.read('walletBalance');
@@ -86,34 +93,6 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
     } else {
       walletBalance = 0;
     }
-  }
-
-  void _setupStorageListeners() {
-    storage.listenKey('accessToken', (value) {
-      if (mounted) setState(() => accessToken = value ?? '');
-    });
-    storage.listenKey('registerId', (value) {
-      if (mounted) setState(() => registerId = value ?? '');
-    });
-    storage.listenKey('accountStatus', (value) {
-      if (mounted) setState(() => accountStatus = value ?? false);
-    });
-    storage.listenKey('selectedLanguage', (value) {
-      if (mounted) setState(() => preferredLanguage = value ?? 'en');
-    });
-    storage.listenKey('walletBalance', (value) {
-      if (mounted) {
-        setState(() {
-          if (value is int) {
-            walletBalance = value;
-          } else if (value is String) {
-            walletBalance = int.tryParse(value) ?? 0;
-          } else {
-            walletBalance = 0;
-          }
-        });
-      }
-    });
   }
 
   @override
@@ -585,7 +564,7 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
           const SizedBox(width: 6),
           Center(
             child: Text(
-              walletBalance.toString(),
+              userController.walletBalance.value,
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,

@@ -383,10 +383,7 @@ class _HomePageState extends State<HomePage> {
                                 text: homepageContent.isNotEmpty
                                     ? homepageContent +
                                           List.filled(10, '\t').join()
-                                    : _getTranslatedString(
-                                            "24X7 Helpline: +919649115777. Available Languages: English • Hindi • Telugu • Kannada",
-                                          ) +
-                                          List.filled(10, '\t').join(),
+                                    : '',
                                 style: GoogleFonts.poppins(
                                   color: Colors.red,
                                   fontWeight: FontWeight.bold,
@@ -463,7 +460,7 @@ class _HomePageState extends State<HomePage> {
                             final contactData = contactSnapshot.data!;
                             _storage.write(
                               'whatsappNo',
-                              contactData.homepageContent,
+                              contactData.whatsappNo,
                             );
                             return Center(
                               child: Row(

@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../BidService.dart';
+import '../../Helper/UserController.dart';
 import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
 import '../../components/BidFailureDialog.dart';
@@ -148,12 +150,13 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
     "990",
   ];
 
+  final UserController userController = Get.put(UserController());
+
   @override
   void initState() {
     super.initState();
     _bidService = BidService(_storage);
     _loadInitialData();
-    _setupStorageListeners();
   }
 
   @override
@@ -168,49 +171,11 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
   Future<void> _loadInitialData() async {
     _accessToken = _storage.read('accessToken') ?? '';
     _registerId = _storage.read('registerId') ?? '';
-    _accountStatus = _storage.read('accountStatus') ?? false;
+    _accountStatus = userController.accountStatus.value;
     _preferredLanguage = _storage.read('selectedLanguage') ?? 'en';
 
-    final dynamic storedWalletBalance = _storage.read('walletBalance');
-    if (storedWalletBalance is int) {
-      _walletBalance = storedWalletBalance;
-    } else if (storedWalletBalance is String) {
-      _walletBalance = int.tryParse(storedWalletBalance) ?? 0;
-    } else {
-      _walletBalance = 0;
-    }
-  }
-
-  void _setupStorageListeners() {
-    _storage.listenKey('accessToken', (value) {
-      if (mounted) setState(() => _accessToken = value ?? '');
-    });
-
-    _storage.listenKey('registerId', (value) {
-      if (mounted) setState(() => _registerId = value ?? '');
-    });
-
-    _storage.listenKey('accountStatus', (value) {
-      if (mounted) setState(() => _accountStatus = value ?? false);
-    });
-
-    _storage.listenKey('selectedLanguage', (value) {
-      if (mounted) setState(() => _preferredLanguage = value ?? 'en');
-    });
-
-    _storage.listenKey('walletBalance', (value) {
-      if (mounted) {
-        setState(() {
-          if (value is int) {
-            _walletBalance = value;
-          } else if (value is String) {
-            _walletBalance = int.tryParse(value) ?? 0;
-          } else {
-            _walletBalance = 0;
-          }
-        });
-      }
-    });
+    double walletBalance = double.parse(userController.walletBalance.value);
+    _walletBalance = walletBalance.toInt();
   }
 
   void _showMessage(String message, {bool isError = false}) {
@@ -475,7 +440,7 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
           const SizedBox(width: 6),
           Center(
             child: Text(
-              '₹${_walletBalance.toString()}',
+              '₹${userController.walletBalance.value}',
               style: GoogleFonts.poppins(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,

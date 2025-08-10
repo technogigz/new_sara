@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:developer'; // For log messages
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:new_sara/KingStarline&Jackpot/games/StarlineJodiBidScreen.dart';
@@ -9,6 +10,7 @@ import 'package:new_sara/KingStarline&Jackpot/games/StarlineTriplePana.dart';
 
 // Ensure these imports are correct and the files exist in your project
 import '../Helper/TranslationHelper.dart';
+import '../Helper/UserController.dart';
 import 'games/StarlineDPMotorsScreen.dart';
 import 'games/StarlineOddEvenBoardScreen.dart';
 import 'games/StarlineSPDPTPScreen.dart';
@@ -99,12 +101,14 @@ class _JackpotJodiOptionsScreenState extends State<JackpotJodiOptionsScreen> {
   Future<String>? _translatedFailedToLoadTextFuture;
   Future<String>? _translatedNoScreenConfiguredTextFuture;
 
+  final UserController userController = Get.put(UserController());
+
   @override
   void initState() {
     super.initState();
 
     _currentLanguageCode = _storage.read('selectedLanguage') ?? 'en';
-    _loadWalletBalance();
+
     _preTranslateFixedTexts(); // Pre-translate fixed texts
 
     // Listen for language changes
@@ -120,12 +124,8 @@ class _JackpotJodiOptionsScreenState extends State<JackpotJodiOptionsScreen> {
     });
 
     // Listen for wallet balance changes
-    _storage.listenKey('walletBalance', (value) {
-      if (mounted) {
-        _loadWalletBalance();
-        setState(() {}); // Trigger rebuild to reflect new balance
-      }
-    });
+    double walletBalance = double.parse(userController.walletBalance.value);
+    _walletBalance = walletBalance.toInt();
 
     fetchJackpotBidTypes(); // Initial fetch of jackpot bid types
   }
@@ -155,17 +155,6 @@ class _JackpotJodiOptionsScreenState extends State<JackpotJodiOptionsScreen> {
     _translatedNoScreenConfiguredTextFuture = _getTranslatedText(
       'No screen configured for game type:',
     );
-  }
-
-  void _loadWalletBalance() {
-    final storedWallet = _storage.read('walletBalance');
-    if (storedWallet is int) {
-      _walletBalance = storedWallet;
-    } else if (storedWallet is String) {
-      _walletBalance = int.tryParse(storedWallet) ?? 0;
-    } else {
-      _walletBalance = 0;
-    }
   }
 
   Future<String> _getTranslatedText(String text) async {
@@ -354,7 +343,7 @@ class _JackpotJodiOptionsScreenState extends State<JackpotJodiOptionsScreen> {
             ),
             const SizedBox(width: 4),
             Text(
-              "₹ $_walletBalance",
+              "₹ ${userController.walletBalance.value}",
               style: const TextStyle(color: Colors.black, fontSize: 16),
             ),
           ],

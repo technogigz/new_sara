@@ -3,10 +3,12 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import '../../Helper/UserController.dart';
 import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
 import '../../components/BidFailureDialog.dart';
@@ -69,12 +71,13 @@ class _StarlineSingleDigitBetScreenState
   Key _messageBarKey = UniqueKey();
   Timer? _messageDismissTimer;
 
+  final UserController userController = Get.put(UserController());
+
   @override
   void initState() {
     super.initState();
     _bidService = StarlineBidService(storage);
     _loadInitialData();
-    _setupStorageListeners();
     digitController.addListener(_onDigitChanged);
   }
 
@@ -101,39 +104,10 @@ class _StarlineSingleDigitBetScreenState
     accountStatus = storage.read('accountStatus') ?? false;
     preferredLanguage = storage.read('selectedLanguage') ?? 'en';
 
-    final dynamic storedWalletBalance = storage.read('walletBalance');
-    if (storedWalletBalance is int) {
-      walletBalance = storedWalletBalance;
-    } else if (storedWalletBalance is String) {
-      walletBalance = int.tryParse(storedWalletBalance) ?? 0;
-    } else {
-      walletBalance = 0;
-    }
-  }
-
-  void _setupStorageListeners() {
-    storage.listenKey('registerId', (value) {
-      if (mounted) setState(() => registerId = value ?? '');
-    });
-    storage.listenKey('accountStatus', (value) {
-      if (mounted) setState(() => accountStatus = value ?? false);
-    });
-    storage.listenKey('selectedLanguage', (value) {
-      if (mounted) setState(() => preferredLanguage = value ?? 'en');
-    });
-    storage.listenKey('walletBalance', (value) {
-      if (mounted) {
-        setState(() {
-          if (value is int) {
-            walletBalance = value;
-          } else if (value is String) {
-            walletBalance = int.tryParse(value) ?? 0;
-          } else {
-            walletBalance = 0;
-          }
-        });
-      }
-    });
+    double walletBalanceDouble = double.parse(
+      userController.walletBalance.value,
+    );
+    walletBalance = walletBalanceDouble.toInt();
   }
 
   @override
@@ -250,70 +224,6 @@ class _StarlineSingleDigitBetScreenState
       (sum, item) => sum + (int.tryParse(item['points'] ?? '0') ?? 0),
     );
   }
-
-  // void _showConfirmationDialog() {
-  //   _clearMessage();
-  //   if (addedEntries.isEmpty) {
-  //     _showMessage('Please add at least one bid.', isError: true);
-  //     return;
-  //   }
-  //
-  //   final List<Map<String, String>> bidsForConfirmation = addedEntries.map((
-  //     bid,
-  //   ) {
-  //     return {
-  //       "digit": bid['digit']!,
-  //       "points": bid['points']!,
-  //       "type": selectedGameBetType,
-  //       "pana": "",
-  //     };
-  //   }).toList();
-  //
-  //   if (bidsForConfirmation.isEmpty) {
-  //     _showMessage('No bids to submit.', isError: true);
-  //     return;
-  //   }
-  //
-  //   final int totalPointsForConfirmation = bidsForConfirmation.fold(
-  //     0,
-  //     (sum, item) => sum + (int.tryParse(item['points'] ?? '0') ?? 0),
-  //   );
-  //
-  //   if (walletBalance < totalPointsForConfirmation) {
-  //     _showMessage(
-  //       'Insufficient wallet balance to place this bid.',
-  //       isError: true,
-  //     );
-  //     return;
-  //   }
-  //
-  //   final String formattedDate = DateFormat(
-  //     'dd MMM yyyy, hh:mm a',
-  //   ).format(DateTime.now());
-  //
-  //   showDialog(
-  //     context: context,
-  //     barrierDismissible: false,
-  //     builder: (BuildContext dialogContext) {
-  //       return BidConfirmationDialog(
-  //         gameTitle: widget.title,
-  //         gameDate: formattedDate,
-  //         bids: bidsForConfirmation,
-  //         totalBids: bidsForConfirmation.length,
-  //         totalBidsAmount: totalPointsForConfirmation,
-  //         walletBalanceBeforeDeduction: walletBalance,
-  //         walletBalanceAfterDeduction:
-  //             (walletBalance - totalPointsForConfirmation).toString(),
-  //         gameId: widget.gameId.toString(),
-  //         gameType: widget.gameCategoryType,
-  //         onConfirm: () async {
-  //           // Navigator.pop(dialogContext); // Close confirmation dialog first
-  //           await _placeFinalBids(); // Then process the bid
-  //         },
-  //       );
-  //     },
-  //   );
-  // }
 
   void _showConfirmationDialog() {
     FocusScope.of(context).unfocus(); // Close keyboard

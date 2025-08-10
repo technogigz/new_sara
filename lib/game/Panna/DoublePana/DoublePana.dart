@@ -3,11 +3,13 @@ import 'dart:developer'; // For log() function
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:new_sara/BidService.dart'; // Ensure this path is correct
 
+import '../../../Helper/UserController.dart';
 import '../../../components/AnimatedMessageBar.dart';
 import '../../../components/BidConfirmationDialog.dart';
 import '../../../components/BidFailureDialog.dart';
@@ -157,16 +159,19 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
 
   bool _isApiCalling = false;
 
+  final UserController userController = Get.put(UserController());
+
   @override
   void initState() {
     super.initState();
     storage = GetStorage();
     _bidService = BidService(storage);
     _loadInitialData();
-    _setupStorageListeners();
+    double walletBalanceDouble = double.parse(
+      userController.walletBalance.value,
+    );
+    walletBalance = walletBalanceDouble.toInt();
 
-    // Call _setInitialGameTypeOptions to set up game types based on widget.selectionStatus
-    // This will also ensure selectedGameBetType is correctly set, overwriting the default "Open" if needed.
     _setInitialGameTypeOptions();
     log(
       'DoublePanaBetScreen: initState called. Initial selectionStatus: ${widget.selectionStatus}, gameTypesOptions: $gameTypesOptions, selectedGameBetType: $selectedGameBetType',
@@ -227,7 +232,7 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
   Future<void> _loadInitialData() async {
     accessToken = storage.read('accessToken') ?? '';
     registerId = storage.read('registerId') ?? '';
-    accountStatus = storage.read('accountStatus') ?? false;
+    accountStatus = userController.accountStatus.value;
     preferredLanguage = storage.read('selectedLanguage') ?? 'en';
 
     final dynamic storedWalletBalance = storage.read('walletBalance');
@@ -241,57 +246,6 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
     log(
       'DoublePanaBetScreen: Initial data loaded - accessToken: ${accessToken.isNotEmpty}, registerId: ${registerId.isNotEmpty}, accountStatus: $accountStatus, walletBalance: $walletBalance',
     );
-  }
-
-  void _setupStorageListeners() {
-    storage.listenKey('accessToken', (value) {
-      if (mounted) {
-        setState(() => accessToken = value ?? '');
-        log(
-          'DoublePanaBetScreen: accessToken updated via listener: ${accessToken.isNotEmpty}',
-        );
-      }
-    });
-    storage.listenKey('registerId', (value) {
-      if (mounted) {
-        setState(() => registerId = value ?? '');
-        log(
-          'DoublePanaBetScreen: registerId updated via listener: ${registerId.isNotEmpty}',
-        );
-      }
-    });
-    storage.listenKey('accountStatus', (value) {
-      if (mounted) {
-        setState(() => accountStatus = value ?? false);
-        log(
-          'DoublePanaBetScreen: accountStatus updated via listener: $accountStatus',
-        );
-      }
-    });
-    storage.listenKey('selectedLanguage', (value) {
-      if (mounted) {
-        setState(() => preferredLanguage = value ?? 'en');
-        log(
-          'DoublePanaBetScreen: preferredLanguage updated via listener: $preferredLanguage',
-        );
-      }
-    });
-    storage.listenKey('walletBalance', (value) {
-      if (mounted) {
-        setState(() {
-          if (value is int) {
-            walletBalance = value;
-          } else if (value is String) {
-            walletBalance = int.tryParse(value) ?? 0;
-          } else {
-            walletBalance = 0;
-          }
-          log(
-            'DoublePanaBetScreen: walletBalance updated via listener: $walletBalance',
-          );
-        });
-      }
-    });
   }
 
   @override

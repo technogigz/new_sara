@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:new_sara/KingStarline&Jackpot/games/StarlineSPDPTPScreen.dart';
@@ -9,6 +10,7 @@ import 'package:new_sara/KingStarline&Jackpot/games/StarlineSPMotorsScreen.dart'
 import 'package:new_sara/KingStarline&Jackpot/games/StarlineSinglePana.dart';
 
 import '../Helper/TranslationHelper.dart';
+import '../Helper/UserController.dart';
 import '../ulits/Constents.dart';
 import 'games/StarlineDPMotorsScreen.dart';
 import 'games/StarlineDoublePana.dart';
@@ -74,6 +76,7 @@ class _KingStarlineOptionScreenState extends State<KingStarlineOptionScreen> {
   List<KingStarlineBidType> _options = [];
   bool _isLoading = true;
   final GetStorage _storage = GetStorage();
+  final UserController userController = Get.put(UserController());
 
   late String _currentLanguageCode;
   int _walletBalance = 0;
@@ -91,8 +94,12 @@ class _KingStarlineOptionScreenState extends State<KingStarlineOptionScreen> {
   void initState() {
     super.initState();
     _currentLanguageCode = _storage.read('selectedLanguage') ?? 'en';
-    _loadWalletBalance();
+
+    fetchKingStarlineBidTypes();
     _preTranslateFixedTexts();
+    double walletBalance = double.parse(userController.walletBalance.value);
+    _walletBalance = walletBalance.toInt();
+
     _storage.listenKey('selectedLanguage', (value) {
       if (value != null && value is String && value != _currentLanguageCode) {
         _currentLanguageCode = value;
@@ -101,10 +108,6 @@ class _KingStarlineOptionScreenState extends State<KingStarlineOptionScreen> {
         fetchKingStarlineBidTypes();
       }
     });
-    _storage.listenKey('walletBalance', (value) {
-      _loadWalletBalance();
-    });
-    fetchKingStarlineBidTypes();
   }
 
   void _preTranslateFixedTexts() {
@@ -124,17 +127,6 @@ class _KingStarlineOptionScreenState extends State<KingStarlineOptionScreen> {
     _translatedNoScreenConfiguredTextFuture = _getTranslatedText(
       'No screen configured for game type:',
     );
-  }
-
-  void _loadWalletBalance() {
-    final storedWallet = _storage.read('walletBalance');
-    if (storedWallet is int) {
-      _walletBalance = storedWallet;
-    } else if (storedWallet is String) {
-      _walletBalance = int.tryParse(storedWallet) ?? 0;
-    } else {
-      _walletBalance = 0;
-    }
   }
 
   Future<String> _getTranslatedText(String text) async {
@@ -317,7 +309,7 @@ class _KingStarlineOptionScreenState extends State<KingStarlineOptionScreen> {
               future: _translatedWalletTextFuture,
               builder: (context, snapshot) {
                 return Text(
-                  "₹ $_walletBalance",
+                  '₹ ${userController.walletBalance.value}',
                   style: const TextStyle(color: Colors.black, fontSize: 16),
                 );
               },

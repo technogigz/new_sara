@@ -3,11 +3,13 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:new_sara/KingStarline&Jackpot/StarlineBidService.dart';
 
+import '../../Helper/UserController.dart';
 import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
 import '../../components/BidFailureDialog.dart';
@@ -75,13 +77,18 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
 
   bool _isApiCalling = false;
 
+  final UserController userController = Get.put(UserController());
+
   @override
   void initState() {
     super.initState();
     storage = GetStorage();
     _bidService = StarlineBidService(storage);
     _loadInitialData();
-    _setupStorageListeners();
+    double walletBalanceDouble = double.parse(
+      userController.walletBalance.value,
+    );
+    walletBalance = walletBalanceDouble.toInt();
     log(
       'StarlineTPMotorsScreen: initState called. Game type is fixed to: $selectedGameBetType',
     );
@@ -108,71 +115,12 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
   Future<void> _loadInitialData() async {
     accessToken = storage.read('accessToken') ?? '';
     registerId = storage.read('registerId') ?? '';
-    accountStatus = storage.read('accountStatus') ?? false;
+    accountStatus = userController.accountStatus.value;
     preferredLanguage = storage.read('selectedLanguage') ?? 'en';
 
-    final dynamic storedWalletBalance = storage.read('walletBalance');
-    if (storedWalletBalance is int) {
-      walletBalance = storedWalletBalance;
-    } else if (storedWalletBalance is String) {
-      walletBalance = int.tryParse(storedWalletBalance) ?? 0;
-    } else {
-      walletBalance = 0;
-    }
     log(
       'StarlineTPMotorsScreen: Initial data loaded - accessToken: ${accessToken.isNotEmpty}, registerId: ${registerId.isNotEmpty}, accountStatus: $accountStatus, walletBalance: $walletBalance',
     );
-  }
-
-  void _setupStorageListeners() {
-    storage.listenKey('accessToken', (value) {
-      if (mounted) {
-        setState(() => accessToken = value ?? '');
-        log(
-          'StarlineTPMotorsScreen: accessToken updated via listener: ${accessToken.isNotEmpty}',
-        );
-      }
-    });
-    storage.listenKey('registerId', (value) {
-      if (mounted) {
-        setState(() => registerId = value ?? '');
-        log(
-          'StarlineTPMotorsScreen: registerId updated via listener: ${registerId.isNotEmpty}',
-        );
-      }
-    });
-    storage.listenKey('accountStatus', (value) {
-      if (mounted) {
-        setState(() => accountStatus = value ?? false);
-        log(
-          'StarlineTPMotorsScreen: accountStatus updated via listener: $accountStatus',
-        );
-      }
-    });
-    storage.listenKey('selectedLanguage', (value) {
-      if (mounted) {
-        setState(() => preferredLanguage = value ?? 'en');
-        log(
-          'StarlineTPMotorsScreen: preferredLanguage updated via listener: $preferredLanguage',
-        );
-      }
-    });
-    storage.listenKey('walletBalance', (value) {
-      if (mounted) {
-        setState(() {
-          if (value is int) {
-            walletBalance = value;
-          } else if (value is String) {
-            walletBalance = int.tryParse(value) ?? 0;
-          } else {
-            walletBalance = 0;
-          }
-          log(
-            'StarlineTPMotorsScreen: walletBalance updated via listener: $walletBalance',
-          );
-        });
-      }
-    });
   }
 
   @override
@@ -531,7 +479,7 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
           const SizedBox(width: 6),
           Center(
             child: Text(
-              walletBalance.toString(),
+              userController.walletBalance.value,
               style: const TextStyle(
                 color: Colors.black,
                 fontWeight: FontWeight.bold,

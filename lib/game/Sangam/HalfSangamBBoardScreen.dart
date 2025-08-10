@@ -4,11 +4,13 @@ import 'dart:developer'; // Import for log function
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../BidService.dart';
+import '../../Helper/UserController.dart';
 import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
 import '../../components/BidFailureDialog.dart';
@@ -149,12 +151,16 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
     "990",
   ];
 
+  final UserController userController = Get.put(UserController());
+
   @override
   void initState() {
     super.initState();
     log('HalfSangamBBoardScreen: initState called.', name: 'HalfSangamUI');
     _bidService = BidService(_storage);
     _loadInitialData();
+    double walletBalance = double.parse(userController.walletBalance.value);
+    _walletBalance = walletBalance.toInt().toString();
     _setupStorageListeners();
   }
 
@@ -171,16 +177,8 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
   Future<void> _loadInitialData() async {
     _accessToken = _storage.read('accessToken') ?? '';
     _registerId = _storage.read('registerId') ?? '';
-    _accountStatus = _storage.read('accountStatus') ?? false;
+    _accountStatus = userController.accountStatus.value;
     _preferredLanguage = _storage.read('selectedLanguage') ?? 'en';
-    final dynamic storedWalletBalance = _storage.read('walletBalance');
-    if (storedWalletBalance is int) {
-      _walletBalance = storedWalletBalance.toString();
-    } else if (storedWalletBalance is String) {
-      _walletBalance = storedWalletBalance;
-    } else {
-      _walletBalance = '0';
-    }
   }
 
   void _setupStorageListeners() {
@@ -389,6 +387,8 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
     );
 
     if (currentWalletBalance < totalPoints) {
+      log('totalPoints: $totalPoints');
+      log('Current Wallet Balance: $currentWalletBalance');
       _showMessage(
         'Insufficient wallet balance to place this bid.',
         isError: true,
@@ -490,54 +490,36 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
   }
 
   Future<Map<String, dynamic>> _placeFinalBids() async {
-    log('HalfSangamUI: _placeFinalBids called.', name: 'HalfSangamUI');
-    if (mounted) {
-      setState(() {
-        _isApiCalling = true;
-      });
-      log(
-        'HalfSangamUI: _placeFinalBids: Setting _isApiCalling to true.',
-        name: 'HalfSangamUI',
-      );
-    }
+    if (!mounted) return {'status': false, 'msg': 'Screen not mounted.'};
+    setState(() {
+      _isApiCalling = true;
+    });
 
     try {
-      Map<String, String> bidAmountsMap = {};
-      for (var bid in _bids) {
-        final String digitKey = '${bid['ank']}-${bid['panna']}';
-        bidAmountsMap[digitKey] = bid['points']!;
-      }
-      log(
-        'HalfSangamUI: bidAmountsMap generated: $bidAmountsMap',
-        name: 'HalfSangamUI',
-      );
-
-      int currentBatchTotalPoints = _getTotalPoints();
-      log(
-        'HalfSangamUI: currentBatchTotalPoints: $currentBatchTotalPoints',
-        name: 'HalfSangamUI',
-      );
-
       if (_accessToken.isEmpty || _registerId.isEmpty) {
         return {
           'status': false,
           'msg': 'Authentication error. Please log in again.',
         };
       }
+
+      // Convert the list of bids into the Map format required by BidService.
+      // The key is a combination of the open digit and close panna.
+      Map<String, String> bidAmountsMap = {};
+      for (var bid in _bids) {
+        final String digitKey = '${bid['ank']!}-${bid['panna']!}';
+        bidAmountsMap[digitKey] = bid['points']!;
+      }
+
+      int currentBatchTotalPoints = _getTotalPoints();
+
       if (bidAmountsMap.isEmpty) {
         return {'status': false, 'msg': 'No valid bids to submit.'};
       }
 
-      const String selectedSessionType = "OPEN";
-      log(
-        'HalfSangamUI: Determined selectedSessionType: $selectedSessionType',
-        name: 'HalfSangamUI',
-      );
+      // Half Sangam A always uses the OPEN session type
+      final String selectedSessionType = "OPEN";
 
-      log(
-        'HalfSangamUI: Calling _bidService.placeFinalBids...',
-        name: 'HalfSangamUI',
-      );
       final Map<String, dynamic> result = await _bidService.placeFinalBids(
         gameName: widget.gameName,
         accessToken: _accessToken,
@@ -545,32 +527,39 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
         deviceId: _deviceId,
         deviceName: _deviceName,
         accountStatus: _accountStatus,
-        bidAmounts: bidAmountsMap,
+        bidAmounts: bidAmountsMap, // Sending the map here
         selectedGameType: selectedSessionType,
         gameId: widget.gameId,
         gameType: widget.gameType,
         totalBidAmount: currentBatchTotalPoints,
       );
-      log(
-        'HalfSangamUI: _bidService.placeFinalBids returned: $result',
-        name: 'HalfSangamUI',
-      );
+
+      // Handle the wallet balance update here if the bid was successful.
+      if (result['status'] == true) {
+        final walletBalanceRaw = result['data']?['wallet_balance'];
+
+        int newBalance;
+        if (walletBalanceRaw is num) {
+          newBalance = walletBalanceRaw.toInt();
+        } else {
+          final fallbackBalance = int.tryParse(_walletBalance ?? '0') ?? 0;
+          newBalance = fallbackBalance - currentBatchTotalPoints;
+        }
+
+        await _bidService.updateWalletBalance(newBalance);
+      }
+
       return result;
     } catch (e) {
-      log(
-        'HalfSangamUI: Caught unexpected error during bid placement: $e',
-        name: 'HalfSangamUIError',
-      );
-      return {'status': false, 'msg': 'An unexpected error occurred.'};
+      return {
+        'status': false,
+        'msg': 'An unexpected error occurred during bid submission: $e',
+      };
     } finally {
       if (mounted) {
         setState(() {
           _isApiCalling = false;
         });
-        log(
-          'HalfSangamUI: _placeFinalBids: Resetting _isApiCalling to false (finally block).',
-          name: 'HalfSangamUI',
-        );
       }
     }
   }

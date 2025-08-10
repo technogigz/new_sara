@@ -4,11 +4,13 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
+import '../../Helper/UserController.dart';
 import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
 import '../../components/BidFailureDialog.dart';
@@ -68,75 +70,22 @@ class _TwoDigitPanelScreenState extends State<TwoDigitPanelScreen> {
   bool _isAddBidApiCalling = false;
   bool _isSubmitBidApiCalling = false;
 
+  final UserController userController = Get.put(UserController());
+
   @override
   void initState() {
     super.initState();
     _loadInitialData();
-    _setupStorageListeners();
   }
 
   Future<void> _loadInitialData() async {
     accessToken = storage.read('accessToken') ?? '';
     registerId = storage.read('registerId') ?? '';
-    accountStatus = storage.read('accountStatus') ?? false;
+    accountStatus = userController.accountStatus.value;
     preferredLanguage = storage.read('selectedLanguage') ?? 'en';
 
-    final dynamic storedWalletBalance = storage.read('walletBalance');
-    if (storedWalletBalance is String) {
-      walletBalance = int.tryParse(storedWalletBalance) ?? 0;
-    } else if (storedWalletBalance is int) {
-      walletBalance = storedWalletBalance;
-    } else {
-      walletBalance = 0;
-    }
-  }
-
-  void _setupStorageListeners() {
-    storage.listenKey('accessToken', (value) {
-      if (mounted) {
-        setState(() {
-          accessToken = value ?? '';
-        });
-      }
-    });
-
-    storage.listenKey('registerId', (value) {
-      if (mounted) {
-        setState(() {
-          registerId = value ?? '';
-        });
-      }
-    });
-
-    storage.listenKey('accountStatus', (value) {
-      if (mounted) {
-        setState(() {
-          accountStatus = value ?? false;
-        });
-      }
-    });
-
-    storage.listenKey('selectedLanguage', (value) {
-      if (mounted) {
-        setState(() {
-          preferredLanguage = value ?? 'en';
-        });
-      }
-    });
-
-    storage.listenKey('walletBalance', (value) {
-      if (mounted) {
-        setState(() {
-          if (value is String) {
-            walletBalance = int.tryParse(value) ?? 0;
-          } else if (value is int) {
-            walletBalance = value;
-          } else {
-            walletBalance = 0;
-          }
-        });
-      }
-    });
+    double _walletBalance = double.parse(userController.walletBalance.value);
+    walletBalance = _walletBalance.toInt();
   }
 
   @override
@@ -527,7 +476,7 @@ class _TwoDigitPanelScreenState extends State<TwoDigitPanelScreen> {
           const SizedBox(width: 6),
           Center(
             child: Text(
-              walletBalance.toString(),
+              userController.walletBalance.value,
               style: GoogleFonts.poppins(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,

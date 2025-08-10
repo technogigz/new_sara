@@ -57,12 +57,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void launchWhatsAppChat() async {
-    final phoneNumber =
-        userController.contactWhatsappNo.value ??
-        userController.contactMobileNo.value ??
-        '';
-
-    final url = Uri.parse('https://wa.me/$phoneNumber');
+    var mobileNumber = userController.contactWhatsappNo.value;
+    log("WhatsApp number: $mobileNumber");
+    final url = Uri.parse('https://wa.me/${mobileNumber}');
 
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);

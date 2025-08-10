@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:intl/intl.dart';
 import 'package:marquee/marquee.dart';
 
 import '../../BidService.dart';
+import '../../Helper/UserController.dart';
 import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
 import '../../components/BidFailureDialog.dart';
@@ -50,6 +52,7 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
   late String _preferredLanguage;
   bool _accountStatus = false;
   late int _walletBalance;
+  final UserController userController = Get.put(UserController());
 
   String? _messageToShow;
   bool _isErrorForMessage = false;
@@ -64,47 +67,16 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
 
     _accessToken = storage.read('accessToken') ?? '';
     _registerId = storage.read('registerId') ?? '';
-    _accountStatus = storage.read('accountStatus') ?? false;
+    _accountStatus = userController.accountStatus.value;
     _preferredLanguage = storage.read('selectedLanguage') ?? 'en';
-
-    final dynamic storedWalletBalance = storage.read('walletBalance');
-    if (storedWalletBalance is String) {
-      _walletBalance = int.tryParse(storedWalletBalance) ?? 0;
-    } else if (storedWalletBalance is int) {
-      _walletBalance = storedWalletBalance;
-    } else {
-      _walletBalance = 0;
-    }
+    double walletBalance = double.parse(userController.walletBalance.value);
+    _walletBalance = walletBalance.toInt();
 
     if (widget.selectionStatus) {
       _selectedLataDayType = LataDayType.open;
     } else {
       _selectedLataDayType = LataDayType.close;
     }
-
-    storage.listenKey('accessToken', (value) {
-      _accessToken = value ?? '';
-    });
-    storage.listenKey('registerId', (value) {
-      _registerId = value ?? '';
-    });
-    storage.listenKey('accountStatus', (value) {
-      _accountStatus = value ?? false;
-    });
-    storage.listenKey('selectedLanguage', (value) {
-      _preferredLanguage = value ?? 'en';
-    });
-    storage.listenKey('walletBalance', (value) {
-      if (value is String) {
-        _walletBalance = int.tryParse(value) ?? 0;
-      } else if (value is int) {
-        _walletBalance = value;
-      } else {
-        _walletBalance = 0;
-      }
-    });
-
-    setState(() {});
   }
 
   @override

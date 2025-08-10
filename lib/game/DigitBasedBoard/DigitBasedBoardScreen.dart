@@ -4,11 +4,13 @@ import 'dart:developer'; // For log
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For TextInputFormatter
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart'; // For GetStorage
 import 'package:google_fonts/google_fonts.dart'; // Added for consistent text styling (optional)
 import 'package:http/http.dart' as http; // For making HTTP requests
 import 'package:intl/intl.dart'; // For date formatting
 import 'package:new_sara/BidsServicesBulk.dart';
+import 'package:new_sara/Helper/UserController.dart';
 
 import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
@@ -40,8 +42,10 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
   final TextEditingController _rightDigitController = TextEditingController();
   final TextEditingController _pointsController = TextEditingController();
 
+  final UserController userController = Get.put(UserController());
+
   List<Map<String, String>> _entries = [];
-  int _walletBalance = 0; // State variable for wallet balance
+  late int _walletBalance; // State variable for wallet balance
   bool _isSubmitting = false; // New state for submission in progress
 
   // --- AnimatedMessageBar State ---
@@ -61,9 +65,10 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
   void initState() {
     super.initState();
     storage = GetStorage(); // Initialize GetStorage
+    double walletBalance = double.parse(userController.walletBalance.value);
+    _walletBalance = walletBalance.toInt();
     _bidService = BidServiceBulk(storage); // Initialize BidService
     _loadInitialData(); // Load wallet balance, access token, register ID
-    _setupStorageListeners(); // Setup listeners for dynamic updates
   }
 
   @override
@@ -78,61 +83,8 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
   Future<void> _loadInitialData() async {
     _accessToken = storage.read('accessToken');
     _registerId = storage.read('registerId');
-    _accountStatus =
-        storage.read('accountStatus') ?? false; // Load account status
-
-    final dynamic storedValue = storage.read('walletBalance');
-
-    if (storedValue != null) {
-      if (storedValue is int) {
-        _walletBalance = storedValue;
-      } else if (storedValue is String) {
-        _walletBalance = int.tryParse(storedValue) ?? 0;
-      } else {
-        _walletBalance = 0; // Fallback for unexpected types
-      }
-    } else {
-      _walletBalance = 0; // Default balance if nothing is stored
-      // Do not set a default here if you expect it from API/login
-    }
-    setState(() {}); // Update UI to show loaded balance
-  }
-
-  void _setupStorageListeners() {
-    storage.listenKey('accessToken', (value) {
-      if (mounted) {
-        setState(() {
-          _accessToken = value;
-        });
-      }
-    });
-    storage.listenKey('registerId', (value) {
-      if (mounted) {
-        setState(() {
-          _registerId = value;
-        });
-      }
-    });
-    storage.listenKey('accountStatus', (value) {
-      if (mounted) {
-        setState(() {
-          _accountStatus = value ?? false;
-        });
-      }
-    });
-    storage.listenKey('walletBalance', (value) {
-      if (mounted) {
-        setState(() {
-          if (value is String) {
-            _walletBalance = int.tryParse(value) ?? 0;
-          } else if (value is int) {
-            _walletBalance = value;
-          } else {
-            _walletBalance = 0;
-          }
-        });
-      }
-    });
+    userController.loadInitialData();
+    _accountStatus = userController.accountStatus.value;
   }
 
   // Refactored to use BidService's update method
@@ -514,7 +466,7 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
                 ), // Using Material Icon
                 const SizedBox(width: 4),
                 Text(
-                  '₹$_walletBalance', // Display dynamic wallet balance
+                  '₹${_walletBalance}', // Display dynamic wallet balance
                   style: GoogleFonts.poppins(
                     color: Colors.black,
                     fontSize: 16,

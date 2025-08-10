@@ -3,12 +3,14 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
 import '../../BidService.dart';
+import '../../Helper/UserController.dart';
 import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
 import '../../components/BidFailureDialog.dart';
@@ -51,6 +53,8 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
 
   late BidService _bidService;
 
+  final UserController userController = Get.put(UserController());
+
   String? _messageToShow;
   bool _isErrorForMessage = false;
   Key _messageBarKey = UniqueKey();
@@ -59,7 +63,7 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
   void initState() {
     super.initState();
     _loadInitialData();
-    _setupStorageListeners();
+
     _bidService = BidService(storage);
   }
 
@@ -68,26 +72,9 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
     _registerId = storage.read('registerId') ?? '';
     _accountStatus = storage.read('accountStatus') ?? false;
     _preferredLanguage = storage.read('selectedLanguage') ?? 'en';
-    _walletBalance = int.tryParse(storage.read('walletBalance') ?? '0') ?? 0;
-  }
 
-  void _setupStorageListeners() {
-    storage.listenKey('accessToken', (value) {
-      if (mounted) setState(() => _accessToken = value ?? '');
-    });
-    storage.listenKey('registerId', (value) {
-      if (mounted) setState(() => _registerId = value ?? '');
-    });
-    storage.listenKey('accountStatus', (value) {
-      if (mounted) setState(() => _accountStatus = value ?? false);
-    });
-    storage.listenKey('selectedLanguage', (value) {
-      if (mounted) setState(() => _preferredLanguage = value ?? 'en');
-    });
-    storage.listenKey('walletBalance', (value) {
-      if (mounted)
-        setState(() => _walletBalance = int.tryParse(value ?? '0') ?? 0);
-    });
+    double walletBalance = double.parse(userController.walletBalance.value);
+    _walletBalance = walletBalance.toInt();
   }
 
   @override
@@ -408,7 +395,7 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  _walletBalance.toString(),
+                  userController.walletBalance.value,
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,

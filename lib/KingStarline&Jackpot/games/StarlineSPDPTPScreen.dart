@@ -1,27 +1,27 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer'; // For log
+import 'dart:developer';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // For TextInputFormatter
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
-import 'package:google_fonts/google_fonts.dart'; // For GoogleFonts
+import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart'; // Import for date formatting
+import 'package:intl/intl.dart';
 import 'package:new_sara/KingStarline&Jackpot/StarlineBidService.dart';
 
 import '../../Helper/UserController.dart';
-import '../../components/AnimatedMessageBar.dart'; // Ensure this path is correct
-import '../../components/BidConfirmationDialog.dart'; // Ensure this path is correct
-import '../../components/BidFailureDialog.dart'; // For API failure dialog (ensure this path is correct)
+import '../../components/AnimatedMessageBar.dart';
+import '../../components/BidConfirmationDialog.dart';
+import '../../components/BidFailureDialog.dart';
 import '../../components/BidSuccessDialog.dart';
-import '../../ulits/Constents.dart'; // For API success dialog (ensure this path is correct)
+import '../../ulits/Constents.dart';
 
 class StarlineSpDpTpScreen extends StatefulWidget {
   final String screenTitle;
-  final int gameId;
-  final String gameType;
+  final int gameId; // TYPE id to send in place-bid
+  final String gameType; // e.g. "SPDPTP"
 
   const StarlineSpDpTpScreen({
     Key? key,
@@ -42,22 +42,28 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
   bool _isDPSelected = false;
   bool _isTPSelected = false;
 
-  // Game type is now fixed to 'OPEN'
+  // UI-only label; Starline API ignores sessionType
   final String _selectedGameTypeOption = 'OPEN';
 
-  List<Map<String, String>> _bids = [];
+  // each row: {digit: "pana", amount: "points", gameType: "SP|DP|TP"}
+  final List<Map<String, String>> _bids = [];
 
-  late int walletBalance;
-  late String accessToken;
-  late String registerId;
-  late String preferredLanguage;
+  static const int _minBet = 10;
+  static const int _maxBet = 1000;
+
+  int walletBalance = 0;
+  String accessToken = '';
+  String registerId = '';
+  String preferredLanguage = 'en';
   bool accountStatus = false;
+
   final GetStorage storage = GetStorage();
+  late final StarlineBidService _bidService;
 
-  late StarlineBidService _bidService;
-
-  final String _deviceId = GetStorage().read('deviceId') ?? '';
-  final String _deviceName = GetStorage().read('deviceName') ?? '';
+  final String _deviceId =
+      GetStorage().read('deviceId')?.toString() ?? 'flutter_device';
+  final String _deviceName =
+      GetStorage().read('deviceName')?.toString() ?? 'Flutter_App';
 
   String? _messageToShow;
   bool _isErrorForMessage = false;
@@ -66,17 +72,15 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
 
   bool _isApiCalling = false;
 
-  final UserController userController = Get.put(UserController());
+  final UserController userController = Get.isRegistered<UserController>()
+      ? Get.find<UserController>()
+      : Get.put(UserController());
 
   @override
   void initState() {
     super.initState();
     _bidService = StarlineBidService(storage);
     _loadInitialData();
-    double walletBalanceDouble = double.parse(
-      userController.walletBalance.value,
-    );
-    walletBalance = walletBalanceDouble.toInt();
   }
 
   Future<void> _loadInitialData() async {
@@ -85,14 +89,23 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
     accountStatus = userController.accountStatus.value;
     preferredLanguage = storage.read('selectedLanguage') ?? 'en';
 
-    final dynamic storedWalletBalance = storage.read('walletBalance');
-    if (storedWalletBalance is int) {
-      walletBalance = storedWalletBalance;
-    } else if (storedWalletBalance is String) {
-      walletBalance = int.tryParse(storedWalletBalance) ?? 0;
+    // wallet safe parse
+    final rawCtrl = userController.walletBalance.value;
+    final rawStore = storage.read('walletBalance');
+    final n = num.tryParse(rawCtrl);
+    if (n != null) {
+      walletBalance = n.toInt();
+    } else if (rawStore != null) {
+      walletBalance = int.tryParse(rawStore.toString()) ?? 0;
     } else {
       walletBalance = 0;
     }
+
+    // live wallet sync
+    storage.listenKey('walletBalance', (val) {
+      final parsed = int.tryParse(val?.toString() ?? '0') ?? 0;
+      if (mounted) setState(() => walletBalance = parsed);
+    });
   }
 
   @override
@@ -111,17 +124,13 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
       _isErrorForMessage = isError;
       _messageBarKey = UniqueKey();
     });
-    _messageDismissTimer = Timer(const Duration(seconds: 3), () {
-      _clearMessage();
-    });
+    _messageDismissTimer = Timer(const Duration(seconds: 3), _clearMessage);
   }
 
   void _clearMessage() {
-    if (mounted) {
-      setState(() {
-        _messageToShow = null;
-      });
-    }
+    if (!mounted) return;
+    setState(() => _messageToShow = null);
+    _messageDismissTimer?.cancel();
   }
 
   int _getTotalPoints() {
@@ -139,9 +148,8 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
       return;
     }
 
-    int currentTotalPoints = _getTotalPoints();
-
-    if (walletBalance < currentTotalPoints) {
+    final total = _getTotalPoints();
+    if (walletBalance < total) {
       _showMessage(
         'Insufficient wallet balance to place this bid.',
         isError: true,
@@ -149,27 +157,24 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
       return;
     }
 
-    final List<Map<String, String>> validBids = _bids
-        .where((bid) {
-          return bid['digit'] != null &&
-              bid['digit']!.isNotEmpty &&
-              bid['amount'] != null &&
-              bid['amount']!.isNotEmpty &&
-              bid['gameType'] != null &&
-              bid['gameType']!.isNotEmpty;
-        })
-        .map((bid) {
-          return {
-            'digit': bid['digit']!,
-            'points': bid['amount']!,
+    final validRows = _bids
+        .where(
+          (b) =>
+              (b['digit']?.isNotEmpty ?? false) &&
+              (b['amount']?.isNotEmpty ?? false),
+        )
+        .map(
+          (b) => {
+            'digit': b['digit']!, // for dialog table
+            'points': b['amount']!,
             'type': _selectedGameTypeOption,
-            'pana': bid['digit']!,
+            'pana': b['digit']!,
             'jodi': '',
-          };
-        })
+          },
+        )
         .toList();
 
-    if (validBids.isEmpty) {
+    if (validRows.isEmpty) {
       _showMessage('No valid bids to submit.', isError: true);
       return;
     }
@@ -177,40 +182,49 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return BidConfirmationDialog(
-          gameTitle: widget.screenTitle,
-          bids: validBids,
-          totalBids: validBids.length,
-          totalBidsAmount: currentTotalPoints,
-          walletBalanceBeforeDeduction: walletBalance,
-          walletBalanceAfterDeduction: (walletBalance - currentTotalPoints)
-              .toString(),
-          gameDate: DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now()),
-          gameId: widget.gameId.toString(),
-          gameType: widget.gameType,
-          onConfirm: () async {
-            setState(() {
-              _isApiCalling = true;
-            });
-            await _placeFinalBids();
-            if (mounted) {
-              setState(() {
-                _isApiCalling = false;
-              });
-            }
-          },
-        );
-      },
+      builder: (_) => BidConfirmationDialog(
+        gameTitle: widget.screenTitle,
+        bids: validRows,
+        totalBids: validRows.length,
+        totalBidsAmount: total,
+        walletBalanceBeforeDeduction: walletBalance,
+        walletBalanceAfterDeduction: (walletBalance - total).toString(),
+        gameDate: DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now()),
+        gameId: widget.gameId.toString(), // TYPE id as string
+        gameType: widget.gameType, // "SPDPTP"
+        onConfirm: () async {
+          setState(() => _isApiCalling = true);
+          await _placeFinalBids();
+          if (mounted) setState(() => _isApiCalling = false);
+        },
+      ),
     );
   }
 
   Future<bool> _placeFinalBids() async {
-    final Map<String, String> bidPayload = {};
-    int currentBatchTotalPoints = _getTotalPoints();
+    // Build payload: digit -> amount
+    final Map<String, String> payload = {};
+    int total = 0;
+    for (final b in _bids) {
+      final d = b['digit'] ?? '';
+      final a = int.tryParse(b['amount'] ?? '0') ?? 0;
+      if (d.isNotEmpty && a > 0) {
+        payload[d] = a.toString();
+        total += a;
+      }
+    }
+
+    if (payload.isEmpty) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) =>
+            const BidFailureDialog(errorMessage: 'No valid bids to submit.'),
+      );
+      return false;
+    }
 
     if (accessToken.isEmpty || registerId.isEmpty) {
-      if (!mounted) return false;
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -221,39 +235,36 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
       return false;
     }
 
-    for (var bid in _bids) {
-      String digit = bid["digit"] ?? "";
-      String amount = bid["amount"] ?? "0";
-
-      if (digit.isNotEmpty && int.tryParse(amount) != null) {
-        bidPayload[digit] = amount;
-      }
-    }
-
-    if (bidPayload.isEmpty) {
-      if (!mounted) return false;
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) =>
-            const BidFailureDialog(errorMessage: 'No valid bids to submit.'),
-      );
-      return false;
+    // Try to extract a time label like "Screen - 12:30 PM" (for UI only)
+    String? sessionLabel;
+    final parts = widget.screenTitle.split(' - ');
+    if (parts.length > 1) {
+      sessionLabel = parts.last.trim();
     }
 
     try {
+      final isStarline = widget.screenTitle.toLowerCase().contains('starline');
+      final isJackpot = widget.screenTitle.toLowerCase().contains('jackpot');
+
       final result = await _bidService.placeFinalBids(
-        gameName: widget.screenTitle,
+        market: isStarline
+            ? Market.starline
+            : (isJackpot ? Market.jackpot : Market.starline),
+
         accessToken: accessToken,
         registerId: registerId,
         deviceId: _deviceId,
         deviceName: _deviceName,
         accountStatus: accountStatus,
-        bidAmounts: bidPayload,
-        selectedGameType: _selectedGameTypeOption,
-        gameId: widget.gameId,
-        gameType: widget.gameType,
-        totalBidAmount: currentBatchTotalPoints,
+        bidAmounts: payload,
+        gameId: widget.gameId, // TYPE id (int here; service sends string)
+        gameType: widget.gameType, // "SPDPTP"
+        totalBidAmount: total,
+
+        // Starline extras not required by your current API spec; omitting.
+        // starlineSessionId: widget.gameId,
+        // starlineSessionTimeLabel: sessionLabel,
+        // playDate: DateTime.now(),
       );
 
       if (!mounted) return false;
@@ -265,23 +276,31 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
           builder: (_) => const BidSuccessDialog(),
         );
 
-        final dynamic updatedBalanceRaw = result['updatedWalletBalance'];
-        final int updatedBalance =
-            int.tryParse(updatedBalanceRaw.toString()) ??
-            (walletBalance - currentBatchTotalPoints);
-        setState(() {
-          walletBalance = updatedBalance;
-          _bids.clear();
-        });
-        _bidService.updateWalletBalance(updatedBalance);
+        // Prefer server wallet if present
+        final data = result['data'];
+        final dynamic serverBal = (data is Map)
+            ? (data['updatedWalletBalance'] ?? data['wallet_balance'])
+            : null;
+        final newBal =
+            int.tryParse(serverBal?.toString() ?? '') ??
+            (walletBalance - total);
+
+        await _bidService.updateWalletBalance(newBal);
+        userController.walletBalance.value = newBal.toString();
+
+        if (mounted) {
+          setState(() {
+            walletBalance = newBal;
+            _bids.clear();
+          });
+        }
         return true;
       } else {
+        final msg = result['msg']?.toString() ?? 'Something went wrong';
         await showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (_) => BidFailureDialog(
-            errorMessage: result['msg'] ?? 'Something went wrong',
-          ),
+          builder: (_) => BidFailureDialog(errorMessage: msg),
         );
         return false;
       }
@@ -291,7 +310,6 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
         name: 'StarlineSpDpTpScreenBidError',
       );
       if (!mounted) return false;
-
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -303,112 +321,28 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
     }
   }
 
-  bool _isValidSpPanna(String panna) {
-    if (panna.length != 3) return false;
-    Set<String> uniqueDigits = panna.split('').toSet();
-    return uniqueDigits.length == 3;
-  }
-
-  bool _isValidDpPanna(String panna) {
-    if (panna.length != 3) return false;
-    List<String> digits = panna.split('');
-    Map<String, int> freq = {};
-    for (var d in digits) {
-      freq[d] = (freq[d] ?? 0) + 1;
-    }
-    return freq.length == 2 && freq.values.contains(2);
-  }
-
-  bool _isValidTpPanna(String panna) {
-    if (panna.length != 3) return false;
-    return panna[0] == panna[1] && panna[1] == panna[2];
-  }
-
-  void _removeBid(int index) {
-    _clearMessage();
-    if (_isApiCalling) return;
-
-    setState(() {
-      final removedBid = _bids.removeAt(index);
-      _showMessage(
-        'Removed bid: ${removedBid['gameType']} ${removedBid['digit']}.',
-      );
-    });
-  }
-
-  Future<List<String>> singlePanaBulk({
-    required int digit,
-    required int amount,
-    required String sessionType,
-    required String gameId,
-    required String registerId,
-  }) async {
-    return await _fetchBulkPannaBids(
-      digit: digit,
-      amount: amount,
-      sessionType: sessionType,
-      apiEndpoint: '${Constant.apiEndpoint}single-pana-bulk',
-      gameId: gameId,
-      registerId: registerId,
-    );
-  }
-
-  Future<List<String>> doublePanaBulk({
-    required int digit,
-    required int amount,
-    required String sessionType,
-    required String gameId,
-    required String registerId,
-  }) async {
-    return await _fetchBulkPannaBids(
-      digit: digit,
-      amount: amount,
-      sessionType: sessionType,
-      apiEndpoint: '${Constant.apiEndpoint}double-pana-bulk',
-      gameId: gameId,
-      registerId: registerId,
-    );
-  }
-
-  Future<List<String>> triplePanaBulk({
-    required int digit,
-    required int amount,
-    required String sessionType,
-    required String gameId,
-    required String registerId,
-  }) async {
-    return await _fetchBulkPannaBids(
-      digit: digit,
-      amount: amount,
-      sessionType: sessionType,
-      apiEndpoint: '${Constant.apiEndpoint}triple-pana-bulk',
-      gameId: gameId,
-      registerId: registerId,
-    );
-  }
-
-  // ✅ Common Fetch Function
+  // ---------- Bulk helpers ----------
   Future<List<String>> _fetchBulkPannaBids({
     required int digit,
     required int amount,
-    required String sessionType,
+    required String sessionType, // 'sp' | 'dp' | 'tp'
     required String apiEndpoint,
     required String gameId,
     required String registerId,
   }) async {
     final uri = Uri.parse(apiEndpoint);
 
-    final deviceId = GetStorage().read('deviceId')?.toString() ?? '';
-    final deviceName = GetStorage().read('deviceName')?.toString() ?? '';
-    final accessToken = GetStorage().read('accessToken')?.toString() ?? '';
-    final accessStatus = GetStorage().read('accountStatus') == true ? '1' : '0';
+    final deviceId = storage.read('deviceId')?.toString() ?? _deviceId;
+    final deviceName = storage.read('deviceName')?.toString() ?? _deviceName;
+    final token = storage.read('accessToken')?.toString() ?? accessToken;
+    final accessStatus = (storage.read('accountStatus') == true) ? '1' : '0';
 
     final headers = <String, String>{
       'deviceId': deviceId,
       'deviceName': deviceName,
       'accessStatus': accessStatus,
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer $accessToken',
+      'Authorization': 'Bearer $token',
     };
 
     final body = jsonEncode({
@@ -441,25 +375,24 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
     _clearMessage();
     if (_isApiCalling) return;
 
-    final digitText = _pannaController.text.trim();
-    final pointsText = _pointsController.text.trim();
+    // Determine SP/DP/TP (exactly one)
+    String? category;
+    if (_isSPSelected) category = 'SP';
+    if (_isDPSelected) category = 'DP';
+    if (_isTPSelected) category = 'TP';
 
-    // Determine selected Game Category
-    String? gameCategory;
-    if (_isSPSelected) gameCategory = 'SP';
-    if (_isDPSelected) gameCategory = 'DP';
-    if (_isTPSelected) gameCategory = 'TP';
-
-    if (gameCategory == null) {
+    if (category == null) {
       _showMessage('Please select SP, DP, or TP.', isError: true);
       return;
     }
+
+    final digitText = _pannaController.text.trim();
+    final pointsText = _pointsController.text.trim();
 
     if (digitText.isEmpty || digitText.length != 1) {
       _showMessage('Please enter a valid single digit (0-9).', isError: true);
       return;
     }
-
     final digit = int.tryParse(digitText);
     if (digit == null || digit < 0 || digit > 9) {
       _showMessage('Digit must be a number from 0 to 9.', isError: true);
@@ -467,12 +400,13 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
     }
 
     final points = int.tryParse(pointsText);
-    if (points == null || points < 10) {
-      _showMessage('Points must be at least 10.', isError: true);
+    if (points == null || points < _minBet || points > _maxBet) {
+      _showMessage(
+        'Points must be between $_minBet and $_maxBet.',
+        isError: true,
+      );
       return;
     }
-
-    final sessionType = gameCategory.toLowerCase(); // 'sp', 'dp', 'tp'
 
     setState(() => _isApiCalling = true);
 
@@ -482,61 +416,55 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
         'DP': '${Constant.apiEndpoint}double-pana-bulk',
         'TP': '${Constant.apiEndpoint}triple-pana-bulk',
       };
+      final endpoint = apiMap[category]!;
 
-      final selectedEndpoint = apiMap[gameCategory]!;
-
-      final pannaList = await _fetchBulkPannaBids(
+      final list = await _fetchBulkPannaBids(
         digit: digit,
         amount: points,
-        sessionType: sessionType,
-        apiEndpoint: selectedEndpoint,
+        sessionType: category.toLowerCase(), // 'sp'|'dp'|'tp'
+        apiEndpoint: endpoint,
         gameId: widget.gameId.toString(),
-        registerId:
-            '', // You can replace it with GetStorage().read('registerId') if needed
+        registerId: registerId,
       );
 
-      int addedCount = 0;
-
+      int added = 0;
       setState(() {
-        for (String item in pannaList) {
-          bool alreadyExists = _bids.any(
-            (bid) =>
-                bid['digit'] == item &&
-                bid['amount'] == points.toString() &&
-                bid['gameType'] == gameCategory,
+        for (final pana in list) {
+          // merge if same (pana + gameType)
+          final idx = _bids.indexWhere(
+            (b) => b['digit'] == pana && b['gameType'] == category,
           );
-
-          if (!alreadyExists) {
+          if (idx != -1) {
+            final old = int.tryParse(_bids[idx]['amount'] ?? '0') ?? 0;
+            _bids[idx]['amount'] = (old + points).toString();
+            added++;
+          } else {
             _bids.add({
-              'digit': item,
+              'digit': pana,
               'amount': points.toString(),
-              'gameType':
-                  _selectedGameTypeOption, // ✅ FIXED: Use selected game category directly
+              'gameType': _selectedGameTypeOption, // ✅ FIX: store category here
             });
-            addedCount++;
+            added++;
           }
         }
-
         _pannaController.clear();
         _pointsController.clear();
-
-        if (addedCount > 0) {
-          _showMessage('$addedCount bids added for $gameCategory.');
-        } else {
-          _showMessage('All bids already exist.', isError: true);
-        }
       });
+
+      if (added > 0) {
+        _showMessage('$added bids added for $category.');
+      } else {
+        _showMessage('All bids already exist.', isError: true);
+      }
     } catch (e) {
-      _showMessage('Error: ${e.toString()}', isError: true);
+      _showMessage('Error: $e', isError: true);
     } finally {
-      setState(() => _isApiCalling = false);
+      if (mounted) setState(() => _isApiCalling = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    String marketName = widget.screenTitle.split(' - ')[0];
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
@@ -563,12 +491,14 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
           ),
           const SizedBox(width: 6),
           Center(
-            child: Text(
-              userController.walletBalance.value,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
+            child: Obx(
+              () => Text(
+                userController.walletBalance.value,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
               ),
             ),
           ),
@@ -597,10 +527,10 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
                                   value: _isSPSelected,
                                   onChanged: _isApiCalling
                                       ? null
-                                      : (bool? value) {
+                                      : (v) {
                                           setState(() {
-                                            _isSPSelected = value!;
-                                            if (value) {
+                                            _isSPSelected = v ?? false;
+                                            if (_isSPSelected) {
                                               _isDPSelected = false;
                                               _isTPSelected = false;
                                             }
@@ -623,10 +553,10 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
                                   value: _isDPSelected,
                                   onChanged: _isApiCalling
                                       ? null
-                                      : (bool? value) {
+                                      : (v) {
                                           setState(() {
-                                            _isDPSelected = value!;
-                                            if (value) {
+                                            _isDPSelected = v ?? false;
+                                            if (_isDPSelected) {
                                               _isSPSelected = false;
                                               _isTPSelected = false;
                                             }
@@ -649,10 +579,10 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
                                   value: _isTPSelected,
                                   onChanged: _isApiCalling
                                       ? null
-                                      : (bool? value) {
+                                      : (v) {
                                           setState(() {
-                                            _isTPSelected = value!;
-                                            if (value) {
+                                            _isTPSelected = v ?? false;
+                                            if (_isTPSelected) {
                                               _isSPSelected = false;
                                               _isDPSelected = false;
                                             }
@@ -686,7 +616,9 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
                               controller: _pannaController,
                               keyboardType: TextInputType.number,
                               inputFormatters: [
-                                LengthLimitingTextInputFormatter(3),
+                                LengthLimitingTextInputFormatter(
+                                  1,
+                                ), // single digit
                                 FilteringTextInputFormatter.digitsOnly,
                               ],
                               decoration: const InputDecoration(
@@ -943,9 +875,18 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
     );
   }
 
+  void _removeBid(int index) {
+    if (_isApiCalling || index < 0 || index >= _bids.length) return;
+    final removed = _bids[index];
+    setState(() {
+      _bids.removeAt(index);
+    });
+    _showMessage('Removed bid: ${removed['digit']}');
+  }
+
   Widget _buildBottomBar() {
-    int totalBids = _bids.length;
-    int totalPoints = _getTotalPoints();
+    final totalBids = _bids.length;
+    final totalPoints = _getTotalPoints();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -963,44 +904,8 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Bids',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                ),
-              ),
-              Text(
-                '$totalBids',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Points',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                ),
-              ),
-              Text(
-                '$totalPoints',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
+          _footStat('Bids', '$totalBids'),
+          _footStat('Points', '$totalPoints'),
           ElevatedButton(
             onPressed: (_isApiCalling || _bids.isEmpty)
                 ? null
@@ -1031,5 +936,42 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
         ],
       ),
     );
+  }
+
+  Widget _footStat(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[700]),
+        ),
+        Text(
+          value,
+          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  // Unused validators (optional)
+  bool _isValidSpPanna(String panna) {
+    if (panna.length != 3) return false;
+    return panna.split('').toSet().length == 3;
+  }
+
+  bool _isValidDpPanna(String panna) {
+    if (panna.length != 3) return false;
+    final digits = panna.split('');
+    final freq = <String, int>{};
+    for (final d in digits) {
+      freq[d] = (freq[d] ?? 0) + 1;
+    }
+    return freq.length == 2 && freq.values.contains(2);
+  }
+
+  bool _isValidTpPanna(String panna) {
+    if (panna.length != 3) return false;
+    return panna[0] == panna[1] && panna[1] == panna[2];
   }
 }

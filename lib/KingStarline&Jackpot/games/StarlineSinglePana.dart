@@ -14,7 +14,7 @@ import '../../../components/BidFailureDialog.dart';
 import '../../../components/BidSuccessDialog.dart';
 import '../../Helper/UserController.dart';
 
-// Define the Single_Pana list globally or as a static member
+// ---- Single Panna master list ----
 const List<String> Single_Pana = [
   "120",
   "123",
@@ -139,11 +139,11 @@ const List<String> Single_Pana = [
 ];
 
 class StarlineSinglePannaScreen extends StatefulWidget {
-  final String title;
-  final int gameId;
-  final String gameType;
-  final String gameName;
-  final bool selectionStatus;
+  final String title; // e.g. "Starline Single Panna"
+  final int gameId; // TYPE id (send as STRING in API)
+  final String gameType; // e.g. "singlePana"
+  final String gameName; // label, e.g. "Starline ..." or "Jackpot ..."
+  final bool selectionStatus; // true => bidding open (UI only)
 
   const StarlineSinglePannaScreen({
     Key? key,
@@ -162,211 +162,120 @@ class StarlineSinglePannaScreen extends StatefulWidget {
 class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
   final TextEditingController digitController = TextEditingController();
   final TextEditingController amountController = TextEditingController();
-  final LayerLink _layerLink = LayerLink();
-  OverlayEntry? _overlayEntry;
-  List<String> filteredPanaOptions = [];
-  final FocusNode _digitFocusNode = FocusNode();
 
-  // The game type is now hardcoded to 'Open'
+  // UI label only (API does not use sessionType)
   final String selectedGameType = 'Open';
 
-  late String deviceId = "flutter_device";
-  late String deviceName = "Flutter_App";
-  late bool accountActiveStatus;
-
-  List<Map<String, String>> bids = [];
-  int walletBalance = 0;
+  // auth / device
+  final GetStorage _box = GetStorage();
   late String accessToken;
   late String registerId;
+  String deviceId = "flutter_device";
+  String deviceName = "Flutter_App";
   bool accountStatus = false;
 
+  // app state
+  List<Map<String, String>> bids = []; // {digit, amount, type}
+  int walletBalance = 0;
+
+  // message bar
   String? _messageToShow;
   bool _isErrorForMessage = false;
   Key _messageBarKey = UniqueKey();
+  Timer? _hideTimer;
 
-  final UserController userController = Get.put(UserController());
+  final UserController userController = Get.isRegistered<UserController>()
+      ? Get.find<UserController>()
+      : Get.put(UserController());
+
+  static const int _minBet = 10;
+  static const int _maxBet = 1000;
+
+  bool get _biddingClosed => !widget.selectionStatus;
 
   @override
   void initState() {
     super.initState();
-    _loadInitialData();
-    _loadSavedBids();
-    digitController.addListener(_onDigitChanged);
-    double walletBalanceDouble = double.parse(
-      userController.walletBalance.value,
-    );
-    walletBalance = walletBalanceDouble.toInt();
-  }
+    accessToken = _box.read('accessToken') ?? '';
+    registerId = _box.read('registerId') ?? '';
+    deviceId = _box.read('deviceId')?.toString() ?? deviceId;
+    deviceName = _box.read('deviceName')?.toString() ?? deviceName;
+    accountStatus = userController.accountStatus.value;
 
-  // DIGIT CHANGE HANDLER
-  void _onDigitChanged() {
-    final text = digitController.text;
-    if (text.isEmpty) {
-      if (mounted) {
-        setState(() {
-          filteredPanaOptions = [];
-          _removeOverlay();
-        });
-      }
-      return;
-    }
+    // wallet from controller (string) -> int
+    final balNum = num.tryParse(userController.walletBalance.value);
+    walletBalance = (balNum ?? 0).toInt();
 
-    if (mounted) {
-      setState(() {
-        filteredPanaOptions = Single_Pana.where(
-          (pana) => pana.startsWith(text),
-        ).toList();
-
-        if (filteredPanaOptions.isNotEmpty) {
-          _showOverlay(filteredPanaOptions);
-        } else {
-          _removeOverlay();
-        }
-      });
-    }
-  }
-
-  // SHOW SUGGESTIONS
-  // SHOW SUGGESTIONS
-  void _showOverlay(List<String> suggestions) {
-    _removeOverlay();
-    _overlayEntry = OverlayEntry(
-      builder: (context) => CompositedTransformFollower(
-        link: _layerLink,
-        showWhenUnlinked: false,
-        offset: const Offset(0, 40),
-        child: Material(
-          elevation: 4.0,
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            width: 150,
-            height: 80,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            constraints: const BoxConstraints(maxHeight: 200),
-            child: ListView.builder(
-              padding: EdgeInsets.zero,
-              shrinkWrap: true,
-              itemCount: suggestions.length,
-              itemBuilder: (context, index) {
-                final suggestion = suggestions[index];
-                return InkWell(
-                  onTap: () {
-                    // This is the key change. We use addPostFrameCallback to ensure
-                    // the UI is updated correctly after the current frame is built.
-                    // We also manage the text and cursor position directly.
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      setState(() {
-                        digitController.text = suggestion;
-                        // Move the cursor to the end of the newly set text.
-                        digitController.selection = TextSelection.fromPosition(
-                          TextPosition(offset: suggestion.length),
-                        );
-                      });
-                      // Remove the overlay immediately after selection.
-                      _removeOverlay();
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    child: Text(
-                      suggestion,
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-      ),
-    );
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        Overlay.of(context).insert(_overlayEntry!);
-      }
+    // live wallet sync
+    _box.listenKey('walletBalance', (value) {
+      final int newBal = int.tryParse(value?.toString() ?? '0') ?? 0;
+      if (mounted) setState(() => walletBalance = newBal);
     });
-  }
 
-  void _removeOverlay() {
-    _overlayEntry?.remove();
-    _overlayEntry = null;
-  }
-
-  void _loadInitialData() {
-    final box = GetStorage();
-    accessToken = box.read('accessToken') ?? '';
-    registerId = box.read('registerId') ?? '';
+    _loadSavedBids();
   }
 
   @override
   void dispose() {
-    digitController.removeListener(_onDigitChanged);
-    _removeOverlay();
+    _hideTimer?.cancel();
     digitController.dispose();
     amountController.dispose();
-    _digitFocusNode.dispose();
     super.dispose();
   }
 
+  // -------------------- storage helpers --------------------
   void _loadSavedBids() {
-    final box = GetStorage();
-    final dynamic savedBidsRaw = box.read('placedBids');
-    if (savedBidsRaw is List) {
-      if (mounted) {
-        setState(() {
-          bids = savedBidsRaw
-              .whereType<Map>()
-              .map((item) {
-                return {
-                  'digit': item['digit']?.toString() ?? '',
-                  'amount': item['amount']?.toString() ?? '',
-                  'type': item['type']?.toString() ?? '',
-                };
-              })
-              .where(
-                (map) =>
-                    map['digit']!.isNotEmpty &&
-                    map['amount']!.isNotEmpty &&
-                    map['type']!.isNotEmpty,
-              )
-              .toList();
-        });
-      }
+    final dynamic saved = _box.read('placedBids');
+    if (saved is List) {
+      final parsed = saved
+          .whereType<Map>()
+          .map(
+            (e) => {
+              'digit': e['digit']?.toString() ?? '',
+              'amount': e['amount']?.toString() ?? '',
+              'type': e['type']?.toString() ?? '',
+            },
+          )
+          .where(
+            (m) =>
+                m['digit']!.isNotEmpty &&
+                m['amount']!.isNotEmpty &&
+                m['type']!.isNotEmpty,
+          )
+          .toList();
+      setState(() => bids = parsed);
     }
   }
 
-  void _saveBids() {
-    GetStorage().write('placedBids', bids);
-  }
+  void _saveBids() => _box.write('placedBids', bids);
 
-  void _showMessage(String message, {bool isError = false}) {
-    if (mounted) {
-      setState(() {
-        _messageToShow = message;
-        _isErrorForMessage = isError;
-        _messageBarKey = UniqueKey();
-      });
-    }
+  // -------------------- messages --------------------
+  void _showMessage(String msg, {bool isError = false}) {
+    _hideTimer?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _messageToShow = msg;
+      _isErrorForMessage = isError;
+      _messageBarKey = UniqueKey();
+    });
+    _hideTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _messageToShow = null);
+    });
   }
 
   void _clearMessage() {
-    if (mounted) {
-      setState(() {
-        _messageToShow = null;
-      });
-    }
+    _hideTimer?.cancel();
+    if (mounted) setState(() => _messageToShow = null);
   }
 
+  // -------------------- add/remove bids --------------------
   Future<void> _addBid() async {
     _clearMessage();
-    _removeOverlay();
+
+    if (_biddingClosed) {
+      _showMessage('Bidding is closed for this slot.', isError: true);
+      return;
+    }
 
     final digit = digitController.text.trim();
     final amount = amountController.text.trim();
@@ -375,120 +284,131 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
       _showMessage('Please fill in all fields.', isError: true);
       return;
     }
-
     if (!Single_Pana.contains(digit)) {
       _showMessage('Please enter a valid Single Panna number.', isError: true);
       return;
     }
-
     final intAmount = int.tryParse(amount);
-    if (intAmount == null || intAmount <= 0) {
+    if (intAmount == null || intAmount < _minBet || intAmount > _maxBet) {
       _showMessage(
-        'Please enter a valid amount greater than 0.',
+        'Amount must be between $_minBet and $_maxBet.',
         isError: true,
       );
       return;
     }
 
-    final existingIndex = bids.indexWhere(
-      (entry) => entry['digit'] == digit && entry['type'] == selectedGameType,
+    // wallet check with new/updated total
+    final existingIdx = bids.indexWhere(
+      (e) => e['digit'] == digit && e['type'] == selectedGameType,
     );
-
-    if (mounted) {
-      setState(() {
-        if (existingIndex != -1) {
-          final currentAmount = int.parse(bids[existingIndex]['amount']!);
-          bids[existingIndex]['amount'] = (currentAmount + intAmount)
-              .toString();
-          _showMessage('Updated amount for Panna: $digit.');
-        } else {
-          bids.add({
-            'digit': digit,
-            'amount': amount,
-            'type': selectedGameType,
-          });
-          _showMessage('Added bid: Panna $digit, Amount $amount.');
-        }
-        _saveBids();
-        digitController.clear();
-        amountController.clear();
-        FocusScope.of(context).unfocus();
-      });
+    int currentTotal = _getTotalPoints();
+    if (existingIdx != -1) {
+      currentTotal -= int.tryParse(bids[existingIdx]['amount'] ?? '0') ?? 0;
     }
+    final nextTotal = currentTotal + intAmount;
+    if (nextTotal > walletBalance) {
+      _showMessage('Insufficient wallet balance.', isError: true);
+      return;
+    }
+
+    setState(() {
+      if (existingIdx != -1) {
+        final cur = int.tryParse(bids[existingIdx]['amount']!) ?? 0;
+        bids[existingIdx]['amount'] = (cur + intAmount).toString();
+        _showMessage('Updated amount for Panna: $digit.');
+      } else {
+        bids.add({
+          'digit': digit,
+          'amount': intAmount.toString(),
+          'type': selectedGameType,
+        });
+        _showMessage('Added bid: Panna $digit, Amount $intAmount.');
+      }
+      digitController.clear();
+      amountController.clear();
+      FocusScope.of(context).unfocus();
+      _saveBids();
+    });
   }
 
+  void _removeBid(int index) {
+    _clearMessage();
+    setState(() => bids.removeAt(index));
+    _saveBids();
+    _showMessage('Bid removed from list.');
+  }
+
+  int _getTotalPoints() =>
+      bids.fold(0, (sum, e) => sum + (int.tryParse(e['amount'] ?? '0') ?? 0));
+
+  // -------------------- confirm & submit --------------------
   void _showBidConfirmationDialog() {
     _clearMessage();
-    _removeOverlay();
 
     if (bids.isEmpty) {
       _showMessage('Please add at least one bid to confirm.', isError: true);
       return;
     }
+    if (_biddingClosed) {
+      _showMessage('Bidding is closed for this slot.', isError: true);
+      return;
+    }
 
-    int totalPoints = _getTotalPoints();
-
+    final totalPoints = _getTotalPoints();
     if (totalPoints > walletBalance) {
       _showMessage('Insufficient wallet balance for all bids.', isError: true);
       return;
     }
 
-    final String formattedDate = DateFormat(
-      'dd MMM yyyy, hh:mm a',
-    ).format(DateTime.now());
+    final when = DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now());
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return BidConfirmationDialog(
-          gameTitle: widget.title,
-          gameDate: formattedDate,
-          bids: bids,
-          totalBids: bids.length,
-          totalBidsAmount: totalPoints,
-          walletBalanceBeforeDeduction: walletBalance,
-          walletBalanceAfterDeduction: (walletBalance - totalPoints).toString(),
-          gameId: widget.gameId.toString(),
-          gameType: widget.gameType,
-          onConfirm: () async {
-            bool success = await _placeFinalBids();
-            if (success) {
-              if (mounted) {
-                setState(() {
-                  bids.clear();
-                });
-              }
-              _saveBids();
-            }
-          },
-        );
-      },
+      builder: (_) => BidConfirmationDialog(
+        gameTitle: widget.title,
+        gameDate: when,
+        bids: bids, // {digit, amount, type} – your dialog already supports this
+        totalBids: bids.length,
+        totalBidsAmount: totalPoints,
+        walletBalanceBeforeDeduction: walletBalance,
+        walletBalanceAfterDeduction: (walletBalance - totalPoints).toString(),
+        gameId: widget.gameId.toString(), // TYPE id as string
+        gameType: widget.gameType, // "singlePana"
+        onConfirm: () async {
+          final ok = await _placeFinalBids();
+          if (ok && mounted) {
+            setState(() => bids.clear());
+            _saveBids();
+          }
+        },
+      ),
     );
+  }
+
+  Market _detectMarket() {
+    final s = ('${widget.title} ${widget.gameName}').toLowerCase();
+    return s.contains('jackpot') ? Market.jackpot : Market.starline;
   }
 
   Future<bool> _placeFinalBids() async {
     if (!mounted) return false;
 
-    final _bidService = StarlineBidService(GetStorage());
+    // build digit->amount map for current type
     final Map<String, String> bidPayload = {};
-    int currentBatchTotalPoints = 0;
-
-    for (var entry in bids) {
-      if ((entry["type"] ?? "").toUpperCase() ==
-          selectedGameType.toUpperCase()) {
-        String digit = entry["digit"] ?? "";
-        String amount = entry["amount"] ?? "0";
-
-        if (digit.isNotEmpty && int.tryParse(amount) != null) {
-          bidPayload[digit] = amount;
-          currentBatchTotalPoints += int.parse(amount);
+    int batchTotal = 0;
+    for (final e in bids) {
+      if ((e['type'] ?? '').toUpperCase() == selectedGameType.toUpperCase()) {
+        final d = e['digit'] ?? '';
+        final a = int.tryParse(e['amount'] ?? '0') ?? 0;
+        if (d.isNotEmpty && a > 0) {
+          bidPayload[d] = a.toString();
+          batchTotal += a;
         }
       }
     }
 
     if (bidPayload.isEmpty) {
-      if (!mounted) return false;
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -500,7 +420,6 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
     }
 
     if (accessToken.isEmpty || registerId.isEmpty) {
-      if (!mounted) return false;
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -511,100 +430,78 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
       return false;
     }
 
-    // --- Start of the main logic block ---
-    bool bidPlacementSuccessful = false;
-    String? errorMessage;
+    final service = StarlineBidService(_box); // unified: handles both endpoints
+    bool success = false;
+    String? err;
 
     try {
-      final result = await _bidService.placeFinalBids(
-        gameName: widget.title,
+      final market = _detectMarket();
+
+      final result = await service.placeFinalBids(
+        market: market,
         accessToken: accessToken,
         registerId: registerId,
         deviceId: deviceId,
         deviceName: deviceName,
         accountStatus: accountStatus,
         bidAmounts: bidPayload,
-        selectedGameType: selectedGameType,
-        gameId: widget.gameId,
-        gameType: widget.gameType,
-        totalBidAmount: currentBatchTotalPoints,
+        gameId: widget.gameId, // TYPE id (int here; service sends string)
+        gameType: widget.gameType, // "singlePana"
+        totalBidAmount: batchTotal,
       );
 
-      // CRITICAL: Check mounted after the network call
       if (!mounted) return false;
 
-      bidPlacementSuccessful = result['status'] == true;
-      if (!bidPlacementSuccessful) {
-        errorMessage = result['msg'] ?? 'Something went wrong';
+      success = result['status'] == true;
+      if (!success) err = (result['msg'] ?? 'Something went wrong').toString();
+
+      if (success) {
+        // Prefer server wallet if available
+        final dynamic updatedBalanceRaw =
+            result['updatedWalletBalance'] ??
+            result['data']?['updatedWalletBalance'] ??
+            result['data']?['wallet_balance'];
+
+        final int newBal =
+            int.tryParse(updatedBalanceRaw?.toString() ?? '') ??
+            (walletBalance - batchTotal);
+
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const BidSuccessDialog(),
+        );
+
+        setState(() => walletBalance = newBal);
+        await service.updateWalletBalance(newBal);
+        userController.walletBalance.value = newBal.toString();
+
+        return true;
       }
     } catch (e) {
-      log(
-        'Error during bid placement: $e',
-        name: 'StarlineSinglePannaScreenBidError',
-      );
-      // CRITICAL: Check mounted before setting the error message
-      if (!mounted) return false;
-      errorMessage = 'An unexpected error occurred during bid submission.';
+      log('Error during bid placement: $e', name: 'StarlineSinglePannaSubmit');
+      err = 'An unexpected error occurred during bid submission.';
     }
 
-    // Handle the UI logic based on the outcome of the network call.
-    // This separates the network logic from the UI logic.
-    if (!mounted) return false;
-
-    if (bidPlacementSuccessful) {
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const BidSuccessDialog(),
-      );
-
-      // After dialog, check mounted again
-      if (!mounted) return false;
-
-      final newWalletBalance = walletBalance - currentBatchTotalPoints;
-      setState(() {
-        walletBalance = newWalletBalance;
-        bids.removeWhere(
-          (element) =>
-              (element["type"] ?? "").toUpperCase() ==
-              selectedGameType.toUpperCase(),
-        );
-      });
-      await _bidService.updateWalletBalance(newWalletBalance);
-      _saveBids();
-      return true;
-    } else {
-      // Bid failed or an error occurred, show the failure dialog
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => BidFailureDialog(
-          errorMessage: errorMessage ?? 'An unknown error occurred.',
-        ),
-      );
-
-      // After dialog, check mounted again
-      if (!mounted) return false;
-
-      // Clean up bids regardless of network failure, as the user should retry.
-      setState(() {
-        bids.removeWhere(
-          (element) =>
-              (element["type"] ?? "").toUpperCase() ==
-              selectedGameType.toUpperCase(),
-        );
-      });
-      _saveBids();
-      return false;
-    }
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => BidFailureDialog(errorMessage: err ?? 'Unknown error'),
+    );
+    // (optional) keep bids for retry; comment this if you don’t want to clear.
+    // setState(() {
+    //   bids.removeWhere((e) => (e['type'] ?? '').toUpperCase() == selectedGameType.toUpperCase());
+    // });
+    // _saveBids();
+    return false;
   }
 
+  // -------------------- UI --------------------
   Widget _inputRow(String label, Widget field) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
             label,
@@ -619,10 +516,11 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
     );
   }
 
-  // INPUT FIELD BUILDER
+  // Common input builder; digit field uses Autocomplete, amount normal textfield
   Widget _buildInputField(TextEditingController controller, String hint) {
-    // If the controller is not the digit controller, use a standard TextFormField.
-    if (controller != digitController) {
+    final isDigit = controller == digitController;
+
+    if (!isDigit) {
       return SizedBox(
         height: 35,
         width: 150,
@@ -630,7 +528,7 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
           controller: controller,
           cursorColor: Colors.orange,
           keyboardType: TextInputType.number,
-          onTap: () => _clearMessage(),
+          onTap: _clearMessage,
           textAlignVertical: TextAlignVertical.center,
           decoration: InputDecoration(
             hintText: hint,
@@ -658,108 +556,89 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
       );
     }
 
-    // Use Autocomplete for the digit controller.
+    // Digit field with Autocomplete over Single_Pana
     return SizedBox(
       height: 35,
       width: 150,
       child: Autocomplete<String>(
-        optionsBuilder: (TextEditingValue textEditingValue) {
-          if (textEditingValue.text.isEmpty) {
-            // No suggestions if the field is empty
-            return const Iterable<String>.empty();
-          }
-          // Filter options based on user input
-          return Single_Pana.where(
-            (pana) => pana.startsWith(textEditingValue.text),
-          );
+        optionsBuilder: (TextEditingValue tev) {
+          if (tev.text.isEmpty) return const Iterable<String>.empty();
+          return Single_Pana.where((p) => p.startsWith(tev.text));
         },
-        onSelected: (String selection) {
-          // Set the text field value to the selected option
-          digitController.text = selection;
+        onSelected: (sel) {
+          digitController.text = sel;
           _clearMessage();
           FocusScope.of(context).unfocus();
         },
-        fieldViewBuilder:
-            (
-              BuildContext context,
-              TextEditingController textEditingController,
-              FocusNode focusNode,
-              VoidCallback onFieldSubmitted,
-            ) {
-              // This builds the actual text field. Use the provided controllers and focus node.
-              return TextFormField(
-                controller: textEditingController,
-                focusNode: focusNode,
-                cursorColor: Colors.orange,
-                keyboardType: TextInputType.number,
-                onTap: () => _clearMessage(),
-                textAlignVertical: TextAlignVertical.center,
-                decoration: InputDecoration(
-                  hintText: hint,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 0,
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30),
-                    borderSide: const BorderSide(color: Colors.black),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30),
-                    borderSide: const BorderSide(color: Colors.black),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30),
-                    borderSide: const BorderSide(
-                      color: Colors.orange,
-                      width: 2,
-                    ),
-                  ),
+        fieldViewBuilder: (context, textCtrl, focusNode, onSubmit) {
+          // keep external controller in sync
+          textCtrl.addListener(() {
+            if (digitController.text != textCtrl.text) {
+              digitController.text = textCtrl.text;
+              digitController.selection = textCtrl.selection;
+            }
+          });
+          return TextFormField(
+            controller: textCtrl,
+            focusNode: focusNode,
+            cursorColor: Colors.orange,
+            keyboardType: TextInputType.number,
+            onTap: _clearMessage,
+            textAlignVertical: TextAlignVertical.center,
+            decoration: InputDecoration(
+              hintText: hint,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 0,
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(30),
+                borderSide: const BorderSide(color: Colors.black),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(30),
+                borderSide: const BorderSide(color: Colors.black),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(30),
+                borderSide: const BorderSide(color: Colors.orange, width: 2),
+              ),
+            ),
+            style: GoogleFonts.poppins(fontSize: 14),
+          );
+        },
+        optionsViewBuilder: (context, onSelected, options) {
+          return Align(
+            alignment: Alignment.topLeft,
+            child: Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(8),
+              child: SizedBox(
+                width: 150,
+                height: 200,
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  itemCount: options.length,
+                  itemBuilder: (_, i) {
+                    final opt = options.elementAt(i);
+                    return InkWell(
+                      onTap: () => onSelected(opt),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        child: Text(opt, style: GoogleFonts.poppins()),
+                      ),
+                    );
+                  },
                 ),
-                style: GoogleFonts.poppins(fontSize: 14),
-              );
-            },
-        optionsViewBuilder:
-            (
-              BuildContext context,
-              AutocompleteOnSelected<String> onSelected,
-              Iterable<String> options,
-            ) {
-              // This builds the dropdown list of suggestions.
-              return Align(
-                alignment: Alignment.topLeft,
-                child: Material(
-                  elevation: 4.0,
-                  borderRadius: BorderRadius.circular(8),
-                  child: SizedBox(
-                    width: 150,
-                    height: 200, // You can set a fixed or max height
-                    child: ListView.builder(
-                      padding: EdgeInsets.zero,
-                      shrinkWrap: true,
-                      itemCount: options.length,
-                      itemBuilder: (BuildContext context, int index) {
-                        final String option = options.elementAt(index);
-                        return InkWell(
-                          onTap: () {
-                            onSelected(option);
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            child: Text(option, style: GoogleFonts.poppins()),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              );
-            },
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -799,34 +678,15 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
     );
   }
 
-  void _removeBid(int index) {
-    _clearMessage();
-    if (mounted) {
-      setState(() {
-        bids.removeAt(index);
-      });
-    }
-    _saveBids();
-    _showMessage('Bid removed from list.');
-  }
-
-  int _getTotalPoints() {
-    return bids.fold(
-      0,
-      (sum, bid) => sum + (int.tryParse(bid['amount'] ?? '0') ?? 0),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        FocusScopeNode currentFocus = FocusScope.of(context);
+        final currentFocus = FocusScope.of(context);
         if (!currentFocus.hasPrimaryFocus &&
             currentFocus.focusedChild != null) {
           FocusManager.instance.primaryFocus?.unfocus();
         }
-        _removeOverlay();
       },
       child: Scaffold(
         backgroundColor: const Color(0xfff2f2f2),
@@ -857,11 +717,13 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
                     color: Colors.black,
                   ),
                   const SizedBox(width: 4),
-                  Text(
-                    "$walletBalance",
-                    style: GoogleFonts.poppins(
-                      color: Colors.black,
-                      fontWeight: FontWeight.w600,
+                  Obx(
+                    () => Text(
+                      userController.walletBalance.value,
+                      style: GoogleFonts.poppins(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -879,7 +741,6 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
                 ),
                 child: Column(
                   children: [
-                    // This section now displays the hardcoded game type
                     _inputRow(
                       "Enter Single Panna:",
                       _buildInputField(digitController, "Bid Panna"),

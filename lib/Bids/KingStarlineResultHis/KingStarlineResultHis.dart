@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:new_sara/ulits/Constents.dart';
 
 class KingStarlineResultScreen extends StatefulWidget {
   const KingStarlineResultScreen({super.key});
@@ -43,7 +44,7 @@ class _KingStarlineResultScreenState extends State<KingStarlineResultScreen> {
     setState(() => isLoading = true);
 
     try {
-      final url = Uri.parse('https://sara777.win/api/v1/get-results');
+      final url = Uri.parse('${Constant.apiEndpoint}get-results');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},

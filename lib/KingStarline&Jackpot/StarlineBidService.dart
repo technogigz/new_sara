@@ -5,44 +5,64 @@ import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:new_sara/ulits/Constents.dart';
 
+enum Market { starline, jackpot }
+
 class StarlineBidService {
   final GetStorage _storage;
-
   StarlineBidService(this._storage);
 
   Future<Map<String, dynamic>> placeFinalBids({
-    required String gameName,
+    required Market market,
     required String accessToken,
     required String registerId,
     required String deviceId,
     required String deviceName,
     required bool accountStatus,
-    required Map<String, String> bidAmounts,
-    required String selectedGameType,
-    required int gameId,
-    required String gameType,
+    required Map<String, String> bidAmounts, // digit -> amount (string)
+    required String gameType, // e.g. "jodi", "singleDigits"
+    required int gameId, // TYPE id (int) — sent as STRING
     required int totalBidAmount,
   }) async {
-    String apiUrl;
-    if (gameName.toLowerCase().contains('jackpot')) {
-      apiUrl = '${Constant.apiEndpoint}place-jackpot-bid';
-      log("Jackpot API URL: $apiUrl, \n $gameName");
-    } else if (gameName.toLowerCase().contains('starline')) {
-      apiUrl = '${Constant.apiEndpoint}place-starline-bid';
-      log("Starline API URL: $apiUrl, \n $gameName");
-    } else {
-      apiUrl = '${Constant.apiEndpoint}place-bid';
-      log("Default API URL: $apiUrl, \n $gameName");
-    }
-
+    // Basic validation
     if (accessToken.isEmpty || registerId.isEmpty) {
       return {
         'status': false,
         'msg': 'Authentication error. Please log in again.',
       };
     }
+    if (gameId <= 0) {
+      return {'status': false, 'msg': 'Invalid gameId/type id.'};
+    }
 
-    final headers = {
+    // Build bids (sessionType is "" for BOTH markets as per your API)
+    final bids = bidAmounts.entries
+        .map((e) {
+          final amt = int.tryParse(e.value) ?? 0;
+          return <String, dynamic>{
+            'sessionType': '',
+            'digit': e.key,
+            'pana': e.key,
+            'bidAmount': amt,
+          };
+        })
+        .where((b) => (b['bidAmount'] as int) > 0)
+        .toList();
+
+    if (bids.isEmpty)
+      return {'status': false, 'msg': 'No valid bids to submit.'};
+
+    final recomputedTotal = bids.fold<int>(
+      0,
+      (s, b) => s + (b['bidAmount'] as int),
+    );
+
+    // Only endpoint changes
+    final apiUrl = market == Market.starline
+        ? '${Constant.apiEndpoint}place-starline-bid'
+        : '${Constant.apiEndpoint}place-jackpot-bid';
+
+    // Headers exactly like Postman
+    final headers = <String, String>{
       'deviceId': deviceId,
       'deviceName': deviceName,
       'accessStatus': accountStatus ? '1' : '0',
@@ -50,57 +70,53 @@ class StarlineBidService {
       'Authorization': 'Bearer $accessToken',
     };
 
-    final List<Map<String, dynamic>> bidPayloadList = [];
-    bidAmounts.forEach((digit, amount) {
-      bidPayloadList.add({
-        "sessionType": selectedGameType.toUpperCase(),
-        "digit": digit,
-        "pana": digit,
-        "bidAmount": int.tryParse(amount) ?? 0,
-      });
-    });
-
-    final body = {
-      "registerId": registerId,
-      "gameId": gameId.toString(),
-      "bidAmount": totalBidAmount,
-      "gameType": gameType,
-      "bid": bidPayloadList,
+    final body = <String, dynamic>{
+      'registerId': registerId,
+      'gameId': gameId.toString(), // STRING
+      'bidAmount': totalBidAmount,
+      'gameType': gameType, // e.g. "jodi"
+      'bid': bids, // sessionType: ""
     };
 
-    // --- Logging cURL command for debugging ---
-    String curlCommand = 'curl -X POST \\\n  $apiUrl \\';
-    headers.forEach((key, value) {
-      curlCommand += '\n  -H "$key: $value" \\';
-    });
-    curlCommand += '\n  -d \'${jsonEncode(body)}\'';
-
-    log('CURL Command for Final Bid Submission:\n$curlCommand', name: 'BidAPI');
-    log('Request Headers for Final Bid Submission: $headers', name: 'BidAPI');
+    log('[BidAPI] URL: $apiUrl', name: 'BidAPI');
+    log('[BidAPI] Headers: $headers', name: 'BidAPI');
     log(
-      'Request Body for Final Bid Submission: ${jsonEncode(body)}',
+      '[BidAPI] RecomputedTotal=$recomputedTotal, ProvidedTotal=$totalBidAmount',
       name: 'BidAPI',
     );
+    log('[BidAPI] Body: ${jsonEncode(body)}', name: 'BidAPI');
 
-    // --- End logging ---
     try {
-      final response = await http.post(
+      final resp = await http.post(
         Uri.parse(apiUrl),
         headers: headers,
         body: jsonEncode(body),
       );
+      log('[BidAPI] Status: ${resp.statusCode}', name: 'BidAPI');
+      log('[BidAPI] Resp: ${resp.body}', name: 'BidAPI');
 
-      log('Response Status Code: ${response.statusCode}', name: 'BidAPI');
-      log('Response Body: ${response.body}', name: 'BidAPI');
+      Map<String, dynamic> jsonResp;
+      try {
+        jsonResp = json.decode(resp.body) as Map<String, dynamic>;
+      } catch (_) {
+        return {'status': false, 'msg': 'Invalid server response.'};
+      }
 
-      final Map<String, dynamic> responseBody = json.decode(response.body);
-
-      if (response.statusCode == 200 && responseBody['status'] == true) {
-        return {'status': true, 'data': responseBody};
+      final ok = resp.statusCode == 200 && (jsonResp['status'] == true);
+      if (ok) {
+        // {status, msg, info}
+        return {
+          'status': true,
+          'msg': (jsonResp['msg'] ?? 'Bid placed successfully.').toString(),
+          'info': jsonResp['info'],
+          'data': jsonResp,
+        };
       } else {
         return {
           'status': false,
-          'msg': responseBody['msg'] ?? "Unknown error occurred.",
+          'msg': (jsonResp['msg'] ?? 'Unknown error occurred.').toString(),
+          'data': jsonResp,
+          'code': resp.statusCode,
         };
       }
     } catch (e) {
@@ -116,11 +132,14 @@ class StarlineBidService {
     await _storage.write('walletBalance', newBalance.toString());
   }
 
-  getBidAmounts(List<Map<String, String>> bids) {
-    Map<String, String> bidAmounts = {};
-    for (var bid in bids) {
-      bidAmounts[bid['digit']!] = bid['amount']!;
+  /// Helper: convert [{digit, amount}] -> {digit: amount}
+  Map<String, String> getBidAmounts(List<Map<String, String>> bids) {
+    final out = <String, String>{};
+    for (final b in bids) {
+      final d = b['digit'];
+      final a = b['amount'];
+      if (d != null && a != null) out[d] = a;
     }
-    return bidAmounts;
+    return out;
   }
 }

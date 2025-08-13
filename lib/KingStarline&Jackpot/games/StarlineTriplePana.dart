@@ -17,10 +17,10 @@ import '../../components/BidSuccessDialog.dart';
 
 class StarlineTPMotorsScreen extends StatefulWidget {
   final String title;
-  final String gameCategoryType;
-  final int gameId;
-  final String gameName;
-  final bool selectionStatus;
+  final String gameCategoryType; // e.g. "triplePana"
+  final int gameId; // STARLINE session/slot id
+  final String gameName; // human label like "12:30 PM"
+  final bool selectionStatus; // true=open, false=closed
 
   const StarlineTPMotorsScreen({
     super.key,
@@ -36,13 +36,13 @@ class StarlineTPMotorsScreen extends StatefulWidget {
 }
 
 class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
-  // Game type is now fixed to "Open"
-  String selectedGameBetType = "Open";
+  // UI/session label only (Starline API ignores this)
+  String selectedGameBetType = "OPEN";
 
   final TextEditingController digitController = TextEditingController();
   final TextEditingController pointsController = TextEditingController();
 
-  List<String> triplePanaOptions = [
+  final List<String> triplePanaOptions = const [
     "111",
     "222",
     "333",
@@ -57,18 +57,23 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
   List<String> filteredDigitOptions = [];
   bool _isDigitSuggestionsVisible = false;
 
-  List<Map<String, String>> addedEntries = [];
-  late GetStorage storage;
-  late StarlineBidService _bidService;
+  final List<Map<String, String>> addedEntries =
+      []; // {digit, amount, type, gameType}
+  late final GetStorage storage;
+  late final StarlineBidService _bidService;
 
-  late String accessToken;
-  late String registerId;
-  late String preferredLanguage;
+  String accessToken = '';
+  String registerId = '';
   bool accountStatus = false;
-  late int walletBalance;
+  int walletBalance = 0;
+  int minBid = 10;
+  static const int _maxBid = 1000;
 
-  final String _deviceId = 'test_device_id_flutter';
-  final String _deviceName = 'test_device_name_flutter';
+  // device headers (from storage with fallbacks)
+  String get _deviceId =>
+      storage.read('deviceId')?.toString() ?? 'flutter_device';
+  String get _deviceName =>
+      storage.read('deviceName')?.toString() ?? 'Flutter_App';
 
   String? _messageToShow;
   bool _isErrorForMessage = false;
@@ -77,7 +82,11 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
 
   bool _isApiCalling = false;
 
-  final UserController userController = Get.put(UserController());
+  final UserController userController = Get.isRegistered<UserController>()
+      ? Get.find<UserController>()
+      : Get.put(UserController());
+
+  bool get _biddingClosed => !widget.selectionStatus;
 
   @override
   void initState() {
@@ -85,41 +94,30 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
     storage = GetStorage();
     _bidService = StarlineBidService(storage);
     _loadInitialData();
-    double walletBalanceDouble = double.parse(
-      userController.walletBalance.value,
-    );
-    walletBalance = walletBalanceDouble.toInt();
-    log(
-      'StarlineTPMotorsScreen: initState called. Game type is fixed to: $selectedGameBetType',
-    );
+    _syncWallet();
     digitController.addListener(_onDigitChanged);
   }
 
-  void _onDigitChanged() {
-    final query = digitController.text.trim();
-    if (query.isNotEmpty) {
-      setState(() {
-        filteredDigitOptions = triplePanaOptions
-            .where((digit) => digit.startsWith(query))
-            .toList();
-        _isDigitSuggestionsVisible = filteredDigitOptions.isNotEmpty;
-      });
-    } else {
-      setState(() {
-        filteredDigitOptions = [];
-        _isDigitSuggestionsVisible = false;
-      });
-    }
+  void _syncWallet() {
+    final raw = userController.walletBalance.value;
+    final n = num.tryParse(raw);
+    walletBalance = n?.toInt() ?? 0;
   }
 
   Future<void> _loadInitialData() async {
     accessToken = storage.read('accessToken') ?? '';
     registerId = storage.read('registerId') ?? '';
     accountStatus = userController.accountStatus.value;
-    preferredLanguage = storage.read('selectedLanguage') ?? 'en';
+    minBid = int.tryParse(storage.read('minBid')?.toString() ?? '10') ?? 10;
+
+    // live wallet sync
+    storage.listenKey('walletBalance', (val) {
+      final parsed = int.tryParse(val?.toString() ?? '0') ?? 0;
+      if (mounted) setState(() => walletBalance = parsed);
+    });
 
     log(
-      'StarlineTPMotorsScreen: Initial data loaded - accessToken: ${accessToken.isNotEmpty}, registerId: ${registerId.isNotEmpty}, accountStatus: $accountStatus, walletBalance: $walletBalance',
+      'TPMotors init: token=${accessToken.isNotEmpty}, reg=${registerId.isNotEmpty}, acc=$accountStatus, minBid=$minBid',
     );
   }
 
@@ -129,10 +127,10 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
     digitController.dispose();
     pointsController.dispose();
     _messageDismissTimer?.cancel();
-    log('StarlineTPMotorsScreen: dispose called.');
     super.dispose();
   }
 
+  // ---------- messages ----------
   void _showMessage(String message, {bool isError = false}) {
     _messageDismissTimer?.cancel();
     if (!mounted) return;
@@ -141,93 +139,111 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
       _isErrorForMessage = isError;
       _messageBarKey = UniqueKey();
     });
-    _messageDismissTimer = Timer(const Duration(seconds: 3), () {
-      _clearMessage();
-    });
-    log(
-      'StarlineTPMotorsScreen: Showing message: "$message" (isError: $isError)',
-    );
+    _messageDismissTimer = Timer(const Duration(seconds: 3), _clearMessage);
   }
 
   void _clearMessage() {
-    if (mounted) {
-      setState(() {
-        _messageToShow = null;
-      });
-    }
-    log('StarlineTPMotorsScreen: Message cleared.');
+    if (!mounted) return;
+    setState(() => _messageToShow = null);
+    _messageDismissTimer?.cancel();
   }
 
+  // ---------- suggestions ----------
+  void _onDigitChanged() {
+    final q = digitController.text.trim();
+    if (q.isEmpty) {
+      setState(() {
+        filteredDigitOptions = [];
+        _isDigitSuggestionsVisible = false;
+      });
+      return;
+    }
+    setState(() {
+      filteredDigitOptions = triplePanaOptions
+          .where((d) => d.startsWith(q))
+          .toList();
+      _isDigitSuggestionsVisible = filteredDigitOptions.isNotEmpty;
+    });
+  }
+
+  // ---------- add/remove ----------
   void _addEntry() {
     _clearMessage();
     if (_isApiCalling) return;
 
-    final digit = digitController.text.trim();
-    final points = pointsController.text.trim();
-
-    if (digit.isEmpty || digit.length != 3 || int.tryParse(digit) == null) {
-      _showMessage('Enter a valid 3-digit number.', isError: true);
+    if (_biddingClosed) {
+      _showMessage('Bidding is closed for this slot.', isError: true);
       return;
     }
 
+    final digit = digitController.text.trim();
+    final pointsStr = pointsController.text.trim();
+
+    if (digit.length != 3 || int.tryParse(digit) == null) {
+      _showMessage('Enter a valid 3-digit number.', isError: true);
+      return;
+    }
     if (!triplePanaOptions.contains(digit)) {
       _showMessage('Invalid Triple Panna number.', isError: true);
       return;
     }
-
-    if (points.isEmpty) {
+    if (pointsStr.isEmpty) {
       _showMessage('Please enter an amount.', isError: true);
       return;
     }
 
-    int? parsedPoints = int.tryParse(points);
-    if (parsedPoints == null || parsedPoints < 10 || parsedPoints > 1000) {
-      _showMessage('Points must be between 10 and 1000.', isError: true);
+    final pts = int.tryParse(pointsStr);
+    if (pts == null || pts < minBid || pts > _maxBid) {
+      _showMessage(
+        'Points must be between $minBid and $_maxBid.',
+        isError: true,
+      );
       return;
     }
 
-    final newEntry = {
-      "digit": digit,
-      "amount": points,
-      "type": selectedGameBetType, // Hardcoded "Open"
-      "gameType": widget.gameCategoryType,
-    };
-
-    final existingIndex = addedEntries.indexWhere(
+    // wallet guard (with replacement logic)
+    _syncWallet();
+    int currentTotal = _getTotalPoints();
+    final idx = addedEntries.indexWhere(
       (e) => e['digit'] == digit && e['type'] == selectedGameBetType,
     );
+    if (idx != -1) {
+      currentTotal -= int.tryParse(addedEntries[idx]['amount'] ?? '0') ?? 0;
+    }
+    if (currentTotal + pts > walletBalance) {
+      _showMessage('Insufficient wallet balance.', isError: true);
+      return;
+    }
 
     setState(() {
-      if (existingIndex != -1) {
-        int existing = int.parse(addedEntries[existingIndex]['amount']!);
-        addedEntries[existingIndex]['amount'] = (existing + parsedPoints)
-            .toString();
-        _showMessage("Updated bid for $digit.");
+      if (idx != -1) {
+        addedEntries[idx]['amount'] = pts.toString(); // replace (not sum)
+        _showMessage('Updated bid for $digit.');
       } else {
-        addedEntries.add(newEntry);
-        _showMessage("Added bid: $digit - $points points");
+        addedEntries.add({
+          "digit": digit,
+          "amount": pts.toString(),
+          "type": selectedGameBetType, // "OPEN"
+          "gameType": widget.gameCategoryType, // e.g. "triplePana"
+        });
+        _showMessage("Added bid: $digit - $pts points");
       }
       digitController.clear();
       pointsController.clear();
       _isDigitSuggestionsVisible = false;
+      FocusScope.of(context).unfocus();
     });
-    log(
-      'StarlineTPMotorsScreen: _addEntry called. Added entries: $addedEntries',
-    );
   }
 
   void _removeEntry(int index) {
     _clearMessage();
-    if (_isApiCalling) return;
+    if (_isApiCalling || index < 0 || index >= addedEntries.length) return;
 
     setState(() {
       final removed = addedEntries[index];
       addedEntries.removeAt(index);
       _showMessage("Removed bid: ${removed['digit']}");
     });
-    log(
-      'StarlineTPMotorsScreen: _removeEntry called. Remaining entries: $addedEntries',
-    );
   }
 
   int _getTotalPoints() {
@@ -237,181 +253,27 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
     );
   }
 
-  int _getTotalPointsForSelectedGameType() {
-    // With game type fixed to "Open", this is the same as _getTotalPoints()
-    return addedEntries.fold(
-      0,
-      (sum, item) => sum + (int.tryParse(item['amount'] ?? '0') ?? 0),
-    );
-  }
-
-  Future<bool> _placeFinalBids() async {
-    final Map<String, String> bidPayload = {};
-    int currentBatchTotalPoints = 0;
-
-    for (var entry in addedEntries) {
-      String digit = entry["digit"] ?? "";
-      String amount = entry["amount"] ?? "0";
-
-      if (digit.isNotEmpty && int.tryParse(amount) != null) {
-        bidPayload[digit] = amount;
-        currentBatchTotalPoints += int.parse(amount);
-      }
-    }
-
-    log(
-      'StarlineTPMotorsScreen: bidPayload (Map<String,String>) being sent to BidService: $bidPayload',
-    );
-    log(
-      'StarlineTPMotorsScreen: currentBatchTotalPoints: $currentBatchTotalPoints',
-    );
-
-    if (bidPayload.isEmpty) {
-      if (!mounted) return false;
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) =>
-            const BidFailureDialog(errorMessage: 'No valid bids to submit.'),
-      );
-      log('StarlineTPMotorsScreen: Bid failed - No valid bids.');
-      return false;
-    }
-
-    if (accessToken.isEmpty || registerId.isEmpty) {
-      if (!mounted) return false;
-
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const BidFailureDialog(
-          errorMessage: 'Authentication error. Please log in again.',
-        ),
-      );
-      log('StarlineTPMotorsScreen: Bid failed - Authentication error.');
-      return false;
-    }
-
-    try {
-      final result = await _bidService.placeFinalBids(
-        gameName: widget.gameName,
-        accessToken: accessToken,
-        registerId: registerId,
-        deviceId: _deviceId,
-        deviceName: _deviceName,
-        accountStatus: accountStatus,
-        bidAmounts: bidPayload,
-        selectedGameType: selectedGameBetType, // Hardcoded "Open"
-        gameId: widget.gameId,
-        gameType: widget.gameCategoryType,
-        totalBidAmount: currentBatchTotalPoints,
-      );
-
-      if (!mounted) return false;
-
-      if (result['status'] == true) {
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => const BidSuccessDialog(),
-        );
-
-        final responseData = result['data'];
-        if (responseData != null &&
-            responseData.containsKey('updatedWalletBalance')) {
-          final dynamic updatedBalanceRaw =
-              responseData['updatedWalletBalance'];
-          final int updatedBalance =
-              int.tryParse(updatedBalanceRaw.toString()) ??
-              (walletBalance - currentBatchTotalPoints);
-          if (mounted) {
-            setState(() {
-              walletBalance = updatedBalance;
-            });
-          }
-          _bidService.updateWalletBalance(updatedBalance);
-          log(
-            'StarlineTPMotorsScreen: Bid success! Wallet updated from API: $updatedBalance',
-          );
-        } else {
-          final newWalletBalance = walletBalance - currentBatchTotalPoints;
-          if (mounted) {
-            setState(() {
-              walletBalance = newWalletBalance;
-            });
-          }
-          _bidService.updateWalletBalance(newWalletBalance);
-          log(
-            'StarlineTPMotorsScreen: Bid success! Wallet updated locally: $newWalletBalance',
-          );
-        }
-
-        if (mounted) {
-          setState(() {
-            addedEntries.clear(); // Clear all entries after successful bid
-          });
-          log(
-            'StarlineTPMotorsScreen: Removed successful bids from addedEntries: $addedEntries',
-          );
-        }
-        return true;
-      } else {
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => BidFailureDialog(
-            errorMessage: result['msg'] ?? 'Something went wrong',
-          ),
-        );
-        log(
-          'StarlineTPMotorsScreen: Bid failed - API message: ${result['msg']}',
-        );
-        return false;
-      }
-    } catch (e) {
-      log(
-        'StarlineTPMotorsScreen: Error during bid placement: $e',
-        name: 'StarlineTPMotorsScreenBidError',
-      );
-      if (!mounted) return false;
-
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const BidFailureDialog(
-          errorMessage: 'An unexpected error occurred during bid submission.',
-        ),
-      );
-      return false;
-    }
-  }
-
+  // ---------- confirm & submit ----------
   void _showConfirmationDialog() {
     _clearMessage();
 
     final int totalPoints = _getTotalPoints();
-
-    if (totalPoints == 0) {
-      _showMessage("No bids added to submit.", isError: true);
-      log('StarlineTPMotorsScreen: Confirmation denied - No bids added.');
+    if (_biddingClosed) {
+      _showMessage("Bidding is closed for this slot.", isError: true);
       return;
     }
-
+    if (totalPoints == 0) {
+      _showMessage("No bids added to submit.", isError: true);
+      return;
+    }
     if (walletBalance < totalPoints) {
       _showMessage("Insufficient wallet balance.", isError: true);
-      log(
-        'StarlineTPMotorsScreen: Confirmation denied - Insufficient balance. Wallet: $walletBalance, Required: $totalPoints',
-      );
       return;
     }
 
     final formattedDate = DateFormat(
       'dd MMM yyyy, hh:mm a',
     ).format(DateTime.now());
-
-    log(
-      'StarlineTPMotorsScreen: Showing confirmation dialog for ${addedEntries.length} bids, total points: $totalPoints',
-    );
 
     showDialog(
       context: context,
@@ -425,6 +287,7 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
             "points": bid['amount']!,
             "type": "${bid['gameType']} (${bid['type']})",
             "pana": bid['digit']!,
+            "jodi": "",
           };
         }).toList(),
         totalBids: addedEntries.length,
@@ -434,24 +297,113 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
         gameId: widget.gameId.toString(),
         gameType: widget.gameCategoryType,
         onConfirm: () async {
-          log(
-            'StarlineTPMotorsScreen: Bid confirmation accepted. Initiating final bid placement.',
-          );
           setState(() => _isApiCalling = true);
-          await _placeFinalBids();
+          final ok = await _placeFinalBids();
           if (mounted) setState(() => _isApiCalling = false);
-          log('StarlineTPMotorsScreen: Final bid placement process completed.');
+          if (ok && mounted) setState(() => addedEntries.clear());
         },
       ),
     );
   }
 
+  Future<bool> _placeFinalBids() async {
+    // Build per-digit payload
+    final Map<String, String> bidPayload = {};
+    int total = 0;
+    for (final e in addedEntries) {
+      final d = e['digit'] ?? '';
+      final a = int.tryParse(e['amount'] ?? '0') ?? 0;
+      if (d.isNotEmpty && a > 0) {
+        bidPayload[d] = a.toString();
+        total += a;
+      }
+    }
+
+    if (bidPayload.isEmpty) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) =>
+            const BidFailureDialog(errorMessage: 'No valid bids to submit.'),
+      );
+      return false;
+    }
+
+    if (accessToken.isEmpty || registerId.isEmpty) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const BidFailureDialog(
+          errorMessage: 'Authentication error. Please log in again.',
+        ),
+      );
+      return false;
+    }
+
+    try {
+      // This screen is always Starline
+      // ✅ NEW (exactly matches your StarlineBidService signature)
+      final result = await _bidService.placeFinalBids(
+        market: Market.starline,
+        accessToken: accessToken,
+        registerId: registerId,
+        deviceId: _deviceId,
+        deviceName: _deviceName,
+        accountStatus: accountStatus,
+        bidAmounts: bidPayload, // Map<String,String> -> {digit: amount}
+        gameType: widget.gameCategoryType, // e.g. "triplePana" (server key)
+        gameId: widget.gameId, // int (service will send as string)
+        totalBidAmount: total, // int
+      );
+
+      if (!mounted) return false;
+
+      if (result['status'] == true) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const BidSuccessDialog(),
+        );
+
+        // Wallet sync (prefer server field if present)
+        final data = result['data'] as Map<String, dynamic>?;
+        final dynamic serverBal =
+            data?['updatedWalletBalance'] ?? data?['wallet_balance'];
+        final int newBal =
+            int.tryParse(serverBal?.toString() ?? '') ??
+            (walletBalance - total);
+
+        await _bidService.updateWalletBalance(newBal);
+        userController.walletBalance.value = newBal.toString();
+        if (mounted) setState(() => walletBalance = newBal);
+
+        return true;
+      } else {
+        final msg = (result['msg'] ?? 'Something went wrong').toString();
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => BidFailureDialog(errorMessage: msg),
+        );
+        return false;
+      }
+    } catch (e) {
+      log('TPMotors placeFinalBids error: $e', name: 'StarlineTPMotorsScreen');
+      if (!mounted) return false;
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const BidFailureDialog(
+          errorMessage: 'An unexpected error occurred during bid submission.',
+        ),
+      );
+      return false;
+    }
+  }
+
+  // ---------- UI ----------
   @override
   Widget build(BuildContext context) {
-    log(
-      'StarlineTPMotorsScreen: Building widget. Game type is fixed to: $selectedGameBetType',
-    );
-
     return Scaffold(
       backgroundColor: Colors.grey.shade200,
       appBar: AppBar(
@@ -459,7 +411,7 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
         backgroundColor: Colors.grey.shade300,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+          onPressed: _isApiCalling ? null : () => Navigator.pop(context),
         ),
         title: Text(
           widget.title,
@@ -470,6 +422,20 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
           ),
         ),
         actions: [
+          if (widget.gameName.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Center(
+                child: Text(
+                  widget.gameName, // session label (e.g., 12:30 PM)
+                  style: GoogleFonts.poppins(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
           Image.asset(
             "assets/images/ic_wallet.png",
             width: 22,
@@ -478,11 +444,13 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
           ),
           const SizedBox(width: 6),
           Center(
-            child: Text(
-              userController.walletBalance.value,
-              style: const TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
+            child: Obx(
+              () => Text(
+                userController.walletBalance.value,
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -494,6 +462,19 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
           children: [
             Column(
               children: [
+                if (_biddingClosed)
+                  Container(
+                    width: double.infinity,
+                    color: Colors.amber.shade200,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    child: Text(
+                      'Bidding is closed for this slot.',
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                    ),
+                  ),
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -540,9 +521,6 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
                                           ),
                                         );
                                   });
-                                  log(
-                                    'StarlineTPMotorsScreen: Digit suggestion selected: $suggestion',
-                                  );
                                 },
                               );
                             },
@@ -566,12 +544,16 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
                         height: 45,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
+                            backgroundColor: _isApiCalling || _biddingClosed
+                                ? Colors.grey
+                                : Colors.orange,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(6),
                             ),
                           ),
-                          onPressed: _isApiCalling ? null : _addEntry,
+                          onPressed: (_isApiCalling || _biddingClosed)
+                              ? null
+                              : _addEntry,
                           child: _isApiCalling
                               ? const CircularProgressIndicator(
                                   color: Colors.white,
@@ -727,28 +709,6 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
     );
   }
 
-  // New widget to display the fixed game type
-  Widget _buildFixedGameTypeDisplay() {
-    return _inputRow(
-      "Game Type:",
-      Container(
-        width: 150,
-        height: 35,
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: Colors.black54),
-          borderRadius: BorderRadius.circular(30),
-        ),
-        child: Text(
-          selectedGameBetType,
-          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold),
-        ),
-      ),
-    );
-  }
-
   Widget _buildDigitInputField() {
     return SizedBox(
       width: double.infinity,
@@ -764,18 +724,10 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
         ],
         onTap: () {
           _clearMessage();
-          if (digitController.text.isNotEmpty) {
-            _onDigitChanged();
-          }
-          log(
-            'StarlineTPMotorsScreen: Digit input field tapped. Current text: ${digitController.text}',
-          );
+          if (digitController.text.isNotEmpty) _onDigitChanged();
         },
-        onChanged: (value) {
-          _onDigitChanged();
-          log('StarlineTPMotorsScreen: Digit input field changed: $value');
-        },
-        enabled: !_isApiCalling,
+        onChanged: (_) => _onDigitChanged(),
+        enabled: !_isApiCalling && !_biddingClosed,
         decoration: InputDecoration(
           hintText: "Enter 3-Digit Triple Panna",
           contentPadding: const EdgeInsets.symmetric(
@@ -816,7 +768,7 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: inputFormatters,
         onTap: _clearMessage,
-        enabled: !_isApiCalling,
+        enabled: !_isApiCalling && !_biddingClosed,
         decoration: InputDecoration(
           hintText: hint,
           contentPadding: const EdgeInsets.symmetric(
@@ -843,8 +795,8 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
   }
 
   Widget _buildBottomBar() {
-    int totalBids = addedEntries.length;
-    int totalPoints = _getTotalPoints();
+    final totalBids = addedEntries.length;
+    final totalPoints = _getTotalPoints();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -862,50 +814,15 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Bids',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                ),
-              ),
-              Text(
-                '$totalBids',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Points',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                ),
-              ),
-              Text(
-                '$totalPoints',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
+          _footStat('Bids', '$totalBids'),
+          _footStat('Points', '$totalPoints'),
           ElevatedButton(
-            onPressed: (_isApiCalling || totalPoints == 0)
+            onPressed: (_isApiCalling || totalPoints == 0 || _biddingClosed)
                 ? null
                 : _showConfirmationDialog,
             style: ElevatedButton.styleFrom(
-              backgroundColor: (_isApiCalling || totalPoints == 0)
+              backgroundColor:
+                  (_isApiCalling || totalPoints == 0 || _biddingClosed)
                   ? Colors.grey
                   : Colors.orange,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -929,6 +846,22 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _footStat(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[700]),
+        ),
+        Text(
+          value,
+          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+      ],
     );
   }
 }

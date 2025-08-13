@@ -7,20 +7,33 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:new_sara/KingStarline&Jackpot/StarlineBidService.dart';
 
 import '../../Helper/UserController.dart';
 import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
 import '../../components/BidFailureDialog.dart';
 import '../../components/BidSuccessDialog.dart';
-import '../StarlineBidService.dart';
+
+/// Simple model for Starline sessions (id + human label)
+class StarlineSession {
+  final int id;
+  final String timeLabel; // e.g., "09:30 PM"
+  StarlineSession({required this.id, required this.timeLabel});
+}
 
 class StarlineSingleDigitBetScreen extends StatefulWidget {
-  final String title;
-  final String gameCategoryType;
-  final int gameId;
-  final String gameName;
-  final bool selectionStatus;
+  final String title; // e.g., "Starline Single Digit"
+  final String gameCategoryType; // e.g., "singleDigits"
+  final int gameId; // TYPE id (sent as STRING)
+  final String gameName; // e.g., "Starline ..." / "Jackpot ..."
+  final bool selectionStatus; // true => bidding open (UI)
+
+  /// Optional Starline time-slot info (UI only; not sent to API)
+  final int? starlineSessionId;
+  final String? starlineSessionTimeLabel;
+  final List<StarlineSession>? sessions;
+  final bool autoPickSession;
 
   const StarlineSingleDigitBetScreen({
     super.key,
@@ -29,6 +42,10 @@ class StarlineSingleDigitBetScreen extends StatefulWidget {
     required this.gameName,
     required this.gameCategoryType,
     required this.selectionStatus,
+    this.starlineSessionId,
+    this.starlineSessionTimeLabel,
+    this.sessions,
+    this.autoPickSession = true,
   });
 
   @override
@@ -38,11 +55,14 @@ class StarlineSingleDigitBetScreen extends StatefulWidget {
 
 class _StarlineSingleDigitBetScreenState
     extends State<StarlineSingleDigitBetScreen> {
-  final String selectedGameBetType = 'Open';
+  /// Amount limits (minBid can be overridden from storage)
+  static const int _defaultMinBet = 10;
+  static const int _maxBet = 1000;
 
   final TextEditingController digitController = TextEditingController();
   final TextEditingController pointsController = TextEditingController();
-  final List<String> digitOptions = [
+
+  final List<String> _digitOptions = [
     '0',
     '1',
     '2',
@@ -54,16 +74,18 @@ class _StarlineSingleDigitBetScreenState
     '8',
     '9',
   ];
-  List<String> filteredDigitOptions = [];
+  List<String> _filteredDigitOptions = [];
   bool _isDigitSuggestionsVisible = false;
 
-  List<Map<String, String>> addedEntries = [];
-  late GetStorage storage = GetStorage();
-  late StarlineBidService _bidService;
-  late String registerId;
-  late String preferredLanguage;
-  bool accountStatus = false;
-  late int walletBalance;
+  /// Local entries: {digit, points}
+  final List<Map<String, String>> _addedEntries = [];
+
+  late final GetStorage _storage = GetStorage();
+  late final StarlineBidService _bidService;
+
+  late String _registerId;
+  bool _accountStatus = false;
+  int _walletBalance = 0;
   bool _isApiCalling = false;
 
   String? _messageToShow;
@@ -71,43 +93,61 @@ class _StarlineSingleDigitBetScreenState
   Key _messageBarKey = UniqueKey();
   Timer? _messageDismissTimer;
 
-  final UserController userController = Get.put(UserController());
+  final UserController userController = Get.isRegistered<UserController>()
+      ? Get.find<UserController>()
+      : Get.put(UserController());
+
+  // UI-only (if provided); not required for API
+  String? _resolvedSessionTime;
 
   @override
   void initState() {
     super.initState();
-    _bidService = StarlineBidService(storage);
+    _bidService = StarlineBidService(_storage);
+
+    final num? wb = num.tryParse(userController.walletBalance.value);
+    _walletBalance = wb?.toInt() ?? 0;
+
     _loadInitialData();
     digitController.addListener(_onDigitChanged);
+    _resolveSessionLabelForUi();
   }
 
-  void _onDigitChanged() {
-    final text = digitController.text;
-    if (text.isEmpty) {
-      setState(() {
-        filteredDigitOptions = [];
-        _isDigitSuggestionsVisible = false;
-      });
-      return;
+  void _resolveSessionLabelForUi() {
+    // show a time label if we can; purely cosmetic
+    _resolvedSessionTime = widget.starlineSessionTimeLabel;
+    if (_resolvedSessionTime == null &&
+        (widget.sessions?.isNotEmpty ?? false) &&
+        widget.autoPickSession) {
+      final now = DateTime.now();
+      final fmt = DateFormat('hh:mm a');
+      for (final s in widget.sessions!) {
+        try {
+          final t = fmt.parse(s.timeLabel);
+          final candidate = DateTime(
+            now.year,
+            now.month,
+            now.day,
+            t.hour,
+            t.minute,
+          );
+          if (!candidate.isBefore(now)) {
+            _resolvedSessionTime = s.timeLabel;
+            break;
+          }
+        } catch (_) {}
+      }
     }
-
-    setState(() {
-      filteredDigitOptions = digitOptions
-          .where((option) => option.startsWith(text))
-          .toList();
-      _isDigitSuggestionsVisible = filteredDigitOptions.isNotEmpty;
-    });
   }
 
   Future<void> _loadInitialData() async {
-    registerId = storage.read('registerId') ?? '';
-    accountStatus = storage.read('accountStatus') ?? false;
-    preferredLanguage = storage.read('selectedLanguage') ?? 'en';
-
-    double walletBalanceDouble = double.parse(
-      userController.walletBalance.value,
-    );
-    walletBalance = walletBalanceDouble.toInt();
+    _registerId = _storage.read('registerId') ?? '';
+    _accountStatus = userController.accountStatus.value;
+    // live wallet sync
+    _storage.listenKey('walletBalance', (value) {
+      final int newBal = int.tryParse(value?.toString() ?? '0') ?? 0;
+      if (mounted) setState(() => _walletBalance = newBal);
+    });
   }
 
   @override
@@ -117,6 +157,31 @@ class _StarlineSingleDigitBetScreenState
     pointsController.dispose();
     _messageDismissTimer?.cancel();
     super.dispose();
+  }
+
+  // -------- helpers --------
+  Market _detectMarket() {
+    final s = ('${widget.title} ${widget.gameName}').toLowerCase();
+    return s.contains('jackpot') ? Market.jackpot : Market.starline;
+  }
+
+  bool get _biddingClosed => !widget.selectionStatus;
+
+  void _onDigitChanged() {
+    final text = digitController.text;
+    if (text.isEmpty) {
+      setState(() {
+        _filteredDigitOptions = [];
+        _isDigitSuggestionsVisible = false;
+      });
+      return;
+    }
+    setState(() {
+      _filteredDigitOptions = _digitOptions
+          .where((o) => o.startsWith(text))
+          .toList();
+      _isDigitSuggestionsVisible = _filteredDigitOptions.isNotEmpty;
+    });
   }
 
   void _showMessage(String message, {bool isError = false}) {
@@ -131,58 +196,66 @@ class _StarlineSingleDigitBetScreenState
   }
 
   void _clearMessage() {
-    if (mounted) {
-      setState(() {
-        _messageToShow = null;
-      });
-    }
+    if (!mounted) return;
+    setState(() => _messageToShow = null);
     _messageDismissTimer?.cancel();
   }
 
+  int _getTotalPoints() {
+    return _addedEntries.fold<int>(
+      0,
+      (sum, e) => sum + (int.tryParse(e['points'] ?? '0') ?? 0),
+    );
+  }
+
+  // -------- add/remove --------
   void _addEntry() {
     _clearMessage();
     if (_isApiCalling) return;
 
-    final digit = digitController.text.trim();
-    final points = pointsController.text.trim();
-
-    if (digit.isEmpty) {
-      _showMessage('Please enter a digit.', isError: true);
+    if (_biddingClosed) {
+      _showMessage('Bidding is closed for this slot.', isError: true);
       return;
     }
 
-    if (digit.length != 1 || !digitOptions.contains(digit)) {
+    final digit = digitController.text.trim();
+    final pointsStr = pointsController.text.trim();
+
+    if (digit.isEmpty || digit.length != 1 || !_digitOptions.contains(digit)) {
       _showMessage('Please enter a valid single digit (0-9).', isError: true);
       return;
     }
-
-    if (points.isEmpty) {
-      _showMessage('Please enter an Amount.', isError: true);
+    if (pointsStr.isEmpty) {
+      _showMessage('Please enter an amount.', isError: true);
       return;
     }
 
-    int? parsedPoints = int.tryParse(points);
-    if (parsedPoints == null || parsedPoints < 10 || parsedPoints > 1000) {
-      _showMessage('Points must be between 10 and 1000.', isError: true);
+    final fromStorage =
+        int.tryParse(_storage.read('minBid')?.toString() ?? '') ??
+        _defaultMinBet;
+    final minBid = fromStorage > 0 ? fromStorage : _defaultMinBet;
+
+    final points = int.tryParse(pointsStr);
+    if (points == null) {
+      _showMessage('Amount must be a number.', isError: true);
+      return;
+    }
+    if (points < minBid || points > _maxBet) {
+      _showMessage(
+        'Amount must be between $minBid and $_maxBet.',
+        isError: true,
+      );
       return;
     }
 
-    int currentTotalPoints = _getTotalPoints();
-    int pointsForThisBid = parsedPoints;
-
-    final existingEntryIndex = addedEntries.indexWhere(
-      (entry) =>
-          entry['digit'] == digit && entry['type'] == selectedGameBetType,
-    );
-
-    if (existingEntryIndex != -1) {
-      currentTotalPoints -=
-          (int.tryParse(addedEntries[existingEntryIndex]['points']!) ?? 0);
+    // Calculate total after replacing/adding this entry
+    int currentTotal = _getTotalPoints();
+    final idx = _addedEntries.indexWhere((e) => e['digit'] == digit);
+    if (idx != -1) {
+      currentTotal -= (int.tryParse(_addedEntries[idx]['points'] ?? '0') ?? 0);
     }
-
-    int totalPointsWithNewBid = currentTotalPoints + pointsForThisBid;
-
-    if (totalPointsWithNewBid > walletBalance) {
+    final totalWithNew = currentTotal + points;
+    if (totalWithNew > _walletBalance) {
       _showMessage(
         'Insufficient wallet balance to place these bids.',
         isError: true,
@@ -191,20 +264,16 @@ class _StarlineSingleDigitBetScreenState
     }
 
     setState(() {
-      if (existingEntryIndex != -1) {
-        addedEntries[existingEntryIndex]['points'] = pointsForThisBid
-            .toString();
-        _showMessage('Updated points for Digit: $digit.');
+      if (idx != -1) {
+        _addedEntries[idx]['points'] = points.toString();
+        _showMessage('Updated digit $digit amount to $points.');
       } else {
-        addedEntries.add({
-          "digit": digit,
-          "points": points,
-          "type": selectedGameBetType,
-        });
-        _showMessage('Added bid: Digit $digit, Points $points.');
+        _addedEntries.add({'digit': digit, 'points': points.toString()});
+        _showMessage('Added bid: Digit $digit, Amount $points.');
       }
       digitController.clear();
       pointsController.clear();
+      _isDigitSuggestionsVisible = false;
     });
   }
 
@@ -212,193 +281,170 @@ class _StarlineSingleDigitBetScreenState
     _clearMessage();
     if (_isApiCalling) return;
     setState(() {
-      final removedEntry = addedEntries[index];
-      addedEntries.removeAt(index);
-      _showMessage('Removed bid: Digit ${removedEntry['digit']}.');
+      final removed = _addedEntries[index];
+      _addedEntries.removeAt(index);
+      _showMessage('Removed bid: Digit ${removed['digit']}.');
     });
   }
 
-  int _getTotalPoints() {
-    return addedEntries.fold(
-      0,
-      (sum, item) => sum + (int.tryParse(item['points'] ?? '0') ?? 0),
-    );
-  }
-
+  // -------- confirm & submit --------
   void _showConfirmationDialog() {
-    FocusScope.of(context).unfocus(); // Close keyboard
+    FocusScope.of(context).unfocus();
     _clearMessage();
+    if (_isApiCalling) return;
 
-    if (addedEntries.isEmpty) {
+    if (_addedEntries.isEmpty) {
       _showMessage(
         'Please add at least one bid before submitting.',
         isError: true,
       );
       return;
     }
+    if (_biddingClosed) {
+      _showMessage('Bidding is closed for this slot.', isError: true);
+      return;
+    }
 
-    final bidsForConfirmation = addedEntries
-        .map((entry) => {'digit': entry['digit']!, 'points': entry['points']!})
+    final totalPointsForConfirmation = _getTotalPoints();
+    if (totalPointsForConfirmation > _walletBalance) {
+      _showMessage('Insufficient wallet balance to submit.', isError: true);
+      return;
+    }
+
+    final bidsForConfirmation = _addedEntries
+        .map((e) => {'digit': e['digit']!, 'points': e['points']!})
         .toList();
-
-    final int totalPointsForConfirmation = bidsForConfirmation.fold<int>(
-      0,
-      (sum, bid) => sum + int.tryParse(bid['points'] ?? '0')!,
-    );
 
     final formattedDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return BidConfirmationDialog(
-          gameTitle: widget.title,
-          gameDate: formattedDate,
-          bids: bidsForConfirmation,
-          totalBids: bidsForConfirmation.length,
-          totalBidsAmount: totalPointsForConfirmation,
-          walletBalanceBeforeDeduction: walletBalance,
-          walletBalanceAfterDeduction:
-              (walletBalance - totalPointsForConfirmation).toString(),
-          gameId: widget.gameId.toString(),
-          gameType: widget.gameCategoryType,
-          onConfirm: () async {
-            Navigator.of(
-              dialogContext,
-            ).pop(); // ✅ Close confirmation dialog first
-            await Future.delayed(
-              const Duration(milliseconds: 100),
-            ); // ✅ Avoid render issues
-            await _placeFinalBids(); // ✅ Then submit the bids
-          },
-        );
-      },
+      builder: (ctx) => BidConfirmationDialog(
+        gameTitle: widget.title,
+        gameDate: formattedDate,
+        bids: bidsForConfirmation,
+        totalBids: bidsForConfirmation.length,
+        totalBidsAmount: totalPointsForConfirmation,
+        walletBalanceBeforeDeduction: _walletBalance,
+        walletBalanceAfterDeduction:
+            (_walletBalance - totalPointsForConfirmation).toString(),
+        gameId: widget.gameId.toString(),
+        gameType: widget.gameCategoryType,
+        onConfirm: () async {
+          await _placeFinalBids();
+        },
+      ),
     );
   }
 
   Future<void> _placeFinalBids() async {
     if (!mounted) return;
 
-    // Start API call
-    setState(() {
-      _isApiCalling = true;
-    });
+    setState(() => _isApiCalling = true);
     _clearMessage();
-    FocusScope.of(context).unfocus(); // Dismiss keyboard if open
+    FocusScope.of(context).unfocus();
 
-    if (addedEntries.isEmpty) {
+    if (_addedEntries.isEmpty) {
       _showMessage('No bids to submit.', isError: true);
-      if (!mounted) return;
-      setState(() {
-        _isApiCalling = false;
-      });
+      if (mounted) setState(() => _isApiCalling = false);
       return;
     }
 
-    final String? accessToken = storage.read('accessToken');
-    final String? deviceId = storage.read('deviceId');
-    final String? deviceName = storage.read('deviceName');
-
+    final accessToken = _storage.read('accessToken') as String?;
+    final deviceId = _storage.read('deviceId') as String?;
+    final deviceName = _storage.read('deviceName') as String?;
     if (accessToken == null || deviceId == null || deviceName == null) {
       _showMessage('Authentication error. Please log in again.', isError: true);
-      if (!mounted) return;
-      setState(() {
-        _isApiCalling = false;
-      });
+      if (mounted) setState(() => _isApiCalling = false);
       return;
     }
 
-    Map<String, String> bidAmounts = {};
-    int totalBidAmount = 0;
-    for (var bid in addedEntries) {
-      final digit = bid['digit'];
-      final points = bid['points'];
-      if (digit != null && points != null) {
-        bidAmounts[digit] = points;
-        totalBidAmount += int.tryParse(points) ?? 0;
+    // Build (digit -> amount) map
+    final bidAmounts = <String, String>{};
+    var totalBidAmount = 0;
+    for (final bid in _addedEntries) {
+      final d = bid['digit'];
+      final p = int.tryParse(bid['points'] ?? '0') ?? 0;
+      if (d != null && p > 0) {
+        bidAmounts[d] = p.toString();
+        totalBidAmount += p;
       }
     }
 
     try {
-      final response = await _bidService.placeFinalBids(
-        gameName: widget.title,
+      final market = _detectMarket();
+
+      final resp = await _bidService.placeFinalBids(
+        market: market,
         accessToken: accessToken,
-        registerId: registerId,
+        registerId: _registerId,
         deviceId: deviceId,
         deviceName: deviceName,
-        accountStatus: accountStatus,
+        accountStatus: _accountStatus,
         bidAmounts: bidAmounts,
-        selectedGameType: selectedGameBetType,
-        gameId: widget.gameId,
-        gameType: widget.gameCategoryType,
+        gameId: widget.gameId, // TYPE id (as STRING in API)
+        gameType: widget.gameCategoryType, // e.g. "singleDigits"
         totalBidAmount: totalBidAmount,
       );
 
       if (!mounted) return;
 
-      if (response['status'] == true) {
-        final int newBalance = walletBalance - totalBidAmount;
+      if (resp['status'] == true) {
+        // Prefer server wallet if available
+        final dynamic serverBal =
+            resp['updatedWalletBalance'] ??
+            resp['data']?['updatedWalletBalance'] ??
+            resp['data']?['wallet_balance'];
+
+        final int newBalance =
+            int.tryParse(serverBal?.toString() ?? '') ??
+            (_walletBalance - totalBidAmount);
 
         setState(() {
-          walletBalance = newBalance;
-          addedEntries.clear();
+          _walletBalance = newBalance;
+          _addedEntries.clear();
           digitController.clear();
           pointsController.clear();
+          _isDigitSuggestionsVisible = false;
         });
 
         await _bidService.updateWalletBalance(newBalance);
+        userController.walletBalance.value = newBalance.toString();
 
         _showMessage('All bids submitted successfully!');
-
-        // Show success dialog AFTER state is updated
-        if (!mounted) return;
-        await Future.delayed(
-          const Duration(milliseconds: 150),
-        ); // Small delay to avoid build issues
         await showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (ctx) => const BidSuccessDialog(),
+          builder: (_) => const BidSuccessDialog(),
         );
       } else {
-        String errorMessage = response['msg'] ?? 'Unknown error occurred.';
-        _showMessage(errorMessage, isError: true);
-
-        if (!mounted) return;
-        await Future.delayed(const Duration(milliseconds: 150));
+        final err = (resp['msg'] as String?) ?? 'Unknown error occurred.';
+        _showMessage(err, isError: true);
         await showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (ctx) => BidFailureDialog(errorMessage: errorMessage),
+          builder: (_) => BidFailureDialog(errorMessage: err),
         );
       }
     } catch (e) {
-      log("Bid submission error: $e");
-      _showMessage(
-        'An unexpected error occurred: ${e.toString()}',
-        isError: true,
-      );
-
-      if (!mounted) return;
-      await Future.delayed(const Duration(milliseconds: 150));
+      log('Bid submission error: $e');
+      final msg = 'An unexpected error occurred: $e';
+      _showMessage(msg, isError: true);
       await showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) =>
-            BidFailureDialog(errorMessage: 'An unexpected error occurred: $e'),
+        builder: (_) => BidFailureDialog(errorMessage: msg),
       );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isApiCalling = false;
-        });
-      }
+      if (mounted) setState(() => _isApiCalling = false);
     }
   }
 
+  // -------- UI --------
   @override
   Widget build(BuildContext context) {
+    final isStarline = widget.gameName.toLowerCase().contains('starline');
     return WillPopScope(
       onWillPop: () async => !_isApiCalling,
       child: Scaffold(
@@ -422,8 +468,22 @@ class _StarlineSingleDigitBetScreenState
             ),
           ),
           actions: [
+            if (isStarline && _resolvedSessionTime != null)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Center(
+                  child: Text(
+                    _resolvedSessionTime!,
+                    style: GoogleFonts.poppins(
+                      color: Colors.black87,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
             Image.asset(
-              "assets/images/ic_wallet.png",
+              'assets/images/ic_wallet.png',
               width: 22,
               height: 22,
               color: Colors.black,
@@ -431,7 +491,7 @@ class _StarlineSingleDigitBetScreenState
             const SizedBox(width: 6),
             Center(
               child: Text(
-                walletBalance.toString(),
+                '$_walletBalance',
                 style: const TextStyle(
                   color: Colors.black,
                   fontWeight: FontWeight.bold,
@@ -454,19 +514,13 @@ class _StarlineSingleDigitBetScreenState
                     child: Column(
                       children: [
                         _inputRow(
-                          "Enter Single Digit:",
+                          'Enter Single Digit:',
                           _buildDigitInputField(),
                         ),
                         const SizedBox(height: 12),
                         _inputRow(
-                          "Enter Points:",
-                          _buildTextField(
-                            pointsController,
-                            "Enter Amount",
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                          ),
+                          'Enter Points:',
+                          _buildAmountField(pointsController, 'Enter Amount'),
                         ),
                         const SizedBox(height: 20),
                         SizedBox(
@@ -494,7 +548,7 @@ class _StarlineSingleDigitBetScreenState
                                     ),
                                   )
                                 : const Text(
-                                    "ADD BID",
+                                    'ADD BID',
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w600,
@@ -503,11 +557,16 @@ class _StarlineSingleDigitBetScreenState
                           ),
                         ),
                         const SizedBox(height: 18),
+                        if (_biddingClosed)
+                          Text(
+                            'Bidding is closed for this slot.',
+                            style: GoogleFonts.poppins(color: Colors.red),
+                          ),
                       ],
                     ),
                   ),
                   const Divider(thickness: 1),
-                  if (addedEntries.isNotEmpty)
+                  if (_addedEntries.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -517,7 +576,7 @@ class _StarlineSingleDigitBetScreenState
                         children: [
                           Expanded(
                             child: Text(
-                              "Digit",
+                              'Digit',
                               style: GoogleFonts.poppins(
                                 fontWeight: FontWeight.bold,
                               ),
@@ -525,7 +584,7 @@ class _StarlineSingleDigitBetScreenState
                           ),
                           Expanded(
                             child: Text(
-                              "Amount",
+                              'Amount',
                               style: GoogleFonts.poppins(
                                 fontWeight: FontWeight.bold,
                               ),
@@ -535,14 +594,14 @@ class _StarlineSingleDigitBetScreenState
                         ],
                       ),
                     ),
-                  if (addedEntries.isNotEmpty) const Divider(thickness: 1),
+                  if (_addedEntries.isNotEmpty) const Divider(thickness: 1),
                   Expanded(
-                    child: addedEntries.isEmpty
-                        ? const Center(child: Text("No data added yet"))
+                    child: _addedEntries.isEmpty
+                        ? const Center(child: Text('No data added yet'))
                         : ListView.builder(
-                            itemCount: addedEntries.length,
+                            itemCount: _addedEntries.length,
                             itemBuilder: (_, index) {
-                              final entry = addedEntries[index];
+                              final entry = _addedEntries[index];
                               return Padding(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 16,
@@ -578,7 +637,7 @@ class _StarlineSingleDigitBetScreenState
                             },
                           ),
                   ),
-                  if (addedEntries.isNotEmpty) _buildBottomBar(),
+                  if (_addedEntries.isNotEmpty) _buildBottomBar(),
                 ],
               ),
               if (_messageToShow != null)
@@ -636,7 +695,10 @@ class _StarlineSingleDigitBetScreenState
           child: TextFormField(
             controller: digitController,
             cursorColor: Colors.orange,
-            keyboardType: TextInputType.number,
+            keyboardType: const TextInputType.numberWithOptions(
+              signed: false,
+              decimal: false,
+            ),
             style: GoogleFonts.poppins(fontSize: 14),
             inputFormatters: [
               LengthLimitingTextInputFormatter(1),
@@ -645,7 +707,7 @@ class _StarlineSingleDigitBetScreenState
             onTap: _clearMessage,
             enabled: !_isApiCalling,
             decoration: InputDecoration(
-              hintText: "Enter Digit",
+              hintText: 'Enter Digit',
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 0,
@@ -686,14 +748,14 @@ class _StarlineSingleDigitBetScreenState
             child: ListView.builder(
               padding: EdgeInsets.zero,
               shrinkWrap: true,
-              itemCount: filteredDigitOptions.length,
+              itemCount: _filteredDigitOptions.length,
               itemBuilder: (context, index) {
                 return ListTile(
                   dense: true,
-                  title: Text(filteredDigitOptions[index]),
+                  title: Text(_filteredDigitOptions[index]),
                   onTap: () {
                     setState(() {
-                      digitController.text = filteredDigitOptions[index];
+                      digitController.text = _filteredDigitOptions[index];
                       _isDigitSuggestionsVisible = false;
                       FocusScope.of(context).unfocus();
                     });
@@ -706,20 +768,19 @@ class _StarlineSingleDigitBetScreenState
     );
   }
 
-  Widget _buildTextField(
-    TextEditingController controller,
-    String hint, {
-    List<TextInputFormatter>? inputFormatters,
-  }) {
+  Widget _buildAmountField(TextEditingController controller, String hint) {
     return SizedBox(
       width: 150,
       height: 35,
       child: TextFormField(
         controller: controller,
         cursorColor: Colors.orange,
-        keyboardType: TextInputType.number,
+        keyboardType: const TextInputType.numberWithOptions(
+          signed: false,
+          decimal: false,
+        ),
         style: GoogleFonts.poppins(fontSize: 14),
-        inputFormatters: inputFormatters,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         onTap: _clearMessage,
         enabled: !_isApiCalling,
         decoration: InputDecoration(
@@ -748,8 +809,8 @@ class _StarlineSingleDigitBetScreenState
   }
 
   Widget _buildBottomBar() {
-    int totalBids = addedEntries.length;
-    int totalPoints = _getTotalPoints();
+    final totalBids = _addedEntries.length;
+    final totalPoints = _getTotalPoints();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -767,50 +828,14 @@ class _StarlineSingleDigitBetScreenState
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Bids',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                ),
-              ),
-              Text(
-                '$totalBids',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Points',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                ),
-              ),
-              Text(
-                '$totalPoints',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
+          _stat('Bids', '$totalBids'),
+          _stat('Points', '$totalPoints'),
           ElevatedButton(
-            onPressed: (_isApiCalling || addedEntries.isEmpty)
+            onPressed: (_isApiCalling || _addedEntries.isEmpty)
                 ? null
                 : _showConfirmationDialog,
             style: ElevatedButton.styleFrom(
-              backgroundColor: (_isApiCalling || addedEntries.isEmpty)
+              backgroundColor: (_isApiCalling || _addedEntries.isEmpty)
                   ? Colors.grey
                   : Colors.orange,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -838,6 +863,22 @@ class _StarlineSingleDigitBetScreenState
           ),
         ],
       ),
+    );
+  }
+
+  Widget _stat(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[700]),
+        ),
+        Text(
+          value,
+          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+      ],
     );
   }
 }

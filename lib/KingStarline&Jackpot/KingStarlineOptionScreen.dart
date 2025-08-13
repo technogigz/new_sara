@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:new_sara/KingStarline&Jackpot/games/StarlineDoublePana.dart';
 import 'package:new_sara/KingStarline&Jackpot/games/StarlineSPDPTPScreen.dart';
 import 'package:new_sara/KingStarline&Jackpot/games/StarlineSPMotorsScreen.dart';
 import 'package:new_sara/KingStarline&Jackpot/games/StarlineSinglePana.dart';
@@ -13,8 +14,8 @@ import '../Helper/TranslationHelper.dart';
 import '../Helper/UserController.dart';
 import '../ulits/Constents.dart';
 import 'games/StarlineDPMotorsScreen.dart';
-import 'games/StarlineDoublePana.dart';
 import 'games/StarlineOddEvenBoardScreen.dart';
+import 'games/StarlineSingleDigit.dart';
 import 'games/StarlineTriplePana.dart';
 
 // Class to model a bid type option for King Starline games.
@@ -397,11 +398,12 @@ class _KingStarlineOptionScreenState extends State<KingStarlineOptionScreen> {
             break;
 
           case 'doublepana':
-            destinationScreen = StarlineDPMotorsScreen(
+            destinationScreen = StarlineDoublePanaBetScreen(
               title: nextScreenTitle,
               gameId: widget.starlineGameId,
               gameName: item.title,
               gameCategoryType: item.type,
+              selectionStatus: true,
             );
             break;
 

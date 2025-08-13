@@ -1,29 +1,28 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer'; // For log
+import 'dart:developer';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // For TextInputFormatter
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
-import 'package:google_fonts/google_fonts.dart'; // For GoogleFonts
+import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart'; // Import for date formatting
+import 'package:intl/intl.dart';
 import 'package:marquee/marquee.dart';
 
-import '../../BidService.dart'; // Import BidService (ensure this path is correct)
 import '../../Helper/UserController.dart';
-import '../../components/AnimatedMessageBar.dart'; // Ensure this path is correct
-import '../../components/BidConfirmationDialog.dart'; // Ensure this path is correct
-import '../../components/BidFailureDialog.dart'; // For API failure dialog (ensure this path is correct)
+import '../../components/AnimatedMessageBar.dart';
+import '../../components/BidConfirmationDialog.dart';
+import '../../components/BidFailureDialog.dart';
 import '../../components/BidSuccessDialog.dart';
-import '../../ulits/Constents.dart'; // For API success dialog (ensure this path is correct)
+import '../../ulits/Constents.dart';
 
 class SpDpTpBoardScreen extends StatefulWidget {
-  final String screenTitle;
-  final int gameId;
-  final String gameType;
-  final bool openSessionStatus;
+  final String screenTitle; // e.g., "RADHA NIGHT, SP DP TP"
+  final int gameId; // e.g., 26
+  final String gameType; // e.g., "SPDPTP"
+  final bool openSessionStatus; // if OPEN session available
 
   const SpDpTpBoardScreen({
     Key? key,
@@ -38,338 +37,425 @@ class SpDpTpBoardScreen extends StatefulWidget {
 }
 
 class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
+  // Inputs
   final TextEditingController _pointsController = TextEditingController();
-  final TextEditingController _pannaController = TextEditingController();
+  final TextEditingController _digitController =
+      TextEditingController(); // single digit 0-9
 
-  bool _isSPSelected = false;
-  bool _isDPSelected = false;
-  bool _isTPSelected = false;
+  // Category toggles (mutually exclusive)
+  bool _isSP = true;
+  bool _isDP = false;
+  bool _isTP = false;
 
-  String? _selectedGameTypeOption;
+  // Session dropdown
+  String? _session; // "OPEN" | "CLOSE"
 
-  List<Map<String, String>> _bids = [];
+  // Bids list: { digit(3), amount, gameType(SP/DP/TP), session(OPEN/CLOSE) }
+  final List<Map<String, String>> _bids = [];
 
-  late int walletBalance;
+  // Services / State
+  final storage = GetStorage();
+  final UserController userController = Get.isRegistered<UserController>()
+      ? Get.find<UserController>()
+      : Get.put(UserController());
+
   late String accessToken;
   late String registerId;
-  late String preferredLanguage;
-  bool accountStatus = false;
-  final GetStorage storage = GetStorage();
+  late bool accountStatus;
+  late int walletBalance;
 
-  late BidService _bidService;
-  final UserController userController = Get.put(UserController());
-
-  final String _deviceId = GetStorage().read('deviceId') ?? '';
-  final String _deviceName = GetStorage().read('deviceName') ?? '';
-
-  String? _messageToShow;
-  bool _isErrorForMessage = false;
-  Key _messageBarKey = UniqueKey();
-  Timer? _messageDismissTimer;
+  late final String _deviceId = storage.read('deviceId') ?? '';
+  late final String _deviceName = storage.read('deviceName') ?? '';
 
   bool _isApiCalling = false;
+
+  // Message bar
+  String? _msg;
+  bool _msgErr = false;
+  Key _msgKey = UniqueKey();
+  Timer? _msgTimer;
 
   @override
   void initState() {
     super.initState();
-    _bidService = BidService(storage);
-    _loadInitialData();
-
-    double _walletBalance = double.parse(userController.walletBalance.value);
-    walletBalance = _walletBalance.toInt();
-
-    // Set initial dropdown value based on session status
-    if (widget.openSessionStatus) {
-      _selectedGameTypeOption = 'OPEN';
-    } else {
-      _selectedGameTypeOption = 'CLOSE';
-    }
+    _loadInitial();
   }
 
-  Future<void> _loadInitialData() async {
+  Future<void> _loadInitial() async {
     accessToken = storage.read('accessToken') ?? '';
     registerId = storage.read('registerId') ?? '';
     accountStatus = userController.accountStatus.value;
-    preferredLanguage = storage.read('selectedLanguage') ?? 'en';
+    final num? bal = num.tryParse(userController.walletBalance.value);
+    walletBalance = bal?.toInt() ?? 0;
+
+    // default session
+    _session = widget.openSessionStatus ? 'OPEN' : 'CLOSE';
+    setState(() {});
   }
 
   @override
   void dispose() {
     _pointsController.dispose();
-    _pannaController.dispose();
-    _messageDismissTimer?.cancel();
+    _digitController.dispose();
+    _msgTimer?.cancel();
     super.dispose();
   }
 
-  void _showMessage(String message, {bool isError = false}) {
-    _messageDismissTimer?.cancel();
-    if (!mounted) return;
+  // --- helpers ---
+  void _showMsg(String m, {bool err = false}) {
+    _msgTimer?.cancel();
     setState(() {
-      _messageToShow = message;
-      _isErrorForMessage = isError;
-      _messageBarKey = UniqueKey();
+      _msg = m;
+      _msgErr = err;
+      _msgKey = UniqueKey();
     });
-    _messageDismissTimer = Timer(const Duration(seconds: 3), () {
-      _clearMessage();
+    _msgTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _msg = null);
     });
   }
 
-  void _clearMessage() {
-    if (mounted) {
+  void _clearMsg() {
+    if (!mounted) return;
+    setState(() => _msg = null);
+  }
+
+  String? _selectedCategory() {
+    if (_isSP) return 'SP';
+    if (_isDP) return 'DP';
+    if (_isTP) return 'TP';
+    return null;
+  }
+
+  int _totalPoints() =>
+      _bids.fold(0, (s, e) => s + (int.tryParse(e['amount'] ?? '0') ?? 0));
+
+  // --- API: bulk expand SP/DP/TP by a single digit into pannas ---
+  Future<List<String>> _fetchBulk({
+    required String category, // SP|DP|TP
+    required int seed, // 0..9
+    required int amount, // server may ignore
+    required String session, // open|close
+  }) async {
+    final String endpoint = category == 'SP'
+        ? 'single-pana-bulk'
+        : category == 'DP'
+        ? 'double-pana-bulk'
+        : 'triple-pana-bulk';
+
+    final headers = {
+      'deviceId': _deviceId,
+      'deviceName': _deviceName,
+      'accessStatus': accountStatus ? '1' : '0',
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $accessToken',
+    };
+
+    final body = jsonEncode({
+      "game_id": widget.gameId.toString(),
+      "register_id": registerId,
+      "session_type": session, // MUST be "open"/"close"
+      "digit": seed,
+      "amount": amount,
+    });
+
+    final uri = Uri.parse('${Constant.apiEndpoint}$endpoint');
+    final resp = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(const Duration(seconds: 25));
+    final map = jsonDecode(resp.body);
+
+    log(
+      '[BULK $category] $session seed=$seed → ${resp.statusCode} | $map',
+      name: 'SPDPTP',
+    );
+
+    if (resp.statusCode == 200 && map['status'] == true) {
+      final List<dynamic> info = (map['info'] ?? []) as List<dynamic>;
+      return info
+          .map((e) => e['pana']?.toString())
+          .whereType<String>()
+          .where((s) => s.length == 3)
+          .toList();
+    } else {
+      final msg = map['msg']?.toString() ?? 'Failed to fetch bulk pannas';
+      throw Exception(msg);
+    }
+  }
+
+  // --- Add flow ---
+  Future<void> _onAdd() async {
+    _clearMsg();
+    if (_isApiCalling) return;
+
+    final cat = _selectedCategory();
+    if (cat == null) {
+      _showMsg('Please select SP, DP or TP.', err: true);
+      return;
+    }
+    if (_session == null) {
+      _showMsg('Select session OPEN/CLOSE.', err: true);
+      return;
+    }
+    final dTxt = _digitController.text.trim();
+    final pTxt = _pointsController.text.trim();
+
+    if (dTxt.isEmpty || dTxt.length != 1 || int.tryParse(dTxt) == null) {
+      _showMsg('Enter a single digit (0-9).', err: true);
+      return;
+    }
+    final seed = int.parse(dTxt);
+    if (seed < 0 || seed > 9) {
+      _showMsg('Digit must be from 0 to 9.', err: true);
+      return;
+    }
+
+    final pts = int.tryParse(pTxt);
+    if (pts == null || pts < 10 || pts > 1000) {
+      _showMsg('Points must be between 10 and 1000.', err: true);
+      return;
+    }
+
+    if (accessToken.isEmpty || registerId.isEmpty) {
+      _showMsg('Authentication error. Please log in again.', err: true);
+      return;
+    }
+
+    setState(() => _isApiCalling = true);
+    try {
+      // bulk API expects open/close
+      final pannas = await _fetchBulk(
+        category: cat,
+        seed: seed,
+        amount: pts,
+        session: _session!.toLowerCase(),
+      );
+
+      if (pannas.isEmpty) {
+        _showMsg('No panna found for the selection.', err: true);
+      } else {
+        // merge by (panna + category + session)
+        setState(() {
+          for (final p in pannas) {
+            final idx = _bids.indexWhere(
+              (e) =>
+                  e['digit'] == p &&
+                  e['gameType'] == cat &&
+                  e['session'] == _session,
+            );
+            if (idx != -1) {
+              final curr = int.tryParse(_bids[idx]['amount'] ?? '0') ?? 0;
+              _bids[idx]['amount'] = (curr + pts).toString();
+            } else {
+              _bids.add({
+                'digit': p,
+                'amount': pts.toString(),
+                'gameType': cat, // SP|DP|TP
+                'session': _session!, // OPEN|CLOSE
+              });
+            }
+          }
+        });
+        _showMsg('Added ${pannas.length} bid(s).');
+      }
+    } catch (e) {
+      _showMsg(e.toString(), err: true);
+    } finally {
+      if (!mounted) return;
       setState(() {
-        _messageToShow = null;
+        _isApiCalling = false;
+        _digitController.clear();
+        _pointsController.clear();
       });
     }
   }
 
-  int _getTotalPoints() {
-    return _bids.fold(
-      0,
-      (sum, item) => sum + (int.tryParse(item['amount'] ?? '0') ?? 0),
-    );
+  void _remove(int index) {
+    if (_isApiCalling) return;
+    final removed = _bids[index];
+    setState(() => _bids.removeAt(index));
+    _showMsg('Removed ${removed['digit']} (${removed['gameType']})');
   }
 
-  void _showConfirmationDialog() {
-    _clearMessage();
+  // --- Confirm & Submit ---
+  void _confirm() {
+    _clearMsg();
     if (_isApiCalling) return;
+
     if (_bids.isEmpty) {
-      _showMessage('Please add bids before submitting.', isError: true);
+      _showMsg('Please add at least one bid.', err: true);
       return;
     }
 
-    int currentTotalPoints = _getTotalPoints();
-
-    if (walletBalance < currentTotalPoints) {
-      _showMessage(
-        'Insufficient wallet balance to place this bid.',
-        isError: true,
-      );
+    final int total = _totalPoints();
+    if (walletBalance < total) {
+      _showMsg('Insufficient wallet balance.', err: true);
       return;
     }
 
-    final List<Map<String, String>> validBids = _bids
-        .where((bid) {
-          return bid['digit'] != null &&
-              bid['digit']!.isNotEmpty &&
-              bid['amount'] != null &&
-              bid['amount']!.isNotEmpty &&
-              bid['gameType'] != null &&
-              bid['gameType']!.isNotEmpty;
-        })
-        .map((bid) {
-          return {
-            'digit': bid['digit']!,
-            'points': bid['amount']!,
-            'type': bid['gameType']!,
-            'pana': bid['digit']!,
-            'jodi': '',
-          };
-        })
+    final rows = _bids
+        .map(
+          (b) => {
+            "digit": b['digit']!,
+            "points": b['amount']!,
+            "type": "${b['gameType']} (${b['session']})",
+            "pana": b['digit']!,
+            "jodi": "",
+          },
+        )
         .toList();
-
-    if (validBids.isEmpty) {
-      _showMessage('No valid bids to submit.', isError: true);
-      return;
-    }
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return BidConfirmationDialog(
-          gameTitle: widget.screenTitle,
-          bids: validBids,
-          totalBids: validBids.length,
-          totalBidsAmount: currentTotalPoints,
-          walletBalanceBeforeDeduction: walletBalance,
-          walletBalanceAfterDeduction: (walletBalance - currentTotalPoints)
-              .toString(),
-          gameDate: DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now()),
-          gameId: widget.gameId.toString(),
-          gameType: widget.gameType,
-          onConfirm: () async {
-            // Navigator.pop(dialogContext); // Dismiss the confirmation dialog
-            setState(() {
-              _isApiCalling = true;
-            });
-            await _placeFinalBids();
-            if (mounted) {
-              setState(() {
-                _isApiCalling = false;
-              });
-            }
-          },
-        );
-      },
+      builder: (_) => BidConfirmationDialog(
+        gameTitle: widget.screenTitle,
+        gameDate: DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now()),
+        bids: rows,
+        totalBids: rows.length,
+        totalBidsAmount: total,
+        walletBalanceBeforeDeduction: walletBalance,
+        walletBalanceAfterDeduction: (walletBalance - total).toString(),
+        gameId: widget.gameId.toString(),
+        gameType: widget.gameType,
+        onConfirm: () async {
+          setState(() => _isApiCalling = true);
+          final ok = await _submit();
+          if (!mounted) return;
+          setState(() => _isApiCalling = false);
+          if (ok) setState(() => _bids.clear());
+        },
+      ),
     );
   }
 
-  Future<bool> _placeFinalBids() async {
-    final Map<String, String> bidPayload = {};
-    int currentBatchTotalPoints = _getTotalPoints();
+  Future<bool> _submit() async {
+    final headers = {
+      'deviceId': _deviceId,
+      'deviceName': _deviceName,
+      'accessStatus': accountStatus ? '1' : '0',
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $accessToken',
+    };
 
-    if (accessToken.isEmpty || registerId.isEmpty) {
-      if (!mounted) return false;
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const BidFailureDialog(
-          errorMessage: 'Authentication error. Please log in again.',
-        ),
-      );
-      return false;
-    }
+    final bidRows = _bids
+        .map(
+          (b) => {
+            "sessionType": b['session'], // OPEN/CLOSE
+            "digit": b['digit'], // 3-digit panna
+            "pana": b['digit'], // backend expects filled
+            "bidAmount": int.tryParse(b['amount'] ?? '0') ?? 0,
+          },
+        )
+        .toList();
 
-    for (var bid in _bids) {
-      String digit = bid["digit"] ?? "";
-      String amount = bid["amount"] ?? "0";
+    final int total = _totalPoints();
 
-      if (digit.isNotEmpty && int.tryParse(amount) != null) {
-        bidPayload[digit] = amount;
-      }
-    }
+    final body = jsonEncode({
+      "registerId": registerId,
+      "gameId": widget.gameId.toString(),
+      "bidAmount": total,
+      "gameType": widget.gameType, // "SPDPTP"
+      "bid": bidRows,
+    });
 
-    if (bidPayload.isEmpty) {
-      if (!mounted) return false;
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) =>
-            const BidFailureDialog(errorMessage: 'No valid bids to submit.'),
-      );
-      return false;
-    }
+    final url = '${Constant.apiEndpoint}place-bid';
+    log('[BidAPI] Headers: $headers');
+    log('[BidAPI] Body   : $body');
 
     try {
-      final result = await _bidService.placeFinalBids(
-        gameName: widget.screenTitle,
-        accessToken: accessToken,
-        registerId: registerId,
-        deviceId: _deviceId,
-        deviceName: _deviceName,
-        accountStatus: accountStatus,
-        bidAmounts: bidPayload,
-        selectedGameType: _selectedGameTypeOption!,
-        gameId: widget.gameId,
-        gameType: widget.gameType,
-        totalBidAmount: currentBatchTotalPoints,
+      final resp = await http.post(
+        Uri.parse(url),
+        headers: headers,
+        body: body,
       );
+      log('[BidAPI] HTTP ${resp.statusCode}');
+      final map = jsonDecode(resp.body);
+      log('[BidAPI] Resp: $map');
 
-      if (!mounted) return false;
-
-      if (result['status'] == true) {
+      if (resp.statusCode == 200 &&
+          (map['status'] == true || map['status'] == 'true')) {
+        final newBal = walletBalance - total;
+        await storage.write('walletBalance', newBal);
+        if (!mounted) return true;
+        setState(() => walletBalance = newBal);
         await showDialog(
           context: context,
           barrierDismissible: false,
           builder: (_) => const BidSuccessDialog(),
         );
-
-        final dynamic updatedBalanceRaw = result['updatedWalletBalance'];
-        final int updatedBalance =
-            int.tryParse(updatedBalanceRaw.toString()) ??
-            (walletBalance - currentBatchTotalPoints);
-        setState(() {
-          walletBalance = updatedBalance;
-          _bids.clear();
-        });
-        _bidService.updateWalletBalance(updatedBalance);
+        _clearMsg();
         return true;
       } else {
+        final msg =
+            map['msg']?.toString() ??
+            'Place bid failed. Please try again later.';
         await showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (_) => BidFailureDialog(
-            errorMessage: result['msg'] ?? 'Something went wrong',
-          ),
+          builder: (_) => BidFailureDialog(errorMessage: msg),
         );
         return false;
       }
     } catch (e) {
-      log('Error during bid placement: $e', name: 'SpDpTpBoardScreenBidError');
-      if (!mounted) return false;
-
       await showDialog(
         context: context,
         barrierDismissible: false,
         builder: (_) => const BidFailureDialog(
-          errorMessage: 'An unexpected error occurred during bid submission.',
+          errorMessage: 'Network error. Please check your internet connection.',
         ),
       );
       return false;
     }
   }
 
-  void _removeBid(int index) {
-    _clearMessage();
-    if (_isApiCalling) return;
-
-    setState(() {
-      final removedBid = _bids.removeAt(index);
-      _showMessage(
-        'Removed bid: ${removedBid['gameType']} ${removedBid['digit']}.',
-      );
-    });
-  }
-
+  // --- UI ---
   @override
   Widget build(BuildContext context) {
-    String marketName = widget.screenTitle.split(' - ')[0];
+    final marketName = widget.screenTitle.split(' - ').first;
 
-    // Determine the dropdown items dynamically
-    List<DropdownMenuItem<String>> dropdownItems = [];
+    // Build session dropdown items
+    final items = <DropdownMenuItem<String>>[];
     if (widget.openSessionStatus) {
-      dropdownItems.add(
-        DropdownMenuItem<String>(
+      items.add(
+        DropdownMenuItem(
           value: 'OPEN',
           child: SizedBox(
             width: 150,
             height: 20,
             child: Marquee(
               text: '$marketName OPEN',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: Colors.black, // Active color
-              ),
+              style: GoogleFonts.poppins(fontSize: 14, color: Colors.black),
               scrollAxis: Axis.horizontal,
-              blankSpace: 40.0,
-              velocity: 30.0,
+              blankSpace: 40,
+              velocity: 30,
               pauseAfterRound: const Duration(seconds: 1),
-              startPadding: 10.0,
-              accelerationDuration: const Duration(seconds: 1),
-              accelerationCurve: Curves.linear,
-              decelerationDuration: const Duration(milliseconds: 500),
-              decelerationCurve: Curves.easeOut,
             ),
           ),
         ),
       );
     }
-    // 'CLOSE' option is always added
-    dropdownItems.add(
-      DropdownMenuItem<String>(
+    items.add(
+      DropdownMenuItem(
         value: 'CLOSE',
         child: SizedBox(
           width: 150,
           height: 20,
           child: Marquee(
             text: '$marketName CLOSE',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              color: Colors.black, // Active color
-            ),
+            style: GoogleFonts.poppins(fontSize: 14, color: Colors.black),
             scrollAxis: Axis.horizontal,
-            blankSpace: 40.0,
-            velocity: 30.0,
+            blankSpace: 40,
+            velocity: 30,
             pauseAfterRound: const Duration(seconds: 1),
-            startPadding: 10.0,
-            accelerationDuration: const Duration(seconds: 1),
-            accelerationCurve: Curves.linear,
-            decelerationDuration: const Duration(milliseconds: 500),
-            decelerationCurve: Curves.easeOut,
           ),
         ),
       ),
     );
+
+    // Pre-calc footer values to avoid closure-prints
+    final int totalBids = _bids.length;
+    final int totalPoints = _totalPoints();
+    final bool canSubmit = !_isApiCalling && _bids.isNotEmpty;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -398,7 +484,7 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
           const SizedBox(width: 6),
           Center(
             child: Text(
-              userController.walletBalance.value,
+              walletBalance.toString(),
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -416,12 +502,13 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 12.0,
+                    horizontal: 16,
+                    vertical: 12,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Session
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -430,7 +517,7 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                             style: GoogleFonts.poppins(fontSize: 16),
                           ),
                           SizedBox(
-                            width: 150,
+                            width: 200,
                             height: 40,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
@@ -444,21 +531,20 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                               child: DropdownButtonHideUnderline(
                                 child: DropdownButton<String>(
                                   isExpanded: true,
-                                  value: _selectedGameTypeOption,
+                                  value: _session,
                                   icon: const Icon(
                                     Icons.keyboard_arrow_down,
                                     color: Colors.orange,
                                   ),
                                   onChanged: _isApiCalling
                                       ? null
-                                      : (String? newValue) {
+                                      : (v) {
                                           setState(() {
-                                            _selectedGameTypeOption = newValue;
-                                            _clearMessage();
+                                            _session = v;
+                                            _clearMsg();
                                           });
                                         },
-                                  items:
-                                      dropdownItems, // Use the dynamically built list
+                                  items: items,
                                 ),
                               ),
                             ),
@@ -466,23 +552,24 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
+
+                      // Category toggles
                       Row(
                         children: [
                           Expanded(
                             child: Row(
                               children: [
                                 Checkbox(
-                                  value: _isSPSelected,
+                                  value: _isSP,
                                   onChanged: _isApiCalling
                                       ? null
-                                      : (bool? value) {
+                                      : (v) {
                                           setState(() {
-                                            _isSPSelected = value!;
-                                            if (value) {
-                                              _isDPSelected = false;
-                                              _isTPSelected = false;
+                                            _isSP = v ?? false;
+                                            if (_isSP) {
+                                              _isDP = false;
+                                              _isTP = false;
                                             }
-                                            _clearMessage();
                                           });
                                         },
                                   activeColor: Colors.orange,
@@ -498,17 +585,16 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                             child: Row(
                               children: [
                                 Checkbox(
-                                  value: _isDPSelected,
+                                  value: _isDP,
                                   onChanged: _isApiCalling
                                       ? null
-                                      : (bool? value) {
+                                      : (v) {
                                           setState(() {
-                                            _isDPSelected = value!;
-                                            if (value) {
-                                              _isSPSelected = false;
-                                              _isTPSelected = false;
+                                            _isDP = v ?? false;
+                                            if (_isDP) {
+                                              _isSP = false;
+                                              _isTP = false;
                                             }
-                                            _clearMessage();
                                           });
                                         },
                                   activeColor: Colors.orange,
@@ -524,18 +610,16 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                             child: Row(
                               children: [
                                 Checkbox(
-                                  value: _isTPSelected,
+                                  value: _isTP,
                                   onChanged: _isApiCalling
                                       ? null
-                                      : (bool? value) {
-                                          if (value == null) return;
+                                      : (v) {
                                           setState(() {
-                                            _isTPSelected = value;
-                                            if (value) {
-                                              _isSPSelected = false;
-                                              _isDPSelected = false;
+                                            _isTP = v ?? false;
+                                            if (_isTP) {
+                                              _isSP = false;
+                                              _isDP = false;
                                             }
-                                            _clearMessage();
                                           });
                                         },
                                   activeColor: Colors.orange,
@@ -549,7 +633,10 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                           ),
                         ],
                       ),
+
                       const SizedBox(height: 16),
+
+                      // Digit
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -561,15 +648,17 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                             width: 150,
                             height: 40,
                             child: TextField(
+                              controller: _digitController,
                               cursorColor: Colors.orange,
-                              controller: _pannaController,
                               keyboardType: TextInputType.number,
                               inputFormatters: [
-                                LengthLimitingTextInputFormatter(3),
+                                LengthLimitingTextInputFormatter(1),
                                 FilteringTextInputFormatter.digitsOnly,
                               ],
+                              onTap: _clearMsg,
+                              enabled: !_isApiCalling,
                               decoration: const InputDecoration(
-                                hintText: 'Enter Single Digit',
+                                hintText: '0-9',
                                 contentPadding: EdgeInsets.symmetric(
                                   horizontal: 12,
                                 ),
@@ -595,13 +684,14 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                                   ),
                                 ),
                               ),
-                              onTap: _clearMessage,
-                              enabled: !_isApiCalling,
                             ),
                           ),
                         ],
                       ),
+
                       const SizedBox(height: 16),
+
+                      // Points
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -613,13 +703,15 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                             width: 150,
                             height: 40,
                             child: TextField(
-                              cursorColor: Colors.orange,
                               controller: _pointsController,
+                              cursorColor: Colors.orange,
                               keyboardType: TextInputType.number,
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly,
                                 LengthLimitingTextInputFormatter(4),
                               ],
+                              onTap: _clearMsg,
+                              enabled: !_isApiCalling,
                               decoration: const InputDecoration(
                                 hintText: 'Enter Amount',
                                 contentPadding: EdgeInsets.symmetric(
@@ -647,20 +739,20 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                                   ),
                                 ),
                               ),
-                              onTap: _clearMessage,
-                              enabled: !_isApiCalling,
                             ),
                           ),
                         ],
                       ),
+
                       const SizedBox(height: 15),
+
                       Align(
                         alignment: Alignment.centerRight,
                         child: SizedBox(
                           width: 150,
                           height: 45,
                           child: ElevatedButton(
-                            onPressed: _isApiCalling ? null : _addBid,
+                            onPressed: _isApiCalling ? null : _onAdd,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: _isApiCalling
                                   ? Colors.grey
@@ -676,7 +768,6 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                                   )
                                 : Text(
                                     "ADD",
-                                    textAlign: TextAlign.center,
                                     style: GoogleFonts.poppins(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w600,
@@ -690,44 +781,41 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                     ],
                   ),
                 ),
+
                 const Divider(thickness: 1),
+
                 if (_bids.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16.0,
-                      vertical: 8.0,
+                      horizontal: 16,
+                      vertical: 8,
                     ),
                     child: Row(
-                      children: [
+                      children: const [
                         Expanded(
                           child: Text(
                             'Digit',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
                         Expanded(
                           child: Text(
                             'Amount',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
                         Expanded(
                           child: Text(
                             'Game Type',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
-                        const SizedBox(width: 48),
+                        SizedBox(width: 48),
                       ],
                     ),
                   ),
                 if (_bids.isNotEmpty) const Divider(thickness: 1),
+
                 Expanded(
                   child: _bids.isEmpty
                       ? Center(
@@ -738,8 +826,8 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                         )
                       : ListView.builder(
                           itemCount: _bids.length,
-                          itemBuilder: (context, index) {
-                            final bid = _bids[index];
+                          itemBuilder: (_, i) {
+                            final b = _bids[i];
                             return Container(
                               margin: const EdgeInsets.symmetric(
                                 horizontal: 10,
@@ -760,29 +848,27 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                               ),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 16.0,
-                                  vertical: 8.0,
+                                  horizontal: 16,
+                                  vertical: 8,
                                 ),
                                 child: Row(
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        bid['digit']!,
+                                        b['digit']!,
                                         style: GoogleFonts.poppins(),
                                       ),
                                     ),
                                     Expanded(
                                       child: Text(
-                                        bid['amount']!,
+                                        b['amount']!,
                                         style: GoogleFonts.poppins(),
                                       ),
                                     ),
                                     Expanded(
                                       child: Text(
-                                        '${bid['gameType']}',
-                                        style: GoogleFonts.poppins(
-                                          color: Colors.green[700],
-                                        ),
+                                        '${b['gameType']} (${b['session']})',
+                                        style: GoogleFonts.poppins(),
                                       ),
                                     ),
                                     IconButton(
@@ -792,7 +878,7 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                                       ),
                                       onPressed: _isApiCalling
                                           ? null
-                                          : () => _removeBid(index),
+                                          : () => _remove(i),
                                     ),
                                   ],
                                 ),
@@ -801,352 +887,131 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                           },
                         ),
                 ),
-                if (_bids.isNotEmpty) _buildBottomBar(),
+
+                // ---------- FIXED FOOTER (matches your old design) ----------
+                if (_bids.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.3),
+                          spreadRadius: 2,
+                          blurRadius: 5,
+                          offset: const Offset(0, -3),
+                        ),
+                      ],
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(16),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        // Bids
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Bids',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '$totalBids',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Points
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Points',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '$totalPoints',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Submit button
+                        SizedBox(
+                          height: 46,
+                          child: ElevatedButton(
+                            onPressed: canSubmit ? _confirm : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: canSubmit
+                                  ? Colors.orange
+                                  : Colors.grey,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              elevation: 3,
+                            ),
+                            child: _isApiCalling
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Text(
+                                    'SUBMIT',
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
-            if (_messageToShow != null)
+
+            if (_msg != null)
               Positioned(
                 top: 0,
                 left: 0,
                 right: 0,
                 child: AnimatedMessageBar(
-                  key: _messageBarKey,
-                  message: _messageToShow!,
-                  isError: _isErrorForMessage,
-                  onDismissed: _clearMessage,
+                  key: _msgKey,
+                  message: _msg!,
+                  isError: _msgErr,
+                  onDismissed: _clearMsg,
                 ),
               ),
           ],
         ),
-      ),
-    );
-  }
-
-  Future<List<String>> singlePanaBulk({
-    required int digit,
-    required int amount,
-    required String sessionType,
-    required String gameId,
-    required String registerId,
-  }) async {
-    return await _fetchBulkPannaBids(
-      digit: digit,
-      amount: amount,
-      sessionType: sessionType,
-      apiEndpoint: '${Constant.apiEndpoint}single-pana-bulk',
-      gameId: gameId,
-      registerId: registerId,
-    );
-  }
-
-  Future<List<String>> doublePanaBulk({
-    required int digit,
-    required int amount,
-    required String sessionType,
-    required String gameId,
-    required String registerId,
-  }) async {
-    return await _fetchBulkPannaBids(
-      digit: digit,
-      amount: amount,
-      sessionType: sessionType,
-      apiEndpoint: '${Constant.apiEndpoint}double-pana-bulk',
-      gameId: gameId,
-      registerId: registerId,
-    );
-  }
-
-  Future<List<String>> triplePanaBulk({
-    required int digit,
-    required int amount,
-    required String sessionType,
-    required String gameId,
-    required String registerId,
-  }) async {
-    return await _fetchBulkPannaBids(
-      digit: digit,
-      amount: amount,
-      sessionType: sessionType,
-      apiEndpoint: '${Constant.apiEndpoint}triple-pana-bulk',
-      gameId: gameId,
-      registerId: registerId,
-    );
-  }
-
-  Future<List<String>> _fetchBulkPannaBids({
-    required int digit,
-    required int amount,
-    required String sessionType,
-    required String apiEndpoint,
-    required String gameId,
-    required String registerId,
-  }) async {
-    final uri = Uri.parse(apiEndpoint);
-    var deviceId = storage.read('deviceId')?.toString() ?? '';
-    var deviceName = storage.read('deviceName')?.toString() ?? '';
-    accessToken = storage.read('accessToken')?.toString() ?? '';
-    var accessStatus = storage.read('accountStatus') == true ? '1' : '0';
-
-    final headers = {
-      'deviceId': deviceId,
-      'deviceName': deviceName,
-      'accessStatus': accessStatus,
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $accessToken',
-    };
-
-    final body = jsonEncode({
-      "game_id": gameId,
-      "register_id": registerId,
-      "session_type": sessionType,
-      "digit": digit,
-      "amount": amount,
-    });
-
-    try {
-      final response = await http.post(uri, headers: headers, body: body);
-      final responseData = json.decode(response.body);
-
-      log("API Response from $apiEndpoint: $responseData");
-
-      if (response.statusCode == 200 && responseData['status'] == true) {
-        final List<dynamic> info = responseData['info'] ?? [];
-        return info.map<String>((item) => item['pana'].toString()).toList();
-      } else {
-        throw 'API Error: ${responseData['msg'] ?? 'Unknown error'}';
-      }
-    } catch (e) {
-      log("Error fetching panna bids from $apiEndpoint: $e");
-      throw 'Network/API Error: $e';
-    }
-  }
-
-  void _addBid() async {
-    if (!mounted) return;
-    _clearMessage();
-
-    if (_isApiCalling) return;
-
-    final digitText = _pannaController.text.trim();
-    final pointsText = _pointsController.text.trim();
-
-    String? gameCategory;
-    if (_isSPSelected) {
-      gameCategory = 'SP';
-    } else if (_isDPSelected) {
-      gameCategory = 'DP';
-    } else if (_isTPSelected) {
-      gameCategory = 'TP';
-    }
-
-    if (gameCategory == null) {
-      _showMessage('Please select SP, DP, or TP.', isError: true);
-      return;
-    }
-
-    if (digitText.isEmpty || digitText.length != 1) {
-      _showMessage('Please enter a valid single digit (0-9).', isError: true);
-      return;
-    }
-
-    final int? digit = int.tryParse(digitText);
-    if (digit == null || digit < 0 || digit > 9) {
-      _showMessage('Digit must be a number from 0 to 9.', isError: true);
-      return;
-    }
-
-    final int? points = int.tryParse(pointsText);
-    if (points == null || points < 10) {
-      _showMessage('Points must be at least 10.', isError: true);
-      return;
-    }
-
-    var sessionType = gameCategory.toLowerCase();
-    var gameId = widget.gameId.toString();
-    registerId = storage.read('registerId')?.toString() ?? '';
-
-    if (gameId.isEmpty || registerId.isEmpty) {
-      _showMessage(
-        'Game ID or Register ID missing. Cannot place bid.',
-        isError: true,
-      );
-      return;
-    }
-
-    if (mounted) setState(() => _isApiCalling = true);
-
-    try {
-      final String apiUrl;
-      switch (gameCategory) {
-        case 'SP':
-          apiUrl = '${Constant.apiEndpoint}single-pana-bulk';
-          break;
-        case 'DP':
-          apiUrl = '${Constant.apiEndpoint}double-pana-bulk';
-          break;
-        case 'TP':
-          apiUrl = '${Constant.apiEndpoint}triple-pana-bulk';
-          break;
-        default:
-          _showMessage('Invalid game category.', isError: true);
-          return;
-      }
-
-      final List<String> pannaList = await _fetchBulkPannaBids(
-        digit: digit,
-        amount: points,
-        sessionType: sessionType,
-        apiEndpoint: apiUrl,
-        gameId: gameId,
-        registerId: registerId,
-      );
-
-      if (!mounted) return;
-
-      int addedCount = 0;
-      List<String> successfullyAdded = [];
-      List<String> alreadyExist = [];
-      List<Map<String, String>> newBids = [];
-
-      for (String panna in pannaList) {
-        if (panna.isEmpty) continue;
-
-        bool exists = _bids.any(
-          (bid) =>
-              bid['digit'] == panna &&
-              bid['amount'] == points.toString() &&
-              bid['gameType'] == gameCategory,
-        );
-
-        if (!exists) {
-          newBids.add({
-            'digit': panna,
-            'amount': points.toString(),
-            'gameType': gameCategory,
-          });
-          successfullyAdded.add(panna);
-          addedCount++;
-        } else {
-          alreadyExist.add(panna);
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _bids.addAll(newBids);
-          _pannaController.clear();
-          _pointsController.clear();
-
-          if (addedCount > 0) {
-            _showMessage(
-              '$addedCount bids added for $gameCategory: ${successfullyAdded.join(", ")}.',
-            );
-            if (alreadyExist.isNotEmpty) {
-              log('Already existing pannas: ${alreadyExist.join(", ")}');
-            }
-          } else if (pannaList.isEmpty) {
-            _showMessage('No panna found for the selected digit and category.');
-          } else {
-            _showMessage('All fetched bids already exist.', isError: true);
-          }
-        });
-      }
-    } catch (e) {
-      log('Error in _addBid: $e', name: 'StarlineAddBidError');
-      if (mounted) {
-        _showMessage('Failed to add bids: $e', isError: true);
-      }
-    } finally {
-      if (mounted) setState(() => _isApiCalling = false);
-    }
-  }
-
-  Widget _buildBottomBar() {
-    int totalBids = _bids.length;
-    int totalPoints = _getTotalPoints();
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.3),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: const Offset(0, -3),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Bids',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                ),
-              ),
-              Text(
-                '$totalBids',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Points',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                ),
-              ),
-              Text(
-                '$totalPoints',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          ElevatedButton(
-            onPressed: _isApiCalling || _bids.isEmpty
-                ? null
-                : _showConfirmationDialog,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _isApiCalling || _bids.isEmpty
-                  ? Colors.grey
-                  : Colors.orange,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              elevation: 3,
-            ),
-            child: _isApiCalling
-                ? const CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    strokeWidth: 2,
-                  )
-                : Text(
-                    'SUBMIT',
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: 16,
-                    ),
-                  ),
-          ),
-        ],
       ),
     );
   }

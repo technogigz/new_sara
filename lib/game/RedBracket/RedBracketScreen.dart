@@ -1,5 +1,7 @@
+// lib/screens/red_bracket_board_screen.dart
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,19 +11,19 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
-import '../../BidService.dart';
 import '../../Helper/UserController.dart';
 import '../../components/AnimatedMessageBar.dart';
 import '../../components/BidConfirmationDialog.dart';
 import '../../components/BidFailureDialog.dart';
 import '../../components/BidSuccessDialog.dart';
+import '../../ulits/Constents.dart';
 
 enum BracketType { half, full }
 
 class RedBracketBoardScreen extends StatefulWidget {
   final String screenTitle;
   final int gameId;
-  final String gameType;
+  final String gameType; // "redBracket"
 
   const RedBracketBoardScreen({
     Key? key,
@@ -37,110 +39,128 @@ class RedBracketBoardScreen extends StatefulWidget {
 class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
   final TextEditingController _amountController = TextEditingController();
 
-  List<Map<String, String>> _bids = [];
+  // entries: { digit: "xy", points: "nn", source: "HALF" | "FULL" }
+  final List<Map<String, String>> _bids = [];
   BracketType _bracketType = BracketType.half;
 
-  late GetStorage storage = GetStorage();
-  late String _accessToken;
-  late String _registerId;
-  late String _preferredLanguage;
+  final GetStorage _storage = GetStorage();
+
+  String _accessToken = '';
+  String _registerId = '';
   bool _accountStatus = false;
-  late int _walletBalance;
-  bool _isApiCalling = false;
+  int _walletBalance = 0;
 
-  final String _deviceId = 'test_device_id_flutter';
-  final String _deviceName = 'test_device_name_flutter';
+  bool _isBusy = false;
 
-  late BidService _bidService;
+  String get _deviceId =>
+      _storage.read('deviceId')?.toString() ?? 'device_red_bracket';
+  String get _deviceName =>
+      _storage.read('deviceName')?.toString() ?? 'RedBracketScreen';
 
-  final UserController userController = Get.put(UserController());
+  final UserController userController = Get.isRegistered<UserController>()
+      ? Get.find<UserController>()
+      : Get.put(UserController());
 
+  // Message bar
   String? _messageToShow;
   bool _isErrorForMessage = false;
   Key _messageBarKey = UniqueKey();
+  Timer? _dismissTimer;
 
   @override
   void initState() {
     super.initState();
-    _loadInitialData();
-
-    _bidService = BidService(storage);
+    _initAuthAndWallet();
   }
 
-  Future<void> _loadInitialData() async {
-    _accessToken = storage.read('accessToken') ?? '';
-    _registerId = storage.read('registerId') ?? '';
-    _accountStatus = storage.read('accountStatus') ?? false;
-    _preferredLanguage = storage.read('selectedLanguage') ?? 'en';
+  Future<void> _initAuthAndWallet() async {
+    _accessToken = _storage.read('accessToken')?.toString() ?? '';
+    _registerId = _storage.read('registerId')?.toString() ?? '';
+    _accountStatus = userController.accountStatus.value;
 
-    double walletBalance = double.parse(userController.walletBalance.value);
-    _walletBalance = walletBalance.toInt();
+    final num? bal = num.tryParse(userController.walletBalance.value);
+    _walletBalance = bal?.toInt() ?? 0;
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
     _amountController.dispose();
+    _dismissTimer?.cancel();
     super.dispose();
   }
 
-  void _showMessage(String message, {bool isError = false}) {
+  // ---------------- message bar ----------------
+  void _showMessage(String msg, {bool isError = false}) {
+    _dismissTimer?.cancel();
     if (!mounted) return;
     setState(() {
-      _messageToShow = message;
+      _messageToShow = msg;
       _isErrorForMessage = isError;
       _messageBarKey = UniqueKey();
+    });
+    _dismissTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _messageToShow = null);
     });
   }
 
   void _clearMessage() {
-    if (mounted) {
-      setState(() {
-        _messageToShow = null;
+    if (!mounted) return;
+    setState(() => _messageToShow = null);
+  }
+
+  // ---------------- helpers ----------------
+  int _getTotalPoints() =>
+      _bids.fold(0, (s, e) => s + (int.tryParse(e['points'] ?? '0') ?? 0));
+
+  void _mergeOrAdd(String digit, int amount, String source) {
+    final i = _bids.indexWhere(
+      (b) => b['digit'] == digit && b['source'] == source,
+    );
+    if (i >= 0) {
+      final cur = int.tryParse(_bids[i]['points'] ?? '0') ?? 0;
+      _bids[i]['points'] = (cur + amount).toString();
+    } else {
+      _bids.add({
+        'digit': digit,
+        'points': amount.toString(),
+        'source': source,
       });
     }
   }
 
+  // ---------------- ADD (expand) ----------------
   Future<void> _addBid() async {
-    if (_isApiCalling) return;
+    if (_isBusy) return;
     _clearMessage();
 
-    final amount = _amountController.text.trim();
-
-    if (amount.isEmpty) {
-      _showMessage('Please enter an amount.', isError: true);
+    final txt = _amountController.text.trim();
+    final int? amt = int.tryParse(txt);
+    if (amt == null || amt < 10 || amt > 10000) {
+      _showMessage('Amount 10–10000 ke beech do.', isError: true);
       return;
     }
-
-    int? parsedAmount = int.tryParse(amount);
-
-    if (parsedAmount == null) {
-      _showMessage('Please enter a valid number for amount.', isError: true);
-      return;
-    }
-
-    String typeForApi = _bracketType == BracketType.half
-        ? "halfBracket"
-        : "fullBracket";
-    String gameTypeDisplay = _bracketType == BracketType.half
-        ? "HALF BRACKET"
-        : "FULL BRACKET";
-
-    setState(() {
-      _isApiCalling = true;
-    });
-
-    final String url = 'https://sara777.win/api/v1/red-bracket-jodi';
 
     if (_accessToken.isEmpty) {
-      _showMessage('Authentication error. Please log in again.', isError: true);
-      setState(() {
-        _isApiCalling = false;
-      });
+      _showMessage('Auth issue — login dobara karo.', isError: true);
       return;
     }
 
+    final String typeForApi = _bracketType == BracketType.half
+        ? 'halfBracket'
+        : 'fullBracket'; // <- API ko agar 'half'/'full' chahiye ho to yaha change karo
+    final String sourceLabel = _bracketType == BracketType.half
+        ? 'HALF'
+        : 'FULL';
+
+    final String base = Constant.apiEndpoint.endsWith('/')
+        ? Constant.apiEndpoint
+        : '${Constant.apiEndpoint}/';
+    final String url = '${base}red-bracket-jodi';
+
+    setState(() => _isBusy = true);
     try {
-      final response = await http.post(
+      final resp = await http.post(
         Uri.parse(url),
         headers: {
           'Content-Type': 'application/json',
@@ -149,218 +169,232 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
           'deviceName': _deviceName,
           'accessStatus': _accountStatus ? '1' : '0',
         },
-        body: jsonEncode({'type': typeForApi, 'amount': parsedAmount}),
+        body: jsonEncode({'type': typeForApi, 'amount': amt}),
       );
 
-      final responseBody = jsonDecode(response.body);
+      final Map<String, dynamic> data = json.decode(resp.body);
+      log('[RedBracket] expand HTTP ${resp.statusCode}');
+      log('[RedBracket] expand resp: $data');
 
-      if (response.statusCode == 200 && responseBody['status'] == true) {
-        final List<dynamic> newBidsFromApi = responseBody['info'];
-
-        setState(() {
-          for (var bidData in newBidsFromApi) {
-            String digit = bidData['pana'].toString();
-            String amount = bidData['amount'].toString();
-
-            // Find existing bid with the same digit and game type
-            int existingIndex = _bids.indexWhere(
-              (bid) =>
-                  bid['digit'] == digit && bid['gameType'] == gameTypeDisplay,
+      if (resp.statusCode == 200 && data['status'] == true) {
+        final List<dynamic> info = data['info'] ?? [];
+        if (info.isEmpty) {
+          _showMessage('Server se koi jodi/pana nahi aaya.', isError: true);
+        } else {
+          // Wallet guard: tentative total check
+          final temp = List<Map<String, String>>.from(_bids);
+          for (final it in info) {
+            final d = it['pana']?.toString() ?? '';
+            final a = int.tryParse(it['amount']?.toString() ?? '0') ?? 0;
+            if (d.isEmpty || a <= 0) continue;
+            final idx = temp.indexWhere(
+              (e) => e['digit'] == d && e['source'] == sourceLabel,
             );
-
-            if (existingIndex != -1) {
-              // If bid already exists, update its amount
-              _bids[existingIndex]['amount'] = amount;
+            if (idx >= 0) {
+              final cur = int.tryParse(temp[idx]['points'] ?? '0') ?? 0;
+              temp[idx]['points'] = (cur + a).toString();
             } else {
-              // Otherwise, add a new bid
-              _bids.add({
-                "digit": digit,
-                "amount": amount,
-                "gameType": gameTypeDisplay,
+              temp.add({
+                'digit': d,
+                'points': a.toString(),
+                'source': sourceLabel,
               });
             }
           }
-          _showMessage(
-            'Bids added/updated successfully from API.',
-            isError: false,
+          final newTotal = temp.fold(
+            0,
+            (s, e) => s + (int.tryParse(e['points'] ?? '0') ?? 0),
           );
-        });
-
-        _amountController.clear();
+          if (_walletBalance > 0 && newTotal > _walletBalance) {
+            _showMessage(
+              'Itna add karoge to total wallet se zyada ho jayega.',
+              isError: true,
+            );
+          } else {
+            setState(() {
+              for (final it in info) {
+                final d = it['pana']?.toString() ?? '';
+                final a = int.tryParse(it['amount']?.toString() ?? '0') ?? 0;
+                if (d.isNotEmpty && a > 0) _mergeOrAdd(d, a, sourceLabel);
+              }
+              _amountController.clear();
+            });
+            _showMessage('Bids add ho gaye.', isError: false);
+          }
+        }
       } else {
-        String errorMessage = responseBody['msg'] ?? 'Failed to add bid.';
-        _showMessage(errorMessage, isError: true);
+        _showMessage(data['msg']?.toString() ?? 'Add failed.', isError: true);
       }
     } catch (e) {
-      _showMessage('An error occurred: $e', isError: true);
+      _showMessage('Network error. Thodi der baad try karo.', isError: true);
     } finally {
-      if (mounted) {
-        setState(() {
-          _isApiCalling = false;
-        });
-      }
+      if (mounted) setState(() => _isBusy = false);
     }
   }
 
   void _removeBid(int index) {
-    if (_isApiCalling) return;
-    _clearMessage();
-    setState(() {
-      final removedDigit = _bids[index]['digit'];
-      _bids.removeAt(index);
-      _showMessage('Bid for Digit $removedDigit removed from list.');
-    });
+    if (_isBusy) return;
+    final removed = _bids[index]['digit'];
+    setState(() => _bids.removeAt(index));
+    _showMessage('Removed $removed.');
   }
 
-  int _getTotalAmount() {
-    return _bids.fold(
-      0,
-      (sum, item) => sum + (int.tryParse(item['amount'] ?? '0') ?? 0),
-    );
-  }
-
-  void _showConfirmationDialog() {
+  // ---------------- SUBMIT ----------------
+  void _openConfirmDialog() {
     _clearMessage();
-    if (_isApiCalling) return;
+    if (_isBusy) return;
 
     if (_bids.isEmpty) {
-      _showMessage('Please add at least one bid.', isError: true);
+      _showMessage('Pehle kuch bids add karo.', isError: true);
       return;
     }
 
-    final int totalPoints = _getTotalAmount();
-
-    if (_walletBalance < totalPoints) {
-      _showMessage(
-        'Insufficient wallet balance to place this bid.',
-        isError: true,
-      );
+    final total = _getTotalPoints();
+    if (_walletBalance < total) {
+      _showMessage('Wallet balance kam hai.', isError: true);
       return;
     }
 
-    List<Map<String, String>> bidsForDialog = _bids.map((bid) {
-      return {
-        "digit": bid['digit']!,
-        "pana": "",
-        "points": bid['amount']!,
-        "type": bid['gameType']!,
-        "jodi": bid['digit']!,
-      };
-    }).toList();
+    // Dialog rows: Digits = pana, Points = amount, Game Type = RED BRACKET (HALF/FULL)
+    final bidsForDialog = _bids
+        .map(
+          (b) => {
+            'digit': b['digit']!,
+            'pana': b['digit']!,
+            'points': b['points']!,
+            'type': 'RED BRACKET (${b['source']})',
+            'jodi': b['digit']!,
+          },
+        )
+        .toList();
 
-    final String formattedDate = DateFormat(
-      'dd MMM yyyy, hh:mm a',
-    ).format(DateTime.now());
+    final when = DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now());
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return BidConfirmationDialog(
-          gameTitle: widget.screenTitle,
-          gameDate: formattedDate,
-          bids: bidsForDialog,
-          totalBids: bidsForDialog.length,
-          totalBidsAmount: totalPoints,
-          walletBalanceBeforeDeduction: _walletBalance,
-          walletBalanceAfterDeduction: (_walletBalance - totalPoints)
-              .toString(),
-          gameId: widget.gameId.toString(),
-          gameType: widget.gameType,
-          onConfirm: () async {
-            setState(() {
-              _isApiCalling = true;
-            });
-            bool success = await _placeFinalBids();
-            if (success) {
-              setState(() {
-                _bids.clear();
-              });
-            }
-            if (mounted) {
-              setState(() {
-                _isApiCalling = false;
-              });
-            }
-          },
-        );
-      },
+      builder: (_) => BidConfirmationDialog(
+        gameTitle: widget.screenTitle,
+        gameDate: when,
+        bids: bidsForDialog,
+        totalBids: bidsForDialog.length,
+        totalBidsAmount: total,
+        walletBalanceBeforeDeduction: _walletBalance,
+        walletBalanceAfterDeduction: (_walletBalance - total).toString(),
+        gameId: widget.gameId.toString(),
+        gameType: widget.gameType,
+        onConfirm: () async {
+          setState(() => _isBusy = true);
+          final ok = await _submitBids(total);
+          if (ok) setState(() => _bids.clear());
+          if (mounted) setState(() => _isBusy = false);
+        },
+      ),
     );
   }
 
-  Future<bool> _placeFinalBids() async {
+  Future<bool> _submitBids(int totalPoints) async {
     if (_accessToken.isEmpty || _registerId.isEmpty) {
-      if (mounted) {
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext dialogContext) {
-            return const BidFailureDialog(
-              errorMessage: 'Authentication error. Please log in again.',
-            );
-          },
-        );
-      }
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const BidFailureDialog(
+          errorMessage: 'Auth issue — login dobara karo.',
+        ),
+      );
       return false;
     }
 
-    Map<String, String> bidAmountsForService = {};
-    for (var bid in _bids) {
-      bidAmountsForService[bid['digit']!] = bid['amount']!;
-    }
+    final payload = {
+      "registerId": _registerId,
+      "gameId": widget.gameId, // int
+      "bidAmount": totalPoints,
+      "gameType": "redBracket",
+      "bid": _bids
+          .map(
+            (b) => {
+              "sessionType": "redBracket",
+              "digit": b['digit'],
+              "pana": b['digit'],
+              "bidAmount": int.tryParse(b['points'] ?? '0') ?? 0,
+            },
+          )
+          .toList(),
+    };
 
-    final response = await _bidService.placeFinalBids(
-      gameName: widget.screenTitle,
-      accessToken: _accessToken,
-      registerId: _registerId,
-      deviceId: _deviceId,
-      deviceName: _deviceName,
-      accountStatus: _accountStatus,
-      bidAmounts: bidAmountsForService,
-      selectedGameType: _bracketType == BracketType.half
-          ? "HALF BRACKET"
-          : "FULL BRACKET",
-      gameId: widget.gameId,
-      gameType: widget.gameType,
-      totalBidAmount: _getTotalAmount(),
-    );
+    final headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $_accessToken',
+      'deviceId': _deviceId,
+      'deviceName': _deviceName,
+      'accessStatus': _accountStatus ? '1' : '0',
+    };
 
-    if (response['status'] == true) {
-      int currentWallet = _walletBalance;
-      int deductedAmount = _getTotalAmount();
-      int newWalletBalance = currentWallet - deductedAmount;
-      await _bidService.updateWalletBalance(newWalletBalance);
+    log('[RedBracket] place-bid headers: $headers');
+    log('[RedBracket] place-bid body: $payload');
 
-      if (mounted) {
-        setState(() {
-          _walletBalance = newWalletBalance;
-        });
+    try {
+      final uri = Uri.parse(
+        '${Constant.apiEndpoint}${Constant.apiEndpoint.endsWith('/') ? '' : '/'}place-bid',
+      );
+      final resp = await http.post(
+        uri,
+        headers: headers,
+        body: jsonEncode(payload),
+      );
+      final Map<String, dynamic> data = json.decode(resp.body);
+
+      log('[RedBracket] place-bid HTTP ${resp.statusCode}');
+      log('[RedBracket] place-bid resp: $data');
+
+      if (resp.statusCode == 200 &&
+          (data['status'] == true || data['status'] == 'true')) {
+        final dynamic serverBal = data['updatedWalletBalance'];
+        final int newBal =
+            int.tryParse(serverBal?.toString() ?? '') ??
+            (_walletBalance - totalPoints);
+
+        await _storage.write('walletBalance', newBal.toString());
+        userController.walletBalance.value = newBal.toString();
+        setState(() => _walletBalance = newBal);
+
         await showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (BuildContext dialogContext) {
-            return const BidSuccessDialog();
-          },
+          builder: (_) => const BidSuccessDialog(),
         );
-      }
-      return true;
-    } else {
-      String errorMessage = response['msg'] ?? "Unknown error occurred.";
-      if (mounted) {
+        _clearMessage();
+        return true;
+      } else {
         await showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (BuildContext dialogContext) {
-            return BidFailureDialog(errorMessage: errorMessage);
-          },
+          builder: (_) => BidFailureDialog(
+            errorMessage:
+                data['msg']?.toString() ??
+                'Place bid failed. Please try again later.',
+          ),
         );
+        return false;
       }
+    } catch (e) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const BidFailureDialog(
+          errorMessage: 'Network error. Internet check karo.',
+        ),
+      );
       return false;
     }
   }
 
+  // ---------------- UI ----------------
   @override
   Widget build(BuildContext context) {
+    final totalBids = _bids.length;
+    final totalPoints = _getTotalPoints();
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -388,18 +422,20 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
             ),
             child: Row(
               children: [
-                const Icon(
-                  Icons.account_balance_wallet,
+                Image.asset(
+                  "assets/images/ic_wallet.png",
                   color: Colors.black,
-                  size: 20,
+                  height: 20,
                 ),
                 const SizedBox(width: 6),
-                Text(
-                  userController.walletBalance.value,
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                Obx(
+                  () => Text(
+                    userController.walletBalance.value,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
                   ),
                 ),
               ],
@@ -412,15 +448,16 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
           children: [
             Column(
               children: [
+                // Controls
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
                     children: [
                       Row(
                         children: [
-                          _buildBracketRadio(BracketType.half, 'Half Bracket'),
+                          _bracketRadio(BracketType.half, 'Half Bracket'),
                           const SizedBox(width: 20),
-                          _buildBracketRadio(BracketType.full, 'Full Bracket'),
+                          _bracketRadio(BracketType.full, 'Full Bracket'),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -436,10 +473,9 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
                           ),
                           const SizedBox(width: 16),
                           Expanded(
-                            child: _buildTextField(
+                            child: _amountField(
                               controller: _amountController,
                               hintText: 'Enter Amount',
-                              isAmountField: true,
                             ),
                           ),
                         ],
@@ -449,17 +485,24 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
                         width: double.infinity,
                         height: 45,
                         child: ElevatedButton(
-                          onPressed: _addBid,
+                          onPressed: _isBusy ? null : _addBid,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
+                            backgroundColor: _isBusy
+                                ? Colors.grey
+                                : Colors.orange,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(6),
                             ),
                           ),
-                          child: _isApiCalling
-                              ? const CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
+                          child: _isBusy
+                              ? const SizedBox(
+                                  height: 22,
+                                  width: 22,
+                                  child: CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                    strokeWidth: 2,
                                   ),
                                 )
                               : Text(
@@ -467,7 +510,7 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
                                   style: GoogleFonts.poppins(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.5,
+                                    letterSpacing: .5,
                                     fontSize: 16,
                                   ),
                                 ),
@@ -476,32 +519,47 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
                     ],
                   ),
                 ),
-                const Divider(thickness: 1, height: 1),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 8.0,
+
+                if (_bids.isNotEmpty) const Divider(thickness: 1, height: 1),
+                if (_bids.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8.0,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Digit',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            'Amount',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            'Type',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 24),
+                      ],
+                    ),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Digit',
-                        style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        'Amount',
-                        style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        'Game Type',
-                        style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(width: 24),
-                    ],
-                  ),
-                ),
-                const Divider(thickness: 1, height: 1),
+                if (_bids.isNotEmpty) const Divider(thickness: 1, height: 1),
+
+                // List
                 Expanded(
                   child: _bids.isEmpty
                       ? Center(
@@ -512,15 +570,15 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
                         )
                       : ListView.builder(
                           itemCount: _bids.length,
-                          itemBuilder: (context, index) {
-                            final bid = _bids[index];
-                            return _buildBidListItem(index, bid);
-                          },
+                          itemBuilder: (_, i) => _bidTile(i, _bids[i]),
                         ),
                 ),
-                if (_bids.isNotEmpty) _buildBottomBar(),
+
+                // Footer
+                if (_bids.isNotEmpty) _bottomBar(totalBids, totalPoints),
               ],
             ),
+
             if (_messageToShow != null)
               Positioned(
                 top: 0,
@@ -539,20 +597,15 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
     );
   }
 
-  Widget _buildBracketRadio(BracketType type, String label) {
+  // ---------------- small widgets ----------------
+  Widget _bracketRadio(BracketType type, String label) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Radio<BracketType>(
           value: type,
           groupValue: _bracketType,
-          onChanged: (BracketType? value) {
-            if (value != null) {
-              setState(() {
-                _bracketType = value;
-              });
-            }
-          },
+          onChanged: (v) => setState(() => _bracketType = v!),
           activeColor: Colors.orange,
         ),
         Text(label, style: GoogleFonts.poppins()),
@@ -560,33 +613,34 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
     );
   }
 
-  Widget _buildTextField({
+  Widget _amountField({
     required TextEditingController controller,
     required String hintText,
-    required bool isAmountField,
   }) {
     return TextField(
       controller: controller,
       keyboardType: TextInputType.number,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      decoration: InputDecoration(
-        hintText: hintText,
-        border: const OutlineInputBorder(
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+        LengthLimitingTextInputFormatter(5),
+      ],
+      decoration: const InputDecoration(
+        hintText: 'Enter Amount',
+        border: OutlineInputBorder(borderSide: BorderSide(color: Colors.black)),
+        enabledBorder: OutlineInputBorder(
           borderSide: BorderSide(color: Colors.black),
         ),
-        enabledBorder: const OutlineInputBorder(
-          borderSide: BorderSide(color: Colors.black),
-        ),
-        focusedBorder: const OutlineInputBorder(
+        focusedBorder: OutlineInputBorder(
           borderSide: BorderSide(color: Colors.orange, width: 2),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       ),
       onTap: _clearMessage,
+      enabled: !_isBusy,
     );
   }
 
-  Widget _buildBidListItem(int index, Map<String, String> bid) {
+  Widget _bidTile(int index, Map<String, String> bid) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -595,24 +649,23 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(child: Text(bid['digit']!, style: GoogleFonts.poppins())),
-          Expanded(child: Text(bid['amount']!, style: GoogleFonts.poppins())),
-          Expanded(child: Text(bid['gameType']!, style: GoogleFonts.poppins())),
+          Expanded(child: Text(bid['points']!, style: GoogleFonts.poppins())),
+          Expanded(
+            child: Text('RED ${bid['source']}', style: GoogleFonts.poppins()),
+          ),
           IconButton(
             icon: const Icon(Icons.delete, color: Colors.red),
-            onPressed: () => _removeBid(index),
+            onPressed: _isBusy ? null : () => _removeBid(index),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBottomBar() {
-    int totalBids = _bids.length;
-    int totalAmount = _getTotalAmount();
-
+  Widget _bottomBar(int totalBids, int totalPoints) {
+    final canSubmit = !_isBusy && _bids.isNotEmpty;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -629,12 +682,13 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Bids: ',
+                'Bids',
                 style: GoogleFonts.poppins(
-                  fontSize: 16,
+                  fontSize: 14,
                   color: Colors.grey[700],
                 ),
               ),
@@ -647,17 +701,18 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
               ),
             ],
           ),
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Total: ',
+                'Total',
                 style: GoogleFonts.poppins(
-                  fontSize: 16,
+                  fontSize: 14,
                   color: Colors.grey[700],
                 ),
               ),
               Text(
-                '$totalAmount',
+                '$totalPoints',
                 style: GoogleFonts.poppins(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -666,9 +721,9 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
             ],
           ),
           ElevatedButton(
-            onPressed: _showConfirmationDialog,
+            onPressed: canSubmit ? _openConfirmDialog : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange[700],
+              backgroundColor: canSubmit ? Colors.orange : Colors.grey,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

@@ -1,5 +1,6 @@
 // lib/screens/choice_sp_dp_tp_board_screen.dart
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
@@ -7,22 +8,24 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:marquee/marquee.dart';
-import 'package:new_sara/components/AnimatedMessageBar.dart';
-import 'package:new_sara/components/BidConfirmationDialog.dart';
-import 'package:new_sara/components/BidFailureDialog.dart';
-import 'package:new_sara/components/BidSuccessDialog.dart';
 
-import '../../BidService.dart';
 import '../../Helper/UserController.dart';
+import '../../components/AnimatedMessageBar.dart';
+import '../../components/BidConfirmationDialog.dart';
+import '../../components/BidFailureDialog.dart';
+import '../../components/BidSuccessDialog.dart';
+import '../../ulits/Constents.dart';
 
 class ChoiceSpDpTpBoardScreen extends StatefulWidget {
   final String screenTitle;
   final int gameId;
-  final String gameType;
+  final String
+  gameType; // e.g. "choicePannaSPDP" (adjust if backend expects something else)
   final String gameName;
-  final bool selectionStatus; // This will control the dropdown options
+  final bool selectionStatus; // if true => OPEN+ CLOSE, else only CLOSE
 
   const ChoiceSpDpTpBoardScreen({
     Key? key,
@@ -39,62 +42,61 @@ class ChoiceSpDpTpBoardScreen extends StatefulWidget {
 }
 
 class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
+  // inputs
   final TextEditingController _leftDigitController = TextEditingController();
   final TextEditingController _middleDigitController = TextEditingController();
   final TextEditingController _rightDigitController = TextEditingController();
   final TextEditingController _pointsController = TextEditingController();
 
-  bool _isSPSelected = false;
-  bool _isDPSelected = false;
-  bool _isTPSelected = false;
+  // category toggles (mutually exclusive)
+  bool _isSP = false;
+  bool _isDP = false;
+  bool _isTP = false;
 
-  String? _selectedGameTypeOption;
+  // session dropdown
+  String? _session; // "OPEN" | "CLOSE"
 
-  List<Map<String, String>> _bids = [];
+  /// bid item shape: { digit: '123', amount:'10', gameType:'SP|DP|TP', session:'OPEN|CLOSE' }
+  final List<Map<String, String>> _bids = [];
 
-  late String walletBalance;
+  // auth / state
   final GetStorage _storage = GetStorage();
+  final UserController userController = Get.isRegistered<UserController>()
+      ? Get.find<UserController>()
+      : Get.put(UserController());
+
   late String accessToken;
   late String registerId;
-  bool accountStatus = false;
-  late String preferredLanguage;
+  late bool accountStatus;
+  late int walletBalance;
 
+  // device
   final String _deviceId = 'test_device_id_flutter';
   final String _deviceName = 'test_device_name_flutter';
 
-  late BidService _bidService;
-
-  String? _messageToShow;
-  bool _isErrorForMessage = false;
-  Key _messageBarKey = UniqueKey();
-
+  // ui state
   bool _isApiCalling = false;
-
-  final UserController userController = Get.put(UserController());
+  String? _msg;
+  bool _msgErr = false;
+  Key _msgKey = UniqueKey();
+  Timer? _msgTimer;
 
   @override
   void initState() {
     super.initState();
-    // Set initial dropdown value based on widget.selectionStatus
-    if (widget.selectionStatus) {
-      _selectedGameTypeOption = 'OPEN';
-    } else {
-      _selectedGameTypeOption = 'CLOSE';
-    }
-
-    _loadInitialData();
-
-    _bidService = BidService(_storage);
+    _loadInitial();
   }
 
-  Future<void> _loadInitialData() async {
+  Future<void> _loadInitial() async {
     accessToken = _storage.read('accessToken') ?? '';
     registerId = _storage.read('registerId') ?? '';
     accountStatus = _storage.read('accountStatus') ?? false;
-    preferredLanguage = _storage.read('selectedLanguage') ?? 'en';
 
-    double _walletBalance = double.parse(userController.walletBalance.value);
-    walletBalance = _walletBalance.toInt().toString();
+    final num? bal = num.tryParse(userController.walletBalance.value);
+    walletBalance = bal?.toInt() ?? 0;
+
+    _session = widget.selectionStatus ? 'OPEN' : 'CLOSE';
+    setState(() {});
   }
 
   @override
@@ -103,338 +105,288 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
     _middleDigitController.dispose();
     _rightDigitController.dispose();
     _pointsController.dispose();
+    _msgTimer?.cancel();
     super.dispose();
   }
 
-  void _showMessage(String message, {bool isError = false}) {
+  // -------- helpers --------
+  void _showMsg(String m, {bool err = false}) {
+    _msgTimer?.cancel();
     setState(() {
-      _messageToShow = message;
-      _isErrorForMessage = isError;
-      _messageBarKey = UniqueKey();
+      _msg = m;
+      _msgErr = err;
+      _msgKey = UniqueKey();
     });
-    // Automatically clear the message after a few seconds
-    Timer(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() {
-          _messageToShow = null;
-        });
-      }
+    _msgTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _msg = null);
     });
   }
 
-  void _clearMessage() {
-    if (mounted) {
-      setState(() {
-        _messageToShow = null;
-      });
-    }
+  void _clearMsg() {
+    if (!mounted) return;
+    setState(() => _msg = null);
   }
 
-  bool _isValidSpPanna(String panna) {
-    if (panna.length != 3) return false;
-    Set<String> uniqueDigits = panna.split('').toSet();
-    return uniqueDigits.length == 3;
+  String? _selectedCategory() {
+    if (_isSP) return 'SP';
+    if (_isDP) return 'DP';
+    if (_isTP) return 'TP';
+    return null;
   }
 
-  bool _isValidDpPanna(String panna) {
-    if (panna.length != 3) return false;
-    List<String> digits = panna.split('');
-    digits.sort(); // Sort to easily check for two same digits
-    return (digits[0] == digits[1] && digits[1] != digits[2]) ||
-        (digits[0] != digits[1] && digits[1] == digits[2]);
+  bool _isValidSP(String p) => p.length == 3 && p.split('').toSet().length == 3;
+
+  bool _isValidDP(String p) {
+    if (p.length != 3) return false;
+    final d = p.split('')..sort();
+    return (d[0] == d[1] && d[1] != d[2]) || (d[0] != d[1] && d[1] == d[2]);
   }
 
-  bool _isValidTpPanna(String panna) {
-    if (panna.length != 3) return false;
-    return panna[0] == panna[1] && panna[1] == panna[2];
-  }
+  bool _isValidTP(String p) => p.length == 3 && p[0] == p[1] && p[1] == p[2];
 
-  void _addBid() {
-    _clearMessage();
+  int _totalPoints() =>
+      _bids.fold(0, (s, e) => s + (int.tryParse(e['amount'] ?? '0') ?? 0));
+
+  // -------- add bid --------
+  void _onAdd() {
+    _clearMsg();
     if (_isApiCalling) return;
 
-    log("ADD button pressed - entering _addBid");
-    final leftDigit = _leftDigitController.text.trim();
-    final middleDigit = _middleDigitController.text.trim();
-    final rightDigit = _rightDigitController.text.trim();
-    final points = _pointsController.text.trim();
+    final left = _leftDigitController.text.trim();
+    final middle = _middleDigitController.text.trim();
+    final right = _rightDigitController.text.trim();
+    final ptsTxt = _pointsController.text.trim();
 
-    if (leftDigit.isEmpty || middleDigit.isEmpty || rightDigit.isEmpty) {
-      _showMessage('Please enter all three digits.', isError: true);
+    if (left.isEmpty || middle.isEmpty || right.isEmpty) {
+      _showMsg('Please enter all three digits.', err: true);
       return;
     }
-    if (leftDigit.length != 1 ||
-        middleDigit.length != 1 ||
-        rightDigit.length != 1 ||
-        int.tryParse(leftDigit) == null ||
-        int.tryParse(middleDigit) == null ||
-        int.tryParse(rightDigit) == null) {
-      _showMessage(
-        'Please enter single digits for Left, Middle, and Right.',
-        isError: true,
+    if ([
+      left,
+      middle,
+      right,
+    ].any((d) => d.length != 1 || int.tryParse(d) == null)) {
+      _showMsg('Each digit must be a single number (0-9).', err: true);
+      return;
+    }
+
+    final panna = '$left$middle$right';
+
+    final cat = _selectedCategory();
+    if (cat == null) {
+      _showMsg('Please select SP, DP or TP.', err: true);
+      return;
+    }
+    if (_session == null) {
+      _showMsg('Please select OPEN/CLOSE.', err: true);
+      return;
+    }
+
+    // validate panna against category
+    final ok =
+        (cat == 'SP' && _isValidSP(panna)) ||
+        (cat == 'DP' && _isValidDP(panna)) ||
+        (cat == 'TP' && _isValidTP(panna));
+    if (!ok) {
+      _showMsg(
+        cat == 'SP'
+            ? 'SP must have 3 unique digits.'
+            : cat == 'DP'
+            ? 'DP must have exactly two same digits.'
+            : 'TP must have all 3 digits same.',
+        err: true,
       );
       return;
     }
 
-    final pannaInput = '$leftDigit$middleDigit$rightDigit';
-
-    int? parsedPoints = int.tryParse(points);
-    if (parsedPoints == null || parsedPoints < 10 || parsedPoints > 10000) {
-      _showMessage('Points must be between 10 and 10000.', isError: true);
+    final pts = int.tryParse(ptsTxt);
+    if (pts == null || pts < 10 || pts > 10000) {
+      _showMsg('Points must be between 10 and 10000.', err: true);
       return;
     }
 
-    String gameCategory = '';
-    int selectedCount = 0;
-    if (_isSPSelected) {
-      gameCategory = 'SP';
-      selectedCount++;
-    }
-    if (_isDPSelected) {
-      gameCategory = 'DP';
-      selectedCount++;
-    }
-    if (_isTPSelected) {
-      gameCategory = 'TP';
-      selectedCount++;
-    }
-
-    if (selectedCount == 0) {
-      _showMessage('Please select SP, DP, or TP.', isError: true);
-      return;
-    }
-    if (selectedCount > 1) {
-      _showMessage('Please select only one of SP, DP, or TP.', isError: true);
-      return;
-    }
-
-    bool isValidPanna = false;
-    if (gameCategory == 'SP') {
-      isValidPanna = _isValidSpPanna(pannaInput);
-      if (!isValidPanna) {
-        _showMessage('SP Panna must have 3 unique digits.', isError: true);
-        return;
-      }
-    } else if (gameCategory == 'DP') {
-      isValidPanna = _isValidDpPanna(pannaInput);
-      if (!isValidPanna) {
-        _showMessage(
-          'DP Panna must have two same digits and one different.',
-          isError: true,
-        );
-        return;
-      }
-    } else if (gameCategory == 'TP') {
-      isValidPanna = _isValidTpPanna(pannaInput);
-      if (!isValidPanna) {
-        _showMessage('TP Panna must have 3 identical digits.', isError: true);
-        return;
-      }
-    }
-
-    if (isValidPanna) {
-      setState(() {
-        bool alreadyExists = _bids.any(
-          (entry) =>
-              entry['digit'] == pannaInput &&
-              entry['gameType'] == gameCategory &&
-              entry['type'] == _selectedGameTypeOption,
-        );
-
-        if (!alreadyExists) {
-          log(
-            "Adding single bid: Digit-$pannaInput, Points-$points, Type-$_selectedGameTypeOption, GameType-$gameCategory",
-          );
-          _bids.add({
-            "digit": pannaInput,
-            "points": points,
-            "type": _selectedGameTypeOption!,
-            "gameType": gameCategory,
-          });
-          _leftDigitController.clear();
-          _middleDigitController.clear();
-          _rightDigitController.clear();
-          _pointsController.clear();
-          _isSPSelected = false; // Reset checkboxes
-          _isDPSelected = false; // Reset checkboxes
-          _isTPSelected = false; // Reset checkboxes
-          _showMessage(
-            'Bid added successfully for $gameCategory: $pannaInput.',
-          );
-        } else {
-          _showMessage(
-            'Panna $pannaInput already added for $gameCategory ($_selectedGameTypeOption).',
-            isError: true,
-          );
-        }
-      });
-    }
-  }
-
-  void _removeBid(int index) {
-    _clearMessage();
-    if (_isApiCalling) return;
-
-    setState(() {
-      final removedBid = _bids.removeAt(index);
-      _showMessage(
-        'Removed bid: ${removedBid['gameType']} ${removedBid['digit']}.',
-      );
-    });
-  }
-
-  int _getTotalPoints() {
-    return _bids.fold(
-      0,
-      (sum, item) => sum + (int.tryParse(item['points'] ?? '0') ?? 0),
+    // merge by (panna + category + session)
+    final i = _bids.indexWhere(
+      (e) =>
+          e['digit'] == panna &&
+          e['gameType'] == cat &&
+          e['session'] == _session,
     );
+    setState(() {
+      if (i != -1) {
+        final curr = int.tryParse(_bids[i]['amount'] ?? '0') ?? 0;
+        _bids[i]['amount'] = (curr + pts).toString();
+        _showMsg('Updated: $panna ($cat ${_session!})');
+      } else {
+        _bids.add({
+          'digit': panna,
+          'amount': pts.toString(),
+          'gameType': cat, // SP | DP | TP
+          'session': _session!, // OPEN | CLOSE
+        });
+        _showMsg('Added: $panna ($cat ${_session!})');
+      }
+      // keep category/session as-is; just clear fields
+      _leftDigitController.clear();
+      _middleDigitController.clear();
+      _rightDigitController.clear();
+      _pointsController.clear();
+    });
   }
 
-  void _showBidConfirmationDialog() {
-    _clearMessage();
+  void _remove(int index) {
+    if (_isApiCalling) return;
+    final r = _bids[index];
+    setState(() => _bids.removeAt(index));
+    _showMsg('Removed: ${r['digit']} (${r['gameType']} ${r['session']})');
+  }
+
+  // -------- confirm & submit --------
+  void _confirm() {
+    _clearMsg();
     if (_isApiCalling) return;
 
     if (_bids.isEmpty) {
-      _showMessage('Please add bids before submitting.', isError: true);
+      _showMsg('Please add bids before submitting.', err: true);
       return;
     }
 
-    final int currentTotalPoints = _getTotalPoints();
-    final int currentWalletBalance = int.tryParse(walletBalance) ?? 0;
-
-    if (currentWalletBalance < currentTotalPoints) {
-      _showMessage(
-        'Insufficient wallet balance to place this bid.',
-        isError: true,
-      );
+    final total = _totalPoints();
+    if (walletBalance < total) {
+      _showMsg('Insufficient wallet balance.', err: true);
       return;
     }
 
-    final List<Map<String, String>> bidsForDialog = _bids.map((bid) {
-      return {
-        'digit': bid['digit']!,
-        'points': bid['points']!,
-        'type': '${bid['gameType']} (${bid['type']})',
-      };
-    }).toList();
-
-    final String formattedDate = DateFormat(
-      'dd MMM yyyy, hh:mm a',
-    ).format(DateTime.now());
+    final rows = _bids
+        .map(
+          (b) => {
+            'digit': b['digit']!,
+            'points': b['amount']!,
+            'type': '${b['gameType']} (${b['session']})',
+            'pana': b['digit']!,
+            'jodi': '',
+          },
+        )
+        .toList();
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return BidConfirmationDialog(
-          gameTitle: widget.screenTitle,
-          gameDate: formattedDate,
-          bids: bidsForDialog,
-          totalBids: bidsForDialog.length,
-          totalBidsAmount: currentTotalPoints,
-          walletBalanceBeforeDeduction: currentWalletBalance,
-          walletBalanceAfterDeduction:
-              (currentWalletBalance - currentTotalPoints).toString(),
-          gameId: widget.gameId.toString(),
-          gameType: widget.gameType,
-          onConfirm: () async {
-            log('Bids Confirmed for API submission: $bidsForDialog');
-            // Navigator.pop(dialogContext); // Dismiss the confirmation dialog
-
-            setState(() {
-              _isApiCalling = true;
-            });
-
-            bool success = await _placeFinalBidsWithService();
-
-            if (success) {
-              setState(() {
-                _bids.clear();
-              });
-            }
-            if (mounted) {
-              setState(() {
-                _isApiCalling = false;
-              });
-            }
-          },
-        );
-      },
+      builder: (_) => BidConfirmationDialog(
+        gameTitle: widget.screenTitle,
+        gameDate: DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now()),
+        bids: rows,
+        totalBids: rows.length,
+        totalBidsAmount: total,
+        walletBalanceBeforeDeduction: walletBalance,
+        walletBalanceAfterDeduction: (walletBalance - total).toString(),
+        gameId: widget.gameId.toString(),
+        gameType: widget.gameType,
+        onConfirm: () async {
+          setState(() => _isApiCalling = true);
+          final ok = await _submit();
+          if (!mounted) return;
+          setState(() => _isApiCalling = false);
+          if (ok) setState(() => _bids.clear());
+        },
+      ),
     );
   }
 
-  Future<bool> _placeFinalBidsWithService() async {
-    Map<String, String> bidAmounts = {};
-    for (var bid in _bids) {
-      bidAmounts[bid['digit']!] = bid['points']!;
+  Future<bool> _submit() async {
+    if (accessToken.isEmpty || registerId.isEmpty) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const BidFailureDialog(
+          errorMessage: 'Authentication error. Please log in again.',
+        ),
+      );
+      return false;
     }
 
+    final headers = {
+      'deviceId': _deviceId,
+      'deviceName': _deviceName,
+      'accessStatus': accountStatus ? '1' : '0',
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $accessToken',
+    };
+
+    // IMPORTANT: send pana filled (equal to digit)
+    final bidRows = _bids
+        .map(
+          (b) => {
+            "sessionType": b['session'], // OPEN/CLOSE
+            "digit": b['digit'], // 3-digit
+            "pana": b['digit'], // must not be empty
+            "bidAmount": int.tryParse(b['amount'] ?? '0') ?? 0,
+          },
+        )
+        .toList();
+
+    final body = jsonEncode({
+      "registerId": registerId,
+      "gameId": widget.gameId.toString(),
+      "bidAmount": _totalPoints(),
+      "gameType": widget.gameType, // keep whatever your backend expects
+      "bid": bidRows,
+    });
+
+    final url = '${Constant.apiEndpoint}place-bid';
+    log('[BidAPI] Headers: $headers');
+    log('[BidAPI] Body   : $body');
+
     try {
-      final response = await _bidService.placeFinalBids(
-        gameName: widget.screenTitle,
-        accessToken: accessToken,
-        registerId: registerId,
-        deviceId: _deviceId,
-        deviceName: _deviceName,
-        accountStatus: accountStatus,
-        bidAmounts: bidAmounts,
-        selectedGameType: _selectedGameTypeOption!,
-        gameId: widget.gameId,
-        gameType: widget.gameType,
-        totalBidAmount: _getTotalPoints(),
+      final resp = await http.post(
+        Uri.parse(url),
+        headers: headers,
+        body: body,
       );
+      log('[BidAPI] HTTP ${resp.statusCode}');
+      final map = jsonDecode(resp.body);
+      log('[BidAPI] Resp: $map');
 
-      if (response['status'] == true) {
-        int newWalletBalance =
-            (int.tryParse(walletBalance) ?? 0) - _getTotalPoints();
-        await _bidService.updateWalletBalance(newWalletBalance);
-
-        if (mounted) {
-          setState(() {
-            walletBalance = newWalletBalance.toString();
-          });
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (BuildContext context) {
-              return const BidSuccessDialog();
-            },
-          );
-        }
+      if (resp.statusCode == 200 &&
+          (map['status'] == true || map['status'] == 'true')) {
+        final newBal = walletBalance - _totalPoints();
+        await _storage.write('walletBalance', newBal);
+        if (!mounted) return true;
+        setState(() => walletBalance = newBal);
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const BidSuccessDialog(),
+        );
+        _clearMsg();
         return true;
       } else {
-        String errorMessage = response['msg'] ?? "Unknown error occurred.";
-        if (mounted) {
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (BuildContext context) {
-              return BidFailureDialog(errorMessage: errorMessage);
-            },
-          );
-        }
+        final msg =
+            map['msg']?.toString() ??
+            'Place bid failed. Please try again later.';
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => BidFailureDialog(errorMessage: msg),
+        );
         return false;
       }
     } catch (e) {
-      log('Error placing bids: $e', name: 'ChoiceSpDpTpBoardScreen');
-      if (mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext context) {
-            return const BidFailureDialog(
-              errorMessage: 'An unexpected error occurred. Please try again.',
-            );
-          },
-        );
-      }
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const BidFailureDialog(
+          errorMessage: 'Network error. Please check your internet connection.',
+        ),
+      );
       return false;
     }
   }
 
-  Widget _buildDigitInputField(String hint, TextEditingController controller) {
+  // -------- UI helpers --------
+  Widget _digitBox(String hint, TextEditingController c) {
     return TextField(
-      controller: controller,
+      controller: c,
       cursorColor: Colors.orange,
       keyboardType: TextInputType.number,
       textAlign: TextAlign.center,
@@ -446,7 +398,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: GoogleFonts.poppins(fontSize: 14, color: Colors.grey),
-        contentPadding: const EdgeInsets.symmetric(vertical: 8.0),
+        contentPadding: const EdgeInsets.symmetric(vertical: 8),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: Colors.black54),
@@ -460,22 +412,22 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
           borderSide: const BorderSide(color: Colors.orange, width: 2),
         ),
       ),
-      onTap: _clearMessage,
+      onTap: _clearMsg,
       enabled: !_isApiCalling,
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    String marketName = widget.screenTitle.contains(" - ")
-        ? widget.screenTitle.split(' - ')[0]
+    final marketName = widget.screenTitle.contains(' - ')
+        ? widget.screenTitle.split(' - ').first
         : widget.screenTitle;
 
-    // Build dropdown items dynamically based on selectionStatus
-    List<DropdownMenuItem<String>> dropdownItems = [];
+    // Session dropdown items
+    final items = <DropdownMenuItem<String>>[];
     if (widget.selectionStatus) {
-      dropdownItems.add(
-        DropdownMenuItem<String>(
+      items.add(
+        DropdownMenuItem(
           value: 'OPEN',
           child: SizedBox(
             width: 150,
@@ -484,25 +436,19 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
               text: '$marketName OPEN',
               style: GoogleFonts.poppins(fontSize: 14, color: Colors.black87),
               scrollAxis: Axis.horizontal,
-              blankSpace: 40.0,
-              velocity: 30.0,
+              blankSpace: 40,
+              velocity: 30,
               pauseAfterRound: const Duration(seconds: 2),
               showFadingOnlyWhenScrolling: true,
               fadingEdgeStartFraction: 0.1,
               fadingEdgeEndFraction: 0.1,
-              startPadding: 10.0,
-              accelerationDuration: const Duration(milliseconds: 500),
-              accelerationCurve: Curves.linear,
-              decelerationDuration: const Duration(milliseconds: 500),
-              decelerationCurve: Curves.easeOut,
             ),
           ),
         ),
       );
     }
-    // 'CLOSE' option is always added
-    dropdownItems.add(
-      DropdownMenuItem<String>(
+    items.add(
+      DropdownMenuItem(
         value: 'CLOSE',
         child: SizedBox(
           width: 150,
@@ -511,21 +457,21 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
             text: '$marketName CLOSE',
             style: GoogleFonts.poppins(fontSize: 14, color: Colors.black87),
             scrollAxis: Axis.horizontal,
-            blankSpace: 40.0,
-            velocity: 30.0,
+            blankSpace: 40,
+            velocity: 30,
             pauseAfterRound: const Duration(seconds: 2),
             showFadingOnlyWhenScrolling: true,
             fadingEdgeStartFraction: 0.1,
             fadingEdgeEndFraction: 0.1,
-            startPadding: 10.0,
-            accelerationDuration: const Duration(milliseconds: 500),
-            accelerationCurve: Curves.linear,
-            decelerationDuration: const Duration(milliseconds: 500),
-            decelerationCurve: Curves.easeOut,
           ),
         ),
       ),
     );
+
+    // footer pre-calc (to avoid closure text)
+    final int totalBids = _bids.length;
+    final int totalPoints = _totalPoints();
+    final bool canSubmit = !_isApiCalling && _bids.isNotEmpty;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -554,8 +500,8 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
           const SizedBox(width: 6),
           Center(
             child: Text(
-              walletBalance,
-              style: GoogleFonts.poppins(
+              walletBalance.toString(),
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: Colors.black,
@@ -572,12 +518,13 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 12.0,
+                    horizontal: 16,
+                    vertical: 12,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // session row
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -600,21 +547,20 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                               child: DropdownButtonHideUnderline(
                                 child: DropdownButton<String>(
                                   isExpanded: true,
-                                  value: _selectedGameTypeOption,
+                                  value: _session,
                                   icon: const Icon(
                                     Icons.keyboard_arrow_down,
                                     color: Colors.orange,
                                   ),
                                   onChanged: _isApiCalling
                                       ? null
-                                      : (String? newValue) {
+                                      : (v) {
                                           setState(() {
-                                            _selectedGameTypeOption = newValue;
-                                            _clearMessage();
+                                            _session = v;
+                                            _clearMsg();
                                           });
                                         },
-                                  items:
-                                      dropdownItems, // Use the dynamically built list
+                                  items: items,
                                 ),
                               ),
                             ),
@@ -622,24 +568,24 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
+
+                      // category toggles
                       Row(
                         children: [
                           Expanded(
                             child: Row(
-                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Checkbox(
-                                  value: _isSPSelected,
+                                  value: _isSP,
                                   onChanged: _isApiCalling
                                       ? null
-                                      : (bool? value) {
+                                      : (v) {
                                           setState(() {
-                                            _isSPSelected = value ?? false;
-                                            if (_isSPSelected) {
-                                              _isDPSelected = false;
-                                              _isTPSelected = false;
+                                            _isSP = v ?? false;
+                                            if (_isSP) {
+                                              _isDP = false;
+                                              _isTP = false;
                                             }
-                                            _clearMessage();
                                           });
                                         },
                                   activeColor: Colors.orange,
@@ -654,20 +600,18 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                           ),
                           Expanded(
                             child: Row(
-                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Checkbox(
-                                  value: _isDPSelected,
+                                  value: _isDP,
                                   onChanged: _isApiCalling
                                       ? null
-                                      : (bool? value) {
+                                      : (v) {
                                           setState(() {
-                                            _isDPSelected = value ?? false;
-                                            if (_isDPSelected) {
-                                              _isSPSelected = false;
-                                              _isTPSelected = false;
+                                            _isDP = v ?? false;
+                                            if (_isDP) {
+                                              _isSP = false;
+                                              _isTP = false;
                                             }
-                                            _clearMessage();
                                           });
                                         },
                                   activeColor: Colors.orange,
@@ -682,20 +626,18 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                           ),
                           Expanded(
                             child: Row(
-                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Checkbox(
-                                  value: _isTPSelected,
+                                  value: _isTP,
                                   onChanged: _isApiCalling
                                       ? null
-                                      : (bool? value) {
+                                      : (v) {
                                           setState(() {
-                                            _isTPSelected = value ?? false;
-                                            if (_isTPSelected) {
-                                              _isSPSelected = false;
-                                              _isDPSelected = false;
+                                            _isTP = v ?? false;
+                                            if (_isTP) {
+                                              _isSP = false;
+                                              _isDP = false;
                                             }
-                                            _clearMessage();
                                           });
                                         },
                                   activeColor: Colors.orange,
@@ -710,36 +652,31 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                           ),
                         ],
                       ),
+
                       const SizedBox(height: 16),
+
+                      // digit boxes
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
-                            child: _buildDigitInputField(
-                              'Digit 1',
-                              _leftDigitController,
-                            ),
+                            child: _digitBox('Digit 1', _leftDigitController),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: _buildDigitInputField(
-                              'Digit 2',
-                              _middleDigitController,
-                            ),
+                            child: _digitBox('Digit 2', _middleDigitController),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: _buildDigitInputField(
-                              'Digit 3',
-                              _rightDigitController,
-                            ),
+                            child: _digitBox('Digit 3', _rightDigitController),
                           ),
                         ],
                       ),
+
                       const SizedBox(height: 16),
+
+                      // points
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Text(
                             'Enter Points:',
@@ -749,19 +686,21 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                             width: 150,
                             height: 40,
                             child: TextField(
-                              cursorColor: Colors.orange,
                               controller: _pointsController,
+                              cursorColor: Colors.orange,
                               keyboardType: TextInputType.number,
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly,
                                 LengthLimitingTextInputFormatter(5),
                               ],
+                              onTap: _clearMsg,
+                              enabled: !_isApiCalling,
                               decoration: InputDecoration(
                                 hintText: 'Amount',
                                 hintStyle: GoogleFonts.poppins(fontSize: 14),
                                 contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12.0,
-                                  vertical: 8.0,
+                                  horizontal: 12,
+                                  vertical: 8,
                                 ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(20),
@@ -783,20 +722,20 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                   ),
                                 ),
                               ),
-                              onTap: _clearMessage,
-                              enabled: !_isApiCalling,
                             ),
                           ),
                         ],
                       ),
+
                       const SizedBox(height: 20),
+
                       Align(
                         alignment: Alignment.centerRight,
                         child: SizedBox(
                           width: 150,
                           height: 45,
                           child: ElevatedButton(
-                            onPressed: _isApiCalling ? null : _addBid,
+                            onPressed: _isApiCalling ? null : _onAdd,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.orange,
                               shape: RoundedRectangleBorder(
@@ -810,8 +749,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                     strokeWidth: 2,
                                   )
                                 : Text(
-                                    "ADD",
-                                    textAlign: TextAlign.center,
+                                    'ADD',
                                     style: GoogleFonts.poppins(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w600,
@@ -821,54 +759,50 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 10),
                     ],
                   ),
                 ),
+
                 const Divider(thickness: 1, height: 1),
+
                 if (_bids.isNotEmpty)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 0),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                     child: Row(
-                      children: [
+                      children: const [
                         Expanded(
                           flex: 2,
                           child: Text(
                             'Panna',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
                         Expanded(
                           flex: 2,
                           child: Text(
                             'Amount',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
                         Expanded(
                           flex: 3,
                           child: Text(
                             'Type',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
-                        const SizedBox(width: 48), // Space for delete icon
+                        SizedBox(width: 48),
                       ],
                     ),
                   ),
                 if (_bids.isNotEmpty)
                   const Divider(
-                    thickness: 0.5,
+                    thickness: .5,
                     indent: 16,
                     endIndent: 16,
                     height: 10,
                   ),
+
                 Expanded(
                   child: _bids.isEmpty
                       ? Center(
@@ -881,27 +815,27 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                           ),
                         )
                       : ListView.builder(
-                          padding: const EdgeInsets.only(top: 0, bottom: 8.0),
+                          padding: const EdgeInsets.only(top: 0, bottom: 8),
                           itemCount: _bids.length,
-                          itemBuilder: (context, index) {
-                            final bid = _bids[index];
+                          itemBuilder: (_, i) {
+                            final b = _bids[i];
                             return Container(
                               margin: const EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 4,
                               ),
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 12.0,
-                                vertical: 8.0,
+                                horizontal: 12,
+                                vertical: 8,
                               ),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(8),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.grey.withOpacity(0.15),
-                                    spreadRadius: 1,
+                                    color: Colors.grey.withOpacity(.15),
                                     blurRadius: 2,
+                                    spreadRadius: 1,
                                     offset: const Offset(0, 1),
                                   ),
                                 ],
@@ -911,21 +845,21 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                   Expanded(
                                     flex: 2,
                                     child: Text(
-                                      bid['digit']!,
+                                      b['digit']!,
                                       style: GoogleFonts.poppins(fontSize: 15),
                                     ),
                                   ),
                                   Expanded(
                                     flex: 2,
                                     child: Text(
-                                      bid['points']!,
+                                      b['amount']!,
                                       style: GoogleFonts.poppins(fontSize: 15),
                                     ),
                                   ),
                                   Expanded(
                                     flex: 3,
                                     child: Text(
-                                      '${bid['gameType']} (${bid['type']})',
+                                      '${b['gameType']} (${b['session']})',
                                       style: GoogleFonts.poppins(
                                         fontSize: 15,
                                         color: Colors.green[700],
@@ -939,7 +873,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                     ),
                                     onPressed: _isApiCalling
                                         ? null
-                                        : () => _removeBid(index),
+                                        : () => _remove(i),
                                   ),
                                 ],
                               ),
@@ -947,19 +881,124 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                           },
                         ),
                 ),
-                if (_bids.isNotEmpty) _buildBottomBar(),
+
+                // Footer (fixed)
+                if (_bids.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.3),
+                          spreadRadius: 2,
+                          blurRadius: 5,
+                          offset: const Offset(0, -3),
+                        ),
+                      ],
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(16),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Bids',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '$totalBids',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Points',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '$totalPoints',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(
+                          height: 46,
+                          child: ElevatedButton(
+                            onPressed: canSubmit ? _confirm : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: canSubmit
+                                  ? Colors.orange
+                                  : Colors.grey,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              elevation: 3,
+                            ),
+                            child: _isApiCalling
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Text(
+                                    'SUBMIT',
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
-            if (_messageToShow != null)
+
+            if (_msg != null)
               Positioned(
                 top: 0,
                 left: 0,
                 right: 0,
                 child: AnimatedMessageBar(
-                  key: _messageBarKey,
-                  message: _messageToShow!,
-                  isError: _isErrorForMessage,
-                  onDismissed: _clearMessage,
+                  key: _msgKey,
+                  message: _msg!,
+                  isError: _msgErr,
+                  onDismissed: _clearMsg,
                 ),
               ),
           ],
@@ -967,1143 +1006,4 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
       ),
     );
   }
-
-  Widget _buildBottomBar() {
-    int totalBids = _bids.length;
-    int totalPoints = _getTotalPoints();
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.3),
-            spreadRadius: 2,
-            blurRadius: 5,
-            offset: const Offset(0, -3),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Bids',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                ),
-              ),
-              Text(
-                '$totalBids',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Points',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                ),
-              ),
-              Text(
-                '$totalPoints',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          ElevatedButton(
-            onPressed: _isApiCalling || _bids.isEmpty
-                ? null
-                : _showBidConfirmationDialog,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _isApiCalling || _bids.isEmpty
-                  ? Colors.grey
-                  : Colors.orange,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              elevation: 3,
-            ),
-            child: _isApiCalling
-                ? const CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    strokeWidth: 2,
-                  )
-                : Text(
-                    'SUBMIT',
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: 16,
-                    ),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
 }
-
-// // lib/screens/choice_sp_dp_tp_board_screen.dart
-// import 'dart:async';
-// import 'dart:developer';
-//
-// import 'package:flutter/material.dart';
-// import 'package:flutter/services.dart';
-// import 'package:get_storage/get_storage.dart';
-// import 'package:google_fonts/google_fonts.dart';
-// import 'package:intl/intl.dart';
-// import 'package:marquee/marquee.dart';
-// import 'package:new_sara/components/AnimatedMessageBar.dart';
-// import 'package:new_sara/components/BidConfirmationDialog.dart';
-// import 'package:new_sara/components/BidFailureDialog.dart';
-// import 'package:new_sara/components/BidSuccessDialog.dart';
-//
-// import '../../BidService.dart';
-//
-// class ChoiceSpDpTpBoardScreen extends StatefulWidget {
-//   final String screenTitle;
-//   final int gameId;
-//   final String gameType;
-//   final String gameName;
-//   final bool selectionStatus;
-//
-//   const ChoiceSpDpTpBoardScreen({
-//     Key? key,
-//     required this.screenTitle,
-//     required this.gameId,
-//     required this.gameType,
-//     required this.gameName,
-//     required this.selectionStatus,
-//   }) : super(key: key);
-//
-//   @override
-//   State<ChoiceSpDpTpBoardScreen> createState() =>
-//       _ChoiceSpDpTpBoardScreenState();
-// }
-//
-// class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
-//   final TextEditingController _leftDigitController = TextEditingController();
-//   final TextEditingController _middleDigitController = TextEditingController();
-//   final TextEditingController _rightDigitController = TextEditingController();
-//   final TextEditingController _pointsController = TextEditingController();
-//
-//   bool _isSPSelected = false;
-//   bool _isDPSelected = false;
-//   bool _isTPSelected = false;
-//
-//   String? _selectedGameTypeOption;
-//
-//   List<Map<String, String>> _bids = [];
-//
-//   late String walletBalance;
-//   final GetStorage _storage = GetStorage();
-//   late String accessToken;
-//   late String registerId;
-//   bool accountStatus = false;
-//   late String preferredLanguage;
-//
-//   final String _deviceId = 'test_device_id_flutter';
-//   final String _deviceName = 'test_device_name_flutter';
-//
-//   late BidService _bidService;
-//
-//   String? _messageToShow;
-//   bool _isErrorForMessage = false;
-//   Key _messageBarKey = UniqueKey();
-//
-//   bool _isApiCalling = false;
-//
-//   @override
-//   void initState() {
-//     super.initState();
-//     _selectedGameTypeOption = 'OPEN';
-//
-//     _loadInitialData();
-//     _setupStorageListeners();
-//
-//     _bidService = BidService(_storage);
-//   }
-//
-//   Future<void> _loadInitialData() async {
-//     accessToken = _storage.read('accessToken') ?? '';
-//     registerId = _storage.read('registerId') ?? '';
-//     accountStatus = _storage.read('accountStatus') ?? false;
-//     preferredLanguage = _storage.read('selectedLanguage') ?? 'en';
-//
-//     final dynamic storedWalletBalance = _storage.read('walletBalance');
-//     if (storedWalletBalance is int) {
-//       walletBalance = storedWalletBalance.toString();
-//     } else if (storedWalletBalance is String) {
-//       walletBalance = storedWalletBalance;
-//     } else {
-//       walletBalance = '0';
-//     }
-//   }
-//
-//   void _setupStorageListeners() {
-//     _storage.listenKey('accessToken', (value) {
-//       if (mounted) setState(() => accessToken = value ?? '');
-//     });
-//     _storage.listenKey('registerId', (value) {
-//       if (mounted) setState(() => registerId = value ?? '');
-//     });
-//     _storage.listenKey('accountStatus', (value) {
-//       if (mounted) setState(() => accountStatus = value ?? false);
-//     });
-//     _storage.listenKey('selectedLanguage', (value) {
-//       if (mounted) setState(() => preferredLanguage = value ?? 'en');
-//     });
-//     _storage.listenKey('walletBalance', (value) {
-//       if (mounted) {
-//         setState(() {
-//           if (value is int) {
-//             walletBalance = value.toString();
-//           } else if (value is String) {
-//             walletBalance = value;
-//           } else {
-//             walletBalance = '0';
-//           }
-//         });
-//       }
-//     });
-//   }
-//
-//   @override
-//   void dispose() {
-//     _leftDigitController.dispose();
-//     _middleDigitController.dispose();
-//     _rightDigitController.dispose();
-//     _pointsController.dispose();
-//     super.dispose();
-//   }
-//
-//   void _showMessage(String message, {bool isError = false}) {
-//     setState(() {
-//       _messageToShow = message;
-//       _isErrorForMessage = isError;
-//       _messageBarKey = UniqueKey();
-//     });
-//   }
-//
-//   void _clearMessage() {
-//     if (mounted) {
-//       setState(() {
-//         _messageToShow = null;
-//       });
-//     }
-//   }
-//
-//   bool _isValidSpPanna(String panna) {
-//     if (panna.length != 3) return false;
-//     Set<String> uniqueDigits = panna.split('').toSet();
-//     return uniqueDigits.length == 3;
-//   }
-//
-//   bool _isValidDpPanna(String panna) {
-//     if (panna.length != 3) return false;
-//     List<String> digits = panna.split('');
-//     digits.sort();
-//     return (digits[0] == digits[1] && digits[1] != digits[2]) ||
-//         (digits[0] != digits[1] && digits[1] == digits[2]);
-//   }
-//
-//   bool _isValidTpPanna(String panna) {
-//     if (panna.length != 3) return false;
-//     return panna[0] == panna[1] && panna[1] == panna[2];
-//   }
-//
-//   void _addBid() {
-//     _clearMessage();
-//     if (_isApiCalling) return;
-//
-//     log("ADD button pressed - entering _addBid");
-//     final leftDigit = _leftDigitController.text.trim();
-//     final middleDigit = _middleDigitController.text.trim();
-//     final rightDigit = _rightDigitController.text.trim();
-//     final points = _pointsController.text.trim();
-//
-//     if (leftDigit.isEmpty || middleDigit.isEmpty || rightDigit.isEmpty) {
-//       _showMessage('Please enter all three digits.', isError: true);
-//       return;
-//     }
-//     if (leftDigit.length != 1 ||
-//         middleDigit.length != 1 ||
-//         rightDigit.length != 1 ||
-//         int.tryParse(leftDigit) == null ||
-//         int.tryParse(middleDigit) == null ||
-//         int.tryParse(rightDigit) == null) {
-//       _showMessage(
-//         'Please enter single digits for Left, Middle, and Right.',
-//         isError: true,
-//       );
-//       return;
-//     }
-//
-//     final pannaInput = '$leftDigit$middleDigit$rightDigit';
-//
-//     int? parsedPoints = int.tryParse(points);
-//     if (parsedPoints == null || parsedPoints < 10 || parsedPoints > 10000) {
-//       _showMessage('Points must be between 10 and 10000.', isError: true);
-//       return;
-//     }
-//
-//     String gameCategory = '';
-//     int selectedCount = 0;
-//     if (_isSPSelected) {
-//       gameCategory = 'SP';
-//       selectedCount++;
-//     }
-//     if (_isDPSelected) {
-//       gameCategory = 'DP';
-//       selectedCount++;
-//     }
-//     if (_isTPSelected) {
-//       gameCategory = 'TP';
-//       selectedCount++;
-//     }
-//
-//     if (selectedCount == 0) {
-//       _showMessage('Please select SP, DP, or TP.', isError: true);
-//       return;
-//     }
-//     if (selectedCount > 1) {
-//       _showMessage('Please select only one of SP, DP, or TP.', isError: true);
-//       return;
-//     }
-//
-//     bool isValidPanna = false;
-//     if (gameCategory == 'SP') {
-//       isValidPanna = _isValidSpPanna(pannaInput);
-//       if (!isValidPanna) {
-//         _showMessage('SP Panna must have 3 unique digits.', isError: true);
-//         return;
-//       }
-//     } else if (gameCategory == 'DP') {
-//       isValidPanna = _isValidDpPanna(pannaInput);
-//       if (!isValidPanna) {
-//         _showMessage(
-//           'DP Panna must have two same digits and one different.',
-//           isError: true,
-//         );
-//         return;
-//       }
-//     } else if (gameCategory == 'TP') {
-//       isValidPanna = _isValidTpPanna(pannaInput);
-//       if (!isValidPanna) {
-//         _showMessage('TP Panna must have 3 identical digits.', isError: true);
-//         return;
-//       }
-//     }
-//
-//     if (isValidPanna) {
-//       setState(() {
-//         bool alreadyExists = _bids.any(
-//           (entry) =>
-//               entry['digit'] == pannaInput &&
-//               entry['gameType'] == gameCategory &&
-//               entry['type'] == _selectedGameTypeOption,
-//         );
-//
-//         if (!alreadyExists) {
-//           log(
-//             "Adding single bid: Digit-$pannaInput, Points-$points, Type-$_selectedGameTypeOption, GameType-$gameCategory",
-//           );
-//           _bids.add({
-//             "digit": pannaInput,
-//             "points": points,
-//             "type": _selectedGameTypeOption!,
-//             "gameType": gameCategory,
-//           });
-//           _leftDigitController.clear();
-//           _middleDigitController.clear();
-//           _rightDigitController.clear();
-//           _pointsController.clear();
-//           _isSPSelected = false;
-//           _isDPSelected = false;
-//           _isTPSelected = false;
-//           _showMessage(
-//             'Bid added successfully for $gameCategory: $pannaInput.',
-//           );
-//         } else {
-//           _showMessage(
-//             'Panna $pannaInput already added for $gameCategory ($_selectedGameTypeOption).',
-//             isError: true,
-//           );
-//         }
-//       });
-//     }
-//   }
-//
-//   void _removeBid(int index) {
-//     _clearMessage();
-//     if (_isApiCalling) return;
-//
-//     setState(() {
-//       final removedBid = _bids.removeAt(index);
-//       _showMessage(
-//         'Removed bid: ${removedBid['gameType']} ${removedBid['digit']}.',
-//       );
-//     });
-//   }
-//
-//   int _getTotalPoints() {
-//     return _bids.fold(
-//       0,
-//       (sum, item) => sum + (int.tryParse(item['points'] ?? '0') ?? 0),
-//     );
-//   }
-//
-//   void _showBidConfirmationDialog() {
-//     _clearMessage();
-//     if (_isApiCalling) return;
-//
-//     if (_bids.isEmpty) {
-//       _showMessage('Please add bids before submitting.', isError: true);
-//       return;
-//     }
-//
-//     final int currentTotalPoints = _getTotalPoints();
-//     final int currentWalletBalance = int.tryParse(walletBalance) ?? 0;
-//
-//     if (currentWalletBalance < currentTotalPoints) {
-//       _showMessage(
-//         'Insufficient wallet balance to place this bid.',
-//         isError: true,
-//       );
-//       return;
-//     }
-//
-//     final List<Map<String, String>> bidsForDialog = _bids.map((bid) {
-//       return {
-//         'digit': bid['digit']!,
-//         'points': bid['points']!,
-//         'type': '${bid['gameType']} (${bid['type']})',
-//       };
-//     }).toList();
-//
-//     final String formattedDate = DateFormat(
-//       'dd MMM yyyy, hh:mm a',
-//     ).format(DateTime.now());
-//
-//     showDialog(
-//       context: context,
-//       barrierDismissible: false,
-//       builder: (BuildContext dialogContext) {
-//         return BidConfirmationDialog(
-//           gameTitle: widget.screenTitle,
-//           gameDate: formattedDate,
-//           bids: bidsForDialog,
-//           totalBids: bidsForDialog.length,
-//           totalBidsAmount: currentTotalPoints,
-//           walletBalanceBeforeDeduction: currentWalletBalance,
-//           walletBalanceAfterDeduction:
-//               (currentWalletBalance - currentTotalPoints).toString(),
-//           gameId: widget.gameId.toString(),
-//           gameType: widget.gameType,
-//           onConfirm: () async {
-//             log('Bids Confirmed for API submission: $bidsForDialog');
-//             // Navigator.pop(dialogContext);
-//
-//             setState(() {
-//               _isApiCalling = true;
-//             });
-//
-//             bool success = await _placeFinalBidsWithService();
-//
-//             if (success) {
-//               setState(() {
-//                 _bids.clear();
-//               });
-//             }
-//             if (mounted) {
-//               setState(() {
-//                 _isApiCalling = false;
-//               });
-//             }
-//           },
-//         );
-//       },
-//     );
-//   }
-//
-//   Future<bool> _placeFinalBidsWithService() async {
-//     Map<String, String> bidAmounts = {};
-//     for (var bid in _bids) {
-//       bidAmounts[bid['digit']!] = bid['points']!;
-//     }
-//
-//     final response = await _bidService.placeFinalBids(
-//       gameName: widget.screenTitle,
-//       accessToken: accessToken,
-//       registerId: registerId,
-//       deviceId: _deviceId,
-//       deviceName: _deviceName,
-//       accountStatus: accountStatus,
-//       bidAmounts: bidAmounts,
-//       selectedGameType: _selectedGameTypeOption!,
-//       gameId: widget.gameId,
-//       gameType: widget.gameType,
-//       totalBidAmount: _getTotalPoints(),
-//     );
-//
-//     if (response['status'] == true) {
-//       int newWalletBalance =
-//           (int.tryParse(walletBalance) ?? 0) - _getTotalPoints();
-//       await _bidService.updateWalletBalance(newWalletBalance);
-//
-//       if (mounted) {
-//         setState(() {
-//           walletBalance = newWalletBalance.toString();
-//         });
-//         showDialog(
-//           context: context,
-//           barrierDismissible: false,
-//           builder: (BuildContext context) {
-//             return const BidSuccessDialog();
-//           },
-//         );
-//       }
-//       return true;
-//     } else {
-//       String errorMessage = response['msg'] ?? "Unknown error occurred.";
-//       if (mounted) {
-//         showDialog(
-//           context: context,
-//           barrierDismissible: false,
-//           builder: (BuildContext context) {
-//             return BidFailureDialog(errorMessage: errorMessage);
-//           },
-//         );
-//       }
-//       return false;
-//     }
-//   }
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     String marketName = widget.screenTitle.contains(" - ")
-//         ? widget.screenTitle.split(' - ')[0]
-//         : widget.screenTitle;
-//
-//     return Scaffold(
-//       backgroundColor: const Color(0xFFF5F5F5),
-//       appBar: AppBar(
-//         backgroundColor: Colors.white,
-//         elevation: 1,
-//         leading: IconButton(
-//           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
-//           onPressed: () => Navigator.pop(context),
-//         ),
-//         title: Text(
-//           widget.screenTitle,
-//           style: GoogleFonts.poppins(
-//             color: Colors.black,
-//             fontSize: 16,
-//             fontWeight: FontWeight.w600,
-//           ),
-//         ),
-//         actions: [
-//           const Icon(
-//             Icons.account_balance_wallet_outlined,
-//             color: Colors.black,
-//           ),
-//           const SizedBox(width: 6),
-//           Center(
-//             child: Text(
-//               walletBalance,
-//               style: GoogleFonts.poppins(
-//                 fontSize: 16,
-//                 fontWeight: FontWeight.bold,
-//                 color: Colors.black,
-//               ),
-//             ),
-//           ),
-//           const SizedBox(width: 12),
-//         ],
-//       ),
-//       body: Stack(
-//         children: [
-//           Column(
-//             children: [
-//               Padding(
-//                 padding: const EdgeInsets.symmetric(
-//                   horizontal: 16.0,
-//                   vertical: 12.0,
-//                 ),
-//                 child: Column(
-//                   crossAxisAlignment: CrossAxisAlignment.start,
-//                   children: [
-//                     Row(
-//                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                       children: [
-//                         Text(
-//                           'Select Game Type',
-//                           style: GoogleFonts.poppins(fontSize: 16),
-//                         ),
-//                         SizedBox(
-//                           width: 180,
-//                           height: 40,
-//                           child: Container(
-//                             padding: const EdgeInsets.symmetric(horizontal: 12),
-//                             decoration: BoxDecoration(
-//                               color: Colors.white,
-//                               border: Border.all(color: Colors.black54),
-//                               borderRadius: BorderRadius.circular(20),
-//                             ),
-//                             child: DropdownButtonHideUnderline(
-//                               child: DropdownButton<String>(
-//                                 isExpanded: true,
-//                                 value: _selectedGameTypeOption,
-//                                 icon: const Icon(
-//                                   Icons.keyboard_arrow_down,
-//                                   color: Colors.orange,
-//                                 ),
-//                                 onChanged: _isApiCalling
-//                                     ? null
-//                                     : (String? newValue) {
-//                                         setState(() {
-//                                           _selectedGameTypeOption = newValue;
-//                                           _clearMessage();
-//                                         });
-//                                       },
-//                                 items: const <String>['OPEN', 'CLOSE']
-//                                     .map<DropdownMenuItem<String>>((
-//                                       String value,
-//                                     ) {
-//                                       return DropdownMenuItem<String>(
-//                                         value: value,
-//                                         child: SizedBox(
-//                                           width: 150,
-//                                           height: 20,
-//                                           child: Marquee(
-//                                             text: '$marketName $value',
-//                                             style: GoogleFonts.poppins(
-//                                               fontSize: 14,
-//                                               color: Colors.black87,
-//                                             ),
-//                                             scrollAxis: Axis.horizontal,
-//                                             blankSpace: 40.0,
-//                                             velocity: 30.0,
-//                                             pauseAfterRound: const Duration(
-//                                               seconds: 2,
-//                                             ),
-//                                             showFadingOnlyWhenScrolling: true,
-//                                             fadingEdgeStartFraction: 0.1,
-//                                             fadingEdgeEndFraction: 0.1,
-//                                             startPadding: 10.0,
-//                                             accelerationDuration:
-//                                                 const Duration(
-//                                                   milliseconds: 500,
-//                                                 ),
-//                                             accelerationCurve: Curves.linear,
-//                                             decelerationDuration:
-//                                                 const Duration(
-//                                                   milliseconds: 500,
-//                                                 ),
-//                                             decelerationCurve: Curves.easeOut,
-//                                           ),
-//                                         ),
-//                                       );
-//                                     })
-//                                     .toList(),
-//                               ),
-//                             ),
-//                           ),
-//                         ),
-//                       ],
-//                     ),
-//                     const SizedBox(height: 16),
-//                     Row(
-//                       children: [
-//                         Expanded(
-//                           child: Row(
-//                             mainAxisSize: MainAxisSize.min,
-//                             children: [
-//                               Checkbox(
-//                                 value: _isSPSelected,
-//                                 onChanged: _isApiCalling
-//                                     ? null
-//                                     : (bool? value) {
-//                                         setState(() {
-//                                           _isSPSelected = value ?? false;
-//                                           if (_isSPSelected) {
-//                                             _isDPSelected = false;
-//                                             _isTPSelected = false;
-//                                           }
-//                                           _clearMessage();
-//                                         });
-//                                       },
-//                                 activeColor: Colors.orange,
-//                                 checkColor: Colors.white,
-//                               ),
-//                               Text(
-//                                 'SP',
-//                                 style: GoogleFonts.poppins(fontSize: 16),
-//                               ),
-//                             ],
-//                           ),
-//                         ),
-//                         Expanded(
-//                           child: Row(
-//                             mainAxisSize: MainAxisSize.min,
-//                             children: [
-//                               Checkbox(
-//                                 value: _isDPSelected,
-//                                 onChanged: _isApiCalling
-//                                     ? null
-//                                     : (bool? value) {
-//                                         setState(() {
-//                                           _isDPSelected = value ?? false;
-//                                           if (_isDPSelected) {
-//                                             _isSPSelected = false;
-//                                             _isTPSelected = false;
-//                                           }
-//                                           _clearMessage();
-//                                         });
-//                                       },
-//                                 activeColor: Colors.orange,
-//                                 checkColor: Colors.white,
-//                               ),
-//                               Text(
-//                                 'DP',
-//                                 style: GoogleFonts.poppins(fontSize: 16),
-//                               ),
-//                             ],
-//                           ),
-//                         ),
-//                         Expanded(
-//                           child: Row(
-//                             mainAxisSize: MainAxisSize.min,
-//                             children: [
-//                               Checkbox(
-//                                 value: _isTPSelected,
-//                                 onChanged: _isApiCalling
-//                                     ? null
-//                                     : (bool? value) {
-//                                         setState(() {
-//                                           _isTPSelected = value ?? false;
-//                                           if (_isTPSelected) {
-//                                             _isSPSelected = false;
-//                                             _isDPSelected = false;
-//                                           }
-//                                           _clearMessage();
-//                                         });
-//                                       },
-//                                 activeColor: Colors.orange,
-//                                 checkColor: Colors.white,
-//                               ),
-//                               Text(
-//                                 'TP',
-//                                 style: GoogleFonts.poppins(fontSize: 16),
-//                               ),
-//                             ],
-//                           ),
-//                         ),
-//                       ],
-//                     ),
-//                     const SizedBox(height: 16),
-//                     Row(
-//                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                       children: [
-//                         Expanded(
-//                           child: _buildDigitInputField(
-//                             'Digit 1',
-//                             _leftDigitController,
-//                           ),
-//                         ),
-//                         const SizedBox(width: 8),
-//                         Expanded(
-//                           child: _buildDigitInputField(
-//                             'Digit 2',
-//                             _middleDigitController,
-//                           ),
-//                         ),
-//                         const SizedBox(width: 8),
-//                         Expanded(
-//                           child: _buildDigitInputField(
-//                             'Digit 3',
-//                             _rightDigitController,
-//                           ),
-//                         ),
-//                       ],
-//                     ),
-//                     const SizedBox(height: 16),
-//                     Row(
-//                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                       crossAxisAlignment: CrossAxisAlignment.center,
-//                       children: [
-//                         Text(
-//                           'Enter Points:',
-//                           style: GoogleFonts.poppins(fontSize: 16),
-//                         ),
-//                         SizedBox(
-//                           width: 150,
-//                           height: 40,
-//                           child: TextField(
-//                             cursorColor: Colors.orange,
-//                             controller: _pointsController,
-//                             keyboardType: TextInputType.number,
-//                             inputFormatters: [
-//                               FilteringTextInputFormatter.digitsOnly,
-//                               LengthLimitingTextInputFormatter(5),
-//                             ],
-//                             decoration: InputDecoration(
-//                               hintText: 'Amount',
-//                               hintStyle: GoogleFonts.poppins(fontSize: 14),
-//                               contentPadding: const EdgeInsets.symmetric(
-//                                 horizontal: 12.0,
-//                                 vertical: 8.0,
-//                               ),
-//                               border: OutlineInputBorder(
-//                                 borderRadius: BorderRadius.circular(20),
-//                                 borderSide: const BorderSide(
-//                                   color: Colors.black54,
-//                                 ),
-//                               ),
-//                               enabledBorder: OutlineInputBorder(
-//                                 borderRadius: BorderRadius.circular(20),
-//                                 borderSide: const BorderSide(
-//                                   color: Colors.black54,
-//                                 ),
-//                               ),
-//                               focusedBorder: OutlineInputBorder(
-//                                 borderRadius: BorderRadius.circular(20),
-//                                 borderSide: const BorderSide(
-//                                   color: Colors.orange,
-//                                   width: 2,
-//                                 ),
-//                               ),
-//                             ),
-//                             onTap: _clearMessage,
-//                             enabled: !_isApiCalling,
-//                           ),
-//                         ),
-//                       ],
-//                     ),
-//                     const SizedBox(height: 20),
-//                     Align(
-//                       alignment: Alignment.centerRight,
-//                       child: SizedBox(
-//                         width: 150,
-//                         height: 45,
-//                         child: ElevatedButton(
-//                           onPressed: _isApiCalling ? null : _addBid,
-//                           style: ElevatedButton.styleFrom(
-//                             backgroundColor: Colors.orange,
-//                             shape: RoundedRectangleBorder(
-//                               borderRadius: BorderRadius.circular(8),
-//                             ),
-//                             elevation: 2,
-//                           ),
-//                           child: _isApiCalling
-//                               ? const CircularProgressIndicator(
-//                                   color: Colors.white,
-//                                   strokeWidth: 2,
-//                                 )
-//                               : Text(
-//                                   "ADD",
-//                                   textAlign: TextAlign.center,
-//                                   style: GoogleFonts.poppins(
-//                                     color: Colors.white,
-//                                     fontWeight: FontWeight.w600,
-//                                     fontSize: 16,
-//                                   ),
-//                                 ),
-//                         ),
-//                       ),
-//                     ),
-//                     const SizedBox(height: 10),
-//                   ],
-//                 ),
-//               ),
-//               const Divider(thickness: 1, height: 1),
-//               if (_bids.isNotEmpty)
-//                 Padding(
-//                   padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 0),
-//                   child: Row(
-//                     children: [
-//                       Expanded(
-//                         flex: 2,
-//                         child: Text(
-//                           'Panna',
-//                           style: GoogleFonts.poppins(
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                       Expanded(
-//                         flex: 2,
-//                         child: Text(
-//                           'Amount',
-//                           style: GoogleFonts.poppins(
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                       Expanded(
-//                         flex: 3,
-//                         child: Text(
-//                           'Type',
-//                           style: GoogleFonts.poppins(
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                       const SizedBox(width: 48),
-//                     ],
-//                   ),
-//                 ),
-//               if (_bids.isNotEmpty)
-//                 const Divider(
-//                   thickness: 0.5,
-//                   indent: 16,
-//                   endIndent: 16,
-//                   height: 10,
-//                 ),
-//               Expanded(
-//                 child: _bids.isEmpty
-//                     ? Center(
-//                         child: Text(
-//                           'No Bids Added Yet',
-//                           style: GoogleFonts.poppins(
-//                             fontSize: 16,
-//                             color: Colors.grey[600],
-//                           ),
-//                         ),
-//                       )
-//                     : ListView.builder(
-//                         padding: const EdgeInsets.only(top: 0, bottom: 8.0),
-//                         itemCount: _bids.length,
-//                         itemBuilder: (context, index) {
-//                           final bid = _bids[index];
-//                           return Container(
-//                             margin: const EdgeInsets.symmetric(
-//                               horizontal: 16,
-//                               vertical: 4,
-//                             ),
-//                             padding: const EdgeInsets.symmetric(
-//                               horizontal: 12.0,
-//                               vertical: 8.0,
-//                             ),
-//                             decoration: BoxDecoration(
-//                               color: Colors.white,
-//                               borderRadius: BorderRadius.circular(8),
-//                               boxShadow: [
-//                                 BoxShadow(
-//                                   color: Colors.grey.withOpacity(0.15),
-//                                   spreadRadius: 1,
-//                                   blurRadius: 2,
-//                                   offset: const Offset(0, 1),
-//                                 ),
-//                               ],
-//                             ),
-//                             child: Row(
-//                               children: [
-//                                 Expanded(
-//                                   flex: 2,
-//                                   child: Text(
-//                                     bid['digit']!,
-//                                     style: GoogleFonts.poppins(fontSize: 15),
-//                                   ),
-//                                 ),
-//                                 Expanded(
-//                                   flex: 2,
-//                                   child: Text(
-//                                     bid['points']!,
-//                                     style: GoogleFonts.poppins(fontSize: 15),
-//                                   ),
-//                                 ),
-//                                 Expanded(
-//                                   flex: 3,
-//                                   child: Text(
-//                                     '${bid['gameType']} (${bid['type']})',
-//                                     style: GoogleFonts.poppins(
-//                                       fontSize: 14,
-//                                       color: Colors.blueGrey[700],
-//                                       fontWeight: FontWeight.w500,
-//                                     ),
-//                                   ),
-//                                 ),
-//                                 IconButton(
-//                                   icon: const Icon(
-//                                     Icons.delete_outline,
-//                                     color: Colors.redAccent,
-//                                   ),
-//                                   iconSize: 22,
-//                                   splashRadius: 20,
-//                                   padding: EdgeInsets.zero,
-//                                   constraints: const BoxConstraints(),
-//                                   onPressed: _isApiCalling
-//                                       ? null
-//                                       : () => _removeBid(index),
-//                                 ),
-//                               ],
-//                             ),
-//                           );
-//                         },
-//                       ),
-//               ),
-//               if (_bids.isNotEmpty) _buildBottomBar(),
-//             ],
-//           ),
-//           if (_messageToShow != null)
-//             Positioned(
-//               top: 0,
-//               left: 0,
-//               right: 0,
-//               child: AnimatedMessageBar(
-//                 key: _messageBarKey,
-//                 message: _messageToShow!,
-//                 isError: _isErrorForMessage,
-//                 onDismissed: _clearMessage,
-//               ),
-//             ),
-//         ],
-//       ),
-//     );
-//   }
-//
-//   Widget _buildDigitInputField(String hint, TextEditingController controller) {
-//     return SizedBox(
-//       height: 40,
-//       child: TextField(
-//         cursorColor: Colors.orange,
-//         controller: controller,
-//         textAlign: TextAlign.center,
-//         style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500),
-//         keyboardType: TextInputType.number,
-//         inputFormatters: [
-//           LengthLimitingTextInputFormatter(1),
-//           FilteringTextInputFormatter.digitsOnly,
-//         ],
-//         decoration: InputDecoration(
-//           hintText: hint,
-//           hintStyle: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[500]),
-//           contentPadding: const EdgeInsets.symmetric(vertical: 8.0),
-//           border: OutlineInputBorder(
-//             borderRadius: BorderRadius.circular(20),
-//             borderSide: const BorderSide(color: Colors.black54),
-//           ),
-//           enabledBorder: OutlineInputBorder(
-//             borderRadius: BorderRadius.circular(20),
-//             borderSide: const BorderSide(color: Colors.black54),
-//           ),
-//           focusedBorder: OutlineInputBorder(
-//             borderRadius: BorderRadius.circular(20),
-//             borderSide: const BorderSide(color: Colors.orange, width: 2),
-//           ),
-//         ),
-//         onTap: _clearMessage,
-//         enabled: !_isApiCalling,
-//       ),
-//     );
-//   }
-//
-//   Widget _buildBottomBar() {
-//     int totalBids = _bids.length;
-//     int totalPoints = _getTotalPoints();
-//
-//     return Container(
-//       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-//       decoration: BoxDecoration(
-//         color: Colors.white,
-//         boxShadow: [
-//           BoxShadow(
-//             color: Colors.black.withOpacity(0.1),
-//             spreadRadius: 0,
-//             blurRadius: 10,
-//             offset: const Offset(0, -2),
-//           ),
-//         ],
-//         border: Border(top: BorderSide(color: Colors.grey[300]!, width: 0.5)),
-//       ),
-//       child: Row(
-//         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//         children: [
-//           Column(
-//             crossAxisAlignment: CrossAxisAlignment.start,
-//             mainAxisSize: MainAxisSize.min,
-//             children: [
-//               Text(
-//                 'Total Bids',
-//                 style: GoogleFonts.poppins(
-//                   fontSize: 13,
-//                   color: Colors.blueGrey[700],
-//                 ),
-//               ),
-//               Text(
-//                 '$totalBids',
-//                 style: GoogleFonts.poppins(
-//                   fontSize: 18,
-//                   fontWeight: FontWeight.bold,
-//                   color: Colors.black87,
-//                 ),
-//               ),
-//             ],
-//           ),
-//           Column(
-//             crossAxisAlignment: CrossAxisAlignment.start,
-//             mainAxisSize: MainAxisSize.min,
-//             children: [
-//               Text(
-//                 'Total Points',
-//                 style: GoogleFonts.poppins(
-//                   fontSize: 13,
-//                   color: Colors.blueGrey[700],
-//                 ),
-//               ),
-//               Text(
-//                 '$totalPoints',
-//                 style: GoogleFonts.poppins(
-//                   fontSize: 18,
-//                   fontWeight: FontWeight.bold,
-//                   color: Colors.black87,
-//                 ),
-//               ),
-//             ],
-//           ),
-//           ElevatedButton(
-//             onPressed: _isApiCalling ? null : _showBidConfirmationDialog,
-//             style: ElevatedButton.styleFrom(
-//               backgroundColor: _isApiCalling ? Colors.grey : Colors.orange,
-//               padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-//               shape: RoundedRectangleBorder(
-//                 borderRadius: BorderRadius.circular(8),
-//               ),
-//               elevation: 2,
-//             ),
-//             child: _isApiCalling
-//                 ? const CircularProgressIndicator(
-//                     color: Colors.white,
-//                     strokeWidth: 2,
-//                   )
-//                 : Text(
-//                     'SUBMIT',
-//                     style: GoogleFonts.poppins(
-//                       color: Colors.white,
-//                       fontSize: 16,
-//                       fontWeight: FontWeight.w600,
-//                     ),
-//                   ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }

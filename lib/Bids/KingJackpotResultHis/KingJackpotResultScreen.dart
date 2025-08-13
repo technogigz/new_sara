@@ -1,10 +1,12 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
+import '../../Helper/UserController.dart';
 import '../../ulits/Constents.dart';
 
 class KingJackpotResultScreen extends StatefulWidget {
@@ -16,9 +18,14 @@ class KingJackpotResultScreen extends StatefulWidget {
 }
 
 class _KingJackpotResultScreenState extends State<KingJackpotResultScreen> {
+  final UserController userController = Get.isRegistered<UserController>()
+      ? Get.find<UserController>()
+      : Get.put(UserController());
+
   DateTime selectedDate = DateTime.now();
   List<Map<String, String>> fullResults = [];
   bool isLoading = false;
+  late final walletBalance;
 
   List<String> hours = [
     "10:00 AM",
@@ -39,6 +46,8 @@ class _KingJackpotResultScreenState extends State<KingJackpotResultScreen> {
   void initState() {
     super.initState();
     fetchResultsForDate(selectedDate);
+    final num? bal = num.tryParse(userController.walletBalance.value);
+    walletBalance = bal?.toInt() ?? 0;
   }
 
   Future<void> fetchResultsForDate(DateTime date) async {
@@ -138,11 +147,24 @@ class _KingJackpotResultScreenState extends State<KingJackpotResultScreen> {
           icon: const Icon(Icons.arrow_back_ios_new, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 12),
-            child: Icon(Icons.account_balance_wallet_outlined),
+        actions: [
+          Image.asset(
+            "assets/images/ic_wallet.png",
+            width: 22,
+            height: 22,
+            color: Colors.black,
           ),
+          const SizedBox(width: 6),
+          Center(
+            child: Text(
+              walletBalance.toString(),
+              style: const TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
         ],
       ),
       body: isLoading

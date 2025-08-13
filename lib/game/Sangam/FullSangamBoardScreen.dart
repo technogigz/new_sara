@@ -1,3 +1,4 @@
+// same imports as before...
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -17,6 +18,8 @@ import '../../components/BidSuccessDialog.dart';
 class FullSangamBoardScreen extends StatefulWidget {
   final String screenTitle;
   final int gameId;
+
+  /// pass EXACT backend type (e.g., "FULLSANGAM")
   final String gameType;
   final String gameName;
 
@@ -37,27 +40,26 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
   final TextEditingController _closePannaController = TextEditingController();
   final TextEditingController _pointsController = TextEditingController();
 
-  List<Map<String, String>> _bids = [];
-  late GetStorage _storage = GetStorage();
+  final List<Map<String, String>> _bids = [];
+  final GetStorage _storage = GetStorage();
+  late final BidService _bidService;
+
   String _accessToken = '';
   String _registerId = '';
-  String _preferredLanguage = 'en';
   bool _accountStatus = false;
   int _walletBalance = 0;
 
   bool _isApiCalling = false;
 
-  final String _deviceId = 'test_device_id_flutter';
-  final String _deviceName = 'test_device_name_flutter';
-
-  late BidService _bidService;
+  static const String _deviceId = 'test_device_id_flutter';
+  static const String _deviceName = 'test_device_name_flutter';
 
   String? _messageToShow;
   bool _isErrorForMessage = false;
   Key _messageBarKey = UniqueKey();
   Timer? _messageDismissTimer;
 
-  static final List<String> _allPannas = [
+  static const List<String> _allPannas = [
     "100",
     "110",
     "112",
@@ -150,7 +152,9 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
     "990",
   ];
 
-  final UserController userController = Get.put(UserController());
+  final UserController userController = Get.isRegistered<UserController>()
+      ? Get.find<UserController>()
+      : Get.put(UserController());
 
   @override
   void initState() {
@@ -172,10 +176,12 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
     _accessToken = _storage.read('accessToken') ?? '';
     _registerId = _storage.read('registerId') ?? '';
     _accountStatus = userController.accountStatus.value;
-    _preferredLanguage = _storage.read('selectedLanguage') ?? 'en';
 
-    double walletBalance = double.parse(userController.walletBalance.value);
-    _walletBalance = walletBalance.toInt();
+    final balStr = userController.walletBalance.value;
+    final num? parsed = num.tryParse(balStr);
+    _walletBalance = parsed?.toInt() ?? 0;
+
+    if (mounted) setState(() {});
   }
 
   void _showMessage(String message, {bool isError = false}) {
@@ -186,41 +192,33 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
       _isErrorForMessage = isError;
       _messageBarKey = UniqueKey();
     });
-    _messageDismissTimer = Timer(const Duration(seconds: 3), () {
-      _clearMessage();
-    });
+    _messageDismissTimer = Timer(const Duration(seconds: 3), _clearMessage);
   }
 
   void _clearMessage() {
-    if (mounted) {
-      setState(() {
-        _messageToShow = null;
-      });
-    }
+    if (!mounted) return;
+    setState(() => _messageToShow = null);
   }
 
+  // ---------- Add / Remove ----------
   void _addBid() {
     if (_isApiCalling) return;
     _clearMessage();
+
     final openPanna = _openPannaController.text.trim();
     final closePanna = _closePannaController.text.trim();
     final points = _pointsController.text.trim();
 
-    if (openPanna.isEmpty ||
-        openPanna.length != 3 ||
-        !_allPannas.contains(openPanna)) {
+    if (openPanna.length != 3 || !_allPannas.contains(openPanna)) {
       _showMessage('Please enter a valid 3-digit Open Panna.', isError: true);
       return;
     }
-
-    if (closePanna.isEmpty ||
-        closePanna.length != 3 ||
-        !_allPannas.contains(closePanna)) {
+    if (closePanna.length != 3 || !_allPannas.contains(closePanna)) {
       _showMessage('Please enter a valid 3-digit Close Panna.', isError: true);
       return;
     }
 
-    int? parsedPoints = int.tryParse(points);
+    final int? parsedPoints = int.tryParse(points);
     final int minBid =
         int.tryParse(_storage.read('minBid')?.toString() ?? '10') ?? 10;
     if (parsedPoints == null || parsedPoints < minBid || parsedPoints > 1000) {
@@ -231,12 +229,10 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
     final sangam = '$openPanna-$closePanna';
 
     setState(() {
-      int existingIndex = _bids.indexWhere((bid) => bid['sangam'] == sangam);
-
-      if (existingIndex != -1) {
-        _bids[existingIndex]['points'] =
-            (int.parse(_bids[existingIndex]['points']!) + parsedPoints)
-                .toString();
+      final idx = _bids.indexWhere((b) => b['sangam'] == sangam);
+      if (idx != -1) {
+        _bids[idx]['points'] = (int.parse(_bids[idx]['points']!) + parsedPoints)
+            .toString();
         _showMessage('Updated points for $sangam.');
       } else {
         _bids.add({
@@ -258,28 +254,33 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
   void _removeBid(int index) {
     if (_isApiCalling) return;
     _clearMessage();
-    if (index >= 0 && index < _bids.length) {
-      setState(() {
-        final removedSangam = _bids[index]['sangam'];
-        _bids.removeAt(index);
-        _showMessage('Bid for $removedSangam removed from list.');
-      });
-    }
+    if (index < 0 || index >= _bids.length) return;
+
+    setState(() {
+      final removedSangam = _bids[index]['sangam'];
+      _bids.removeAt(index);
+      _showMessage('Bid for $removedSangam removed from list.');
+    });
   }
 
   int _getTotalPoints() {
     return _bids.fold(
       0,
-      (sum, item) => sum + (int.tryParse(item['points'] ?? '0') ?? 0),
+      (sum, b) => sum + (int.tryParse(b['points'] ?? '0') ?? 0),
     );
   }
 
+  // ---------- Submit flow ----------
   void _showConfirmationDialog() {
     _clearMessage();
-    if (_isApiCalling || _bids.isEmpty) return;
+    if (_isApiCalling) return;
 
-    final int totalPoints = _getTotalPoints();
+    if (_bids.isEmpty) {
+      _showMessage('Please add at least one bid.', isError: true);
+      return;
+    }
 
+    final totalPoints = _getTotalPoints();
     if (_walletBalance < totalPoints) {
       _showMessage(
         'Insufficient wallet balance to place this bid.',
@@ -288,80 +289,74 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
       return;
     }
 
-    List<Map<String, String>> bidsForDialog = _bids.map((bid) {
-      return {
-        "pana": bid['openPanna']!,
-        "digit": bid['closePanna']!,
-        "points": bid['points']!,
-        "type": '--',
-        "sangam": bid['sangam']!,
-        "jodi": "",
-      };
-    }).toList();
+    final bidsForDialog = _bids
+        .map(
+          (bid) => {
+            "pana": bid['openPanna']!,
+            "digit": bid['closePanna']!,
+            "points": bid['points']!,
+            "type": '--',
+            "sangam": bid['sangam']!,
+            "jodi": "",
+          },
+        )
+        .toList();
 
-    final String formattedDate = DateFormat(
+    final formattedDate = DateFormat(
       'dd MMM yyyy, hh:mm a',
     ).format(DateTime.now());
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return BidConfirmationDialog(
-          gameTitle: widget.gameName,
-          gameDate: formattedDate,
-          bids: bidsForDialog,
-          totalBids: bidsForDialog.length,
-          totalBidsAmount: totalPoints,
-          walletBalanceBeforeDeduction: _walletBalance,
-          walletBalanceAfterDeduction: (_walletBalance - totalPoints)
-              .toString(),
-          gameId: widget.gameId.toString(),
-          gameType: widget.gameType,
-          onConfirm: () async {
-            // Navigator.pop(dialogContext);
-            final Map<String, dynamic> result = await _placeFinalBids();
-            if (!mounted) return;
+      builder: (_) => BidConfirmationDialog(
+        gameTitle: widget.gameName,
+        gameDate: formattedDate,
+        bids: bidsForDialog,
+        totalBids: bidsForDialog.length,
+        totalBidsAmount: totalPoints,
+        walletBalanceBeforeDeduction: _walletBalance,
+        walletBalanceAfterDeduction: (_walletBalance - totalPoints).toString(),
+        gameId: widget.gameId.toString(),
+        gameType: widget.gameType,
+        onConfirm: () async {
+          final result = await _placeFinalBids();
+          if (!mounted) return;
 
-            if (result['status'] == true) {
-              setState(() {
-                _bids.clear();
-              });
-              final int newBalance =
-                  (result['data']?['wallet_balance'] as num?)?.toInt() ??
-                  (_walletBalance - totalPoints);
-              await _bidService.updateWalletBalance(newBalance);
-              await showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (BuildContext context) {
-                  return const BidSuccessDialog();
-                },
-              );
-            } else {
-              await showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (BuildContext context) {
-                  return BidFailureDialog(
-                    errorMessage:
-                        result['msg'] ??
-                        "Bid submission failed. Please try again.",
-                  );
-                },
-              );
-            }
-          },
-        );
-      },
+          if (result['status'] == true) {
+            setState(() => _bids.clear());
+
+            final int newBalance =
+                (result['data']?['wallet_balance'] as num?)?.toInt() ??
+                (_walletBalance - totalPoints);
+
+            await _bidService.updateWalletBalance(newBalance);
+
+            if (!mounted) return;
+            await showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (_) => const BidSuccessDialog(),
+            );
+          } else {
+            if (!mounted) return;
+            await showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (_) => BidFailureDialog(
+                errorMessage:
+                    result['msg'] ?? "Bid submission failed. Please try again.",
+              ),
+            );
+          }
+        },
+      ),
     );
   }
 
   Future<Map<String, dynamic>> _placeFinalBids() async {
     if (!mounted) return {'status': false, 'msg': 'Screen not mounted.'};
-    setState(() {
-      _isApiCalling = true;
-    });
+    setState(() => _isApiCalling = true);
 
     try {
       if (_accessToken.isEmpty || _registerId.isEmpty) {
@@ -371,21 +366,22 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
         };
       }
 
-      Map<String, String> bidAmountsMap = {};
-      for (var bid in _bids) {
-        final String sangamKey = '${bid['openPanna']!}-${bid['closePanna']!}';
-        bidAmountsMap[sangamKey] = bid['points']!;
-      }
-
-      int currentBatchTotalPoints = _getTotalPoints();
+      // Build "openPanna-closePanna" -> "points" map
+      final Map<String, String> bidAmountsMap = {
+        for (final b in _bids)
+          '${b['openPanna']!}-${b['closePanna']!}': b['points']!,
+      };
 
       if (bidAmountsMap.isEmpty) {
         return {'status': false, 'msg': 'No valid bids to submit.'};
       }
 
-      final String selectedSessionType = "FULLSANGAM";
+      final totalPoints = _getTotalPoints();
+      final String payloadGameType = (widget.gameType.isNotEmpty)
+          ? widget.gameType
+          : 'FULLSANGAM';
 
-      final Map<String, dynamic> result = await _bidService.placeFinalBids(
+      final result = await _bidService.placeFinalBids(
         gameName: widget.gameName,
         accessToken: _accessToken,
         registerId: _registerId,
@@ -393,24 +389,21 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
         deviceName: _deviceName,
         accountStatus: _accountStatus,
         bidAmounts: bidAmountsMap,
-        selectedGameType: selectedSessionType,
+        selectedGameType: payloadGameType, // important: server mode
         gameId: widget.gameId,
         gameType: widget.gameType,
-        totalBidAmount: currentBatchTotalPoints,
+        totalBidAmount: totalPoints,
       );
 
       return result;
     } catch (e) {
       return {'status': false, 'msg': 'An unexpected error occurred: $e'};
     } finally {
-      if (mounted) {
-        setState(() {
-          _isApiCalling = false;
-        });
-      }
+      if (mounted) setState(() => _isApiCalling = false);
     }
   }
 
+  // ---------- UI ----------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -439,12 +432,14 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
           ),
           const SizedBox(width: 6),
           Center(
-            child: Text(
-              '₹${userController.walletBalance.value}',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
+            child: Obx(
+              () => Text(
+                '₹${userController.walletBalance.value}',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
               ),
             ),
           ),
@@ -464,32 +459,21 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildPannaInputRow(
+                      _pannaField(
                         'Enter Open Panna :',
                         _openPannaController,
-                        hintText: 'e.g., 123',
-                        maxLength: 3,
-                        enabled: !_isApiCalling,
+                        hint: 'e.g., 123',
                         onSubmitted: _addBid,
                       ),
                       const SizedBox(height: 16),
-                      _buildPannaInputRow(
+                      _pannaField(
                         'Enter Close Panna :',
                         _closePannaController,
-                        hintText: 'e.g., 456',
-                        maxLength: 3,
-                        enabled: !_isApiCalling,
+                        hint: 'e.g., 456',
                         onSubmitted: _addBid,
                       ),
                       const SizedBox(height: 16),
-                      _buildInputRow(
-                        'Enter Points :',
-                        _pointsController,
-                        hintText: 'e.g., 100',
-                        maxLength: 4,
-                        enabled: !_isApiCalling,
-                        onSubmitted: _addBid,
-                      ),
+                      _pointsField(),
                       const SizedBox(height: 20),
                       SizedBox(
                         width: double.infinity,
@@ -505,18 +489,22 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
                             ),
                           ),
                           child: _isApiCalling
-                              ? const CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                    strokeWidth: 2,
                                   ),
-                                  strokeWidth: 2,
                                 )
                               : Text(
                                   "ADD",
                                   style: GoogleFonts.poppins(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.5,
+                                    letterSpacing: .5,
                                     fontSize: 16,
                                   ),
                                 ),
@@ -526,11 +514,12 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
                   ),
                 ),
                 const Divider(thickness: 1),
+
                 if (_bids.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16.0,
-                      vertical: 8.0,
+                      horizontal: 16,
+                      vertical: 8,
                     ),
                     child: Row(
                       children: [
@@ -555,6 +544,7 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
                     ),
                   ),
                 if (_bids.isNotEmpty) const Divider(thickness: 1),
+
                 Expanded(
                   child: _bids.isEmpty
                       ? Center(
@@ -565,8 +555,8 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
                         )
                       : ListView.builder(
                           itemCount: _bids.length,
-                          itemBuilder: (context, index) {
-                            final bid = _bids[index];
+                          itemBuilder: (_, i) {
+                            final bid = _bids[i];
                             return Container(
                               margin: const EdgeInsets.symmetric(
                                 horizontal: 10,
@@ -586,8 +576,8 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
                               ),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 16.0,
-                                  vertical: 8.0,
+                                  horizontal: 16,
+                                  vertical: 8,
                                 ),
                                 child: Row(
                                   children: [
@@ -610,7 +600,7 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
                                       ),
                                       onPressed: _isApiCalling
                                           ? null
-                                          : () => _removeBid(index),
+                                          : () => _removeBid(i),
                                     ),
                                   ],
                                 ),
@@ -619,9 +609,11 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
                           },
                         ),
                 ),
-                _buildBottomBar(),
+
+                SafeArea(top: false, child: _bottomBar()),
               ],
             ),
+
             if (_messageToShow != null)
               Positioned(
                 top: 0,
@@ -640,13 +632,119 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
     );
   }
 
-  Widget _buildInputRow(
+  // ---------- field builders ----------
+  Widget _pointsField() {
+    return _inputRow(
+      'Enter Points :',
+      _pointsController,
+      hintText: 'e.g., 100',
+      maxLength: 4,
+      onSubmitted: _addBid,
+    );
+  }
+
+  Widget _pannaField(
+    String label,
+    TextEditingController controller, {
+    required String hint,
+    VoidCallback? onSubmitted,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: GoogleFonts.poppins(fontSize: 16)),
+        SizedBox(
+          width: 150,
+          height: 40,
+          child: Autocomplete<String>(
+            fieldViewBuilder: (context, textCtrl, focusNode, _) {
+              // keep controllers in sync without flicker
+              if (textCtrl.text != controller.text) {
+                textCtrl.text = controller.text;
+                textCtrl.selection = TextSelection.fromPosition(
+                  TextPosition(offset: textCtrl.text.length),
+                );
+              }
+              return TextField(
+                cursorColor: Colors.orange,
+                controller: textCtrl,
+                focusNode: focusNode,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(3),
+                ],
+                onChanged: (v) => controller.text = v,
+                decoration: const InputDecoration(
+                  hintText: 'e.g., 123',
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(20)),
+                    borderSide: BorderSide(color: Colors.black),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(20)),
+                    borderSide: BorderSide(color: Colors.black),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(20)),
+                    borderSide: BorderSide(color: Colors.orange, width: 2),
+                  ),
+                  suffixIcon: Icon(
+                    Icons.arrow_forward,
+                    color: Colors.orange,
+                    size: 20,
+                  ),
+                ),
+                onSubmitted: (_) => onSubmitted?.call(),
+              );
+            },
+            optionsBuilder: (value) {
+              if (value.text.isEmpty) return const Iterable<String>.empty();
+              return _allPannas.where((s) => s.startsWith(value.text));
+            },
+            onSelected: (s) {
+              controller.text = s;
+              onSubmitted?.call();
+            },
+            optionsViewBuilder: (context, onSelected, options) {
+              final list = options.toList(growable: false);
+              return Align(
+                alignment: Alignment.topLeft,
+                child: Material(
+                  elevation: 4,
+                  child: SizedBox(
+                    height: list.length > 5 ? 200 : list.length * 48,
+                    width: 150,
+                    child: ListView.builder(
+                      padding: EdgeInsets.zero,
+                      itemCount: list.length,
+                      itemBuilder: (_, i) => ListTile(
+                        dense: true,
+                        title: Text(
+                          list[i],
+                          style: GoogleFonts.poppins(fontSize: 14),
+                        ),
+                        onTap: () => onSelected(list[i]),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _inputRow(
     String label,
     TextEditingController controller, {
     String hintText = '',
     int? maxLength,
     bool enabled = true,
-    Function()? onSubmitted,
+    VoidCallback? onSubmitted,
   }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -666,7 +764,7 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
             ],
             onTap: _clearMessage,
             enabled: enabled,
-            onSubmitted: (value) => onSubmitted?.call(),
+            onSubmitted: (_) => onSubmitted?.call(),
             decoration: InputDecoration(
               hintText: hintText,
               contentPadding: const EdgeInsets.symmetric(horizontal: 12),
@@ -694,131 +792,9 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
     );
   }
 
-  Widget _buildPannaInputRow(
-    String label,
-    TextEditingController controller, {
-    String hintText = '',
-    int? maxLength,
-    bool enabled = true,
-    Function()? onSubmitted,
-  }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: GoogleFonts.poppins(fontSize: 16)),
-        SizedBox(
-          width: 150,
-          height: 40,
-          child: Autocomplete<String>(
-            fieldViewBuilder:
-                (
-                  BuildContext context,
-                  TextEditingController textEditingController,
-                  FocusNode focusNode,
-                  VoidCallback onFieldSubmittedCallback,
-                ) {
-                  controller.addListener(() {
-                    if (textEditingController.text != controller.text) {
-                      textEditingController.text = controller.text;
-                    }
-                  });
-
-                  return TextField(
-                    cursorColor: Colors.orange,
-                    controller: textEditingController,
-                    focusNode: focusNode,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      if (maxLength != null)
-                        LengthLimitingTextInputFormatter(maxLength),
-                    ],
-                    onTap: _clearMessage,
-                    enabled: enabled,
-                    decoration: InputDecoration(
-                      hintText: hintText,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                      ),
-                      border: const OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(20)),
-                        borderSide: BorderSide(color: Colors.black),
-                      ),
-                      enabledBorder: const OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(20)),
-                        borderSide: BorderSide(color: Colors.black),
-                      ),
-                      focusedBorder: const OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(20)),
-                        borderSide: BorderSide(color: Colors.orange, width: 2),
-                      ),
-                      suffixIcon: const Icon(
-                        Icons.arrow_forward,
-                        color: Colors.orange,
-                        size: 20,
-                      ),
-                    ),
-                    onSubmitted: (value) => onSubmitted?.call(),
-                  );
-                },
-            optionsBuilder: (TextEditingValue textEditingValue) {
-              if (textEditingValue.text.isEmpty) {
-                return const Iterable<String>.empty();
-              }
-              return _allPannas.where((String option) {
-                return option.startsWith(textEditingValue.text);
-              });
-            },
-            onSelected: (String selection) {
-              controller.text = selection;
-              onSubmitted?.call();
-            },
-            optionsViewBuilder:
-                (
-                  BuildContext context,
-                  AutocompleteOnSelected<String> onSelected,
-                  Iterable<String> options,
-                ) {
-                  return Align(
-                    alignment: Alignment.topLeft,
-                    child: Material(
-                      elevation: 4.0,
-                      child: SizedBox(
-                        height: options.length > 5
-                            ? 200.0
-                            : options.length * 48.0,
-                        width: 150,
-                        child: ListView.builder(
-                          padding: EdgeInsets.zero,
-                          itemCount: options.length,
-                          itemBuilder: (BuildContext context, int index) {
-                            final String option = options.elementAt(index);
-                            return GestureDetector(
-                              onTap: () {
-                                onSelected(option);
-                              },
-                              child: ListTile(
-                                title: Text(
-                                  option,
-                                  style: GoogleFonts.poppins(fontSize: 14),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  );
-                },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBottomBar() {
-    int totalBids = _bids.length;
-    int totalPoints = _getTotalPoints();
+  Widget _bottomBar() {
+    final totalBids = _bids.length;
+    final totalPoints = _getTotalPoints();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -836,44 +812,8 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Bid',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                ),
-              ),
-              Text(
-                '$totalBids',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Total',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                ),
-              ),
-              Text(
-                '$totalPoints',
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
+          _SummaryTile(title: 'Bid', value: '$totalBids'),
+          _SummaryTile(title: 'Total', value: '$totalPoints'),
           ElevatedButton(
             onPressed: (_isApiCalling || _bids.isEmpty)
                 ? null
@@ -889,9 +829,13 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
               elevation: 3,
             ),
             child: _isApiCalling
-                ? const CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    strokeWidth: 2,
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      strokeWidth: 2,
+                    ),
                   )
                 : Text(
                     'SUBMIT',
@@ -907,15 +851,41 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
   }
 }
 
+class _SummaryTile extends StatelessWidget {
+  final String title;
+  final String value;
+  const _SummaryTile({required this.title, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[700]),
+        ),
+        Text(
+          value,
+          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+}
+
+// // same imports as before...
 // import 'dart:async';
 //
 // import 'package:flutter/material.dart';
 // import 'package:flutter/services.dart';
+// import 'package:get/get.dart';
 // import 'package:get_storage/get_storage.dart';
 // import 'package:google_fonts/google_fonts.dart';
 // import 'package:intl/intl.dart';
 //
 // import '../../BidService.dart';
+// import '../../Helper/UserController.dart';
 // import '../../components/AnimatedMessageBar.dart';
 // import '../../components/BidConfirmationDialog.dart';
 // import '../../components/BidFailureDialog.dart';
@@ -924,13 +894,15 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
 // class FullSangamBoardScreen extends StatefulWidget {
 //   final String screenTitle;
 //   final int gameId;
-//   final String gameType;
+//   final String gameType; // pass EXACT backend type (e.g., FULLSANGAM)
+//   final String gameName;
 //
 //   const FullSangamBoardScreen({
 //     Key? key,
 //     required this.screenTitle,
 //     required this.gameType,
 //     required this.gameId,
+//     required this.gameName,
 //   }) : super(key: key);
 //
 //   @override
@@ -942,173 +914,201 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
 //   final TextEditingController _closePannaController = TextEditingController();
 //   final TextEditingController _pointsController = TextEditingController();
 //
-//   List<Map<String, String>> _bids = [];
-//   late GetStorage storage = GetStorage();
-//   late String accessToken;
-//   late String registerId;
-//   late String preferredLanguage;
-//   bool accountStatus = false;
-//   late int walletBalance;
+//   final List<Map<String, String>> _bids = [];
+//   final GetStorage _storage = GetStorage();
+//   late final BidService _bidService;
+//
+//   String _accessToken = '';
+//   String _registerId = '';
+//   String _preferredLanguage = 'en';
+//   bool _accountStatus = false;
+//   int _walletBalance = 0;
 //
 //   bool _isApiCalling = false;
 //
-//   final String _deviceId = 'test_device_id_flutter';
-//   final String _deviceName = 'test_device_name_flutter';
-//
-//   late BidService _bidService;
+//   static const String _deviceId = 'test_device_id_flutter';
+//   static const String _deviceName = 'test_device_name_flutter';
 //
 //   String? _messageToShow;
 //   bool _isErrorForMessage = false;
 //   Key _messageBarKey = UniqueKey();
+//   Timer? _messageDismissTimer;
+//
+//   static const List<String> _allPannas = [
+//     "100",
+//     "110",
+//     "112",
+//     "113",
+//     "114",
+//     "115",
+//     "116",
+//     "117",
+//     "118",
+//     "119",
+//     "122",
+//     "133",
+//     "144",
+//     "155",
+//     "166",
+//     "177",
+//     "188",
+//     "199",
+//     "200",
+//     "220",
+//     "223",
+//     "224",
+//     "225",
+//     "226",
+//     "227",
+//     "228",
+//     "229",
+//     "233",
+//     "244",
+//     "255",
+//     "266",
+//     "277",
+//     "288",
+//     "299",
+//     "300",
+//     "330",
+//     "334",
+//     "335",
+//     "336",
+//     "337",
+//     "338",
+//     "339",
+//     "344",
+//     "355",
+//     "366",
+//     "377",
+//     "388",
+//     "399",
+//     "400",
+//     "440",
+//     "445",
+//     "446",
+//     "447",
+//     "448",
+//     "449",
+//     "455",
+//     "466",
+//     "477",
+//     "488",
+//     "499",
+//     "500",
+//     "550",
+//     "556",
+//     "557",
+//     "558",
+//     "559",
+//     "566",
+//     "577",
+//     "588",
+//     "599",
+//     "600",
+//     "660",
+//     "667",
+//     "668",
+//     "669",
+//     "677",
+//     "688",
+//     "699",
+//     "700",
+//     "770",
+//     "778",
+//     "779",
+//     "788",
+//     "799",
+//     "800",
+//     "880",
+//     "889",
+//     "899",
+//     "900",
+//     "990",
+//   ];
+//
+//   final UserController userController = Get.isRegistered<UserController>()
+//       ? Get.find<UserController>()
+//       : Get.put(UserController());
 //
 //   @override
 //   void initState() {
 //     super.initState();
+//     _bidService = BidService(_storage);
 //     _loadInitialData();
-//     _setupStorageListeners();
-//     _bidService = BidService(storage);
 //   }
-//
-//   Future<void> _loadInitialData() async {
-//     accessToken = storage.read('accessToken') ?? '';
-//     registerId = storage.read('registerId') ?? '';
-//     accountStatus = storage.read('accountStatus') ?? false;
-//     preferredLanguage = storage.read('selectedLanguage') ?? 'en';
-//
-//     final dynamic storedWalletBalance = storage.read('walletBalance');
-//     if (storedWalletBalance is String) {
-//       walletBalance = int.tryParse(storedWalletBalance) ?? 0;
-//     } else if (storedWalletBalance is int) {
-//       walletBalance = storedWalletBalance;
-//     } else {
-//       walletBalance = 0;
-//     }
-//   }
-//
-//   void _setupStorageListeners() {
-//     storage.listenKey('accessToken', (value) {
-//       if (mounted) setState(() => accessToken = value ?? '');
-//     });
-//
-//     storage.listenKey('registerId', (value) {
-//       if (mounted) setState(() => registerId = value ?? '');
-//     });
-//
-//     storage.listenKey('accountStatus', (value) {
-//       if (mounted) setState(() => accountStatus = value ?? false);
-//     });
-//
-//     storage.listenKey('selectedLanguage', (value) {
-//       if (mounted) setState(() => preferredLanguage = value ?? 'en');
-//     });
-//
-//     storage.listenKey('walletBalance', (value) {
-//       if (mounted) {
-//         setState(() {
-//           if (value is String) {
-//             walletBalance = int.tryParse(value) ?? 0;
-//           } else if (value is int) {
-//             walletBalance = value;
-//           } else {
-//             walletBalance = 0;
-//           }
-//         });
-//       }
-//     });
-//   }
-//
-//   static final List<String> _allPannas = List.generate(
-//     900,
-//     (index) => (index + 100).toString(),
-//   );
 //
 //   @override
 //   void dispose() {
 //     _openPannaController.dispose();
 //     _closePannaController.dispose();
 //     _pointsController.dispose();
+//     _messageDismissTimer?.cancel();
 //     super.dispose();
 //   }
 //
+//   Future<void> _loadInitialData() async {
+//     _accessToken = _storage.read('accessToken') ?? '';
+//     _registerId = _storage.read('registerId') ?? '';
+//     _accountStatus = userController.accountStatus.value;
+//     _preferredLanguage = _storage.read('selectedLanguage') ?? 'en';
+//
+//     final balStr = userController.walletBalance.value;
+//     final num? parsed = num.tryParse(balStr);
+//     _walletBalance = parsed?.toInt() ?? 0;
+//
+//     if (mounted) setState(() {});
+//   }
+//
 //   void _showMessage(String message, {bool isError = false}) {
-//     if (!mounted)
-//       return; // Add this check to prevent setState on unmounted widget
+//     _messageDismissTimer?.cancel();
+//     if (!mounted) return;
 //     setState(() {
 //       _messageToShow = message;
 //       _isErrorForMessage = isError;
 //       _messageBarKey = UniqueKey();
 //     });
+//     _messageDismissTimer = Timer(const Duration(seconds: 3), _clearMessage);
 //   }
 //
 //   void _clearMessage() {
-//     if (mounted) {
-//       setState(() {
-//         _messageToShow = null;
-//       });
-//     }
+//     if (!mounted) return;
+//     setState(() => _messageToShow = null);
 //   }
 //
+//   // ---------- Add / Remove ----------
 //   void _addBid() {
 //     if (_isApiCalling) return;
 //     _clearMessage();
+//
 //     final openPanna = _openPannaController.text.trim();
 //     final closePanna = _closePannaController.text.trim();
 //     final points = _pointsController.text.trim();
 //
-//     if (openPanna.isEmpty ||
-//         openPanna.length != 3 ||
-//         int.tryParse(openPanna) == null) {
-//       _showMessage(
-//         'Please enter a 3-digit number for Open Panna.',
-//         isError: true,
-//       );
+//     if (openPanna.length != 3 || !_allPannas.contains(openPanna)) {
+//       _showMessage('Please enter a valid 3-digit Open Panna.', isError: true);
 //       return;
 //     }
-//     int? parsedOpenPanna = int.tryParse(openPanna);
-//     if (parsedOpenPanna == null ||
-//         parsedOpenPanna < 100 ||
-//         parsedOpenPanna > 999) {
-//       _showMessage('Open Panna must be between 100 and 999.', isError: true);
+//     if (closePanna.length != 3 || !_allPannas.contains(closePanna)) {
+//       _showMessage('Please enter a valid 3-digit Close Panna.', isError: true);
 //       return;
 //     }
 //
-//     if (closePanna.isEmpty ||
-//         closePanna.length != 3 ||
-//         int.tryParse(closePanna) == null) {
-//       _showMessage(
-//         'Please enter a 3-digit number for Close Panna.',
-//         isError: true,
-//       );
-//       return;
-//     }
-//     int? parsedClosePanna = int.tryParse(closePanna);
-//     if (parsedClosePanna == null ||
-//         parsedClosePanna < 100 ||
-//         parsedClosePanna > 999) {
-//       _showMessage('Close Panna must be between 100 and 999.', isError: true);
-//       return;
-//     }
-//
-//     int? parsedPoints = int.tryParse(points);
-//     if (parsedPoints == null ||
-//         parsedPoints < GetStorage().read('minBid') ||
-//         parsedPoints > 1000) {
-//       _showMessage(
-//         'Points must be between ${GetStorage().read('minBid')} and 1000.',
-//         isError: true,
-//       );
+//     final int? parsedPoints = int.tryParse(points);
+//     final int minBid =
+//         int.tryParse(_storage.read('minBid')?.toString() ?? '10') ?? 10;
+//     if (parsedPoints == null || parsedPoints < minBid || parsedPoints > 1000) {
+//       _showMessage('Points must be between $minBid and 1000.', isError: true);
 //       return;
 //     }
 //
 //     final sangam = '$openPanna-$closePanna';
 //
 //     setState(() {
-//       int existingIndex = _bids.indexWhere((bid) => bid['sangam'] == sangam);
-//
-//       if (existingIndex != -1) {
-//         _bids[existingIndex]['points'] =
-//             (int.parse(_bids[existingIndex]['points']!) + parsedPoints)
-//                 .toString();
+//       final idx = _bids.indexWhere((b) => b['sangam'] == sangam);
+//       if (idx != -1) {
+//         _bids[idx]['points'] = (int.parse(_bids[idx]['points']!) + parsedPoints)
+//             .toString();
 //         _showMessage('Updated points for $sangam.');
 //       } else {
 //         _bids.add({
@@ -1116,7 +1116,7 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
 //           "points": points,
 //           "openPanna": openPanna,
 //           "closePanna": closePanna,
-//           "type": "FullSangam",
+//           "type": widget.gameType,
 //         });
 //         _showMessage('Added bid: $sangam with $points points.');
 //       }
@@ -1130,7 +1130,8 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
 //   void _removeBid(int index) {
 //     if (_isApiCalling) return;
 //     _clearMessage();
-//     // The key is to wrap the removal in setState() to trigger a UI rebuild.
+//     if (index < 0 || index >= _bids.length) return;
+//
 //     setState(() {
 //       final removedSangam = _bids[index]['sangam'];
 //       _bids.removeAt(index);
@@ -1141,10 +1142,11 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
 //   int _getTotalPoints() {
 //     return _bids.fold(
 //       0,
-//       (sum, item) => sum + (int.tryParse(item['points'] ?? '0') ?? 0),
+//       (sum, b) => sum + (int.tryParse(b['points'] ?? '0') ?? 0),
 //     );
 //   }
 //
+//   // ---------- Submit flow ----------
 //   void _showConfirmationDialog() {
 //     _clearMessage();
 //     if (_isApiCalling) return;
@@ -1154,9 +1156,8 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
 //       return;
 //     }
 //
-//     final int totalPoints = _getTotalPoints();
-//
-//     if (walletBalance < totalPoints) {
+//     final totalPoints = _getTotalPoints();
+//     if (_walletBalance < totalPoints) {
 //       _showMessage(
 //         'Insufficient wallet balance to place this bid.',
 //         isError: true,
@@ -1164,135 +1165,116 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
 //       return;
 //     }
 //
-//     List<Map<String, String>> bidsForDialog = _bids.map((bid) {
-//       return {
-//         "pana": bid['openPanna']!,
-//         "digit": bid['closePanna']!,
-//         "points": bid['points']!,
-//         "type": bid['type']!,
-//         "sangam": bid['sangam']!,
-//         "jodi": "",
-//       };
-//     }).toList();
+//     final bidsForDialog = _bids
+//         .map(
+//           (bid) => {
+//             "pana": bid['openPanna']!,
+//             "digit": bid['closePanna']!,
+//             "points": bid['points']!,
+//             "type": '--',
+//             "sangam": bid['sangam']!,
+//             "jodi": "",
+//           },
+//         )
+//         .toList();
 //
-//     final String formattedDate = DateFormat(
+//     final formattedDate = DateFormat(
 //       'dd MMM yyyy, hh:mm a',
 //     ).format(DateTime.now());
 //
 //     showDialog(
 //       context: context,
 //       barrierDismissible: false,
-//       builder: (BuildContext dialogContext) {
-//         return BidConfirmationDialog(
-//           gameTitle: widget.screenTitle,
-//           gameDate: formattedDate,
-//           bids: bidsForDialog,
-//           totalBids: bidsForDialog.length,
-//           totalBidsAmount: totalPoints,
-//           walletBalanceBeforeDeduction: walletBalance,
-//           walletBalanceAfterDeduction: (walletBalance - totalPoints).toString(),
-//           gameId: widget.gameId.toString(),
-//           gameType: widget.gameType,
-//           onConfirm: () async {
-//             // Navigator.pop(dialogContext); // Dismiss confirmation dialog first
-//             setState(() {
-//               _isApiCalling = true;
-//             });
-//             bool success = await _placeFinalBids();
-//             if (success) {
-//               setState(() {
-//                 _bids.clear(); // Clear bids on successful submission
-//               });
-//             }
-//             if (mounted) {
-//               setState(() {
-//                 _isApiCalling = false;
-//               });
-//             }
-//           },
-//         );
-//       },
-//     );
-//   }
+//       builder: (_) => BidConfirmationDialog(
+//         gameTitle: widget.gameName,
+//         gameDate: formattedDate,
+//         bids: bidsForDialog,
+//         totalBids: bidsForDialog.length,
+//         totalBidsAmount: totalPoints,
+//         walletBalanceBeforeDeduction: _walletBalance,
+//         walletBalanceAfterDeduction: (_walletBalance - totalPoints).toString(),
+//         gameId: widget.gameId.toString(),
+//         gameType: widget.gameType,
+//         onConfirm: () async {
+//           final result = await _placeFinalBids();
+//           if (!mounted) return;
 //
-//   Future<bool> _placeFinalBids() async {
-//     if (accessToken.isEmpty || registerId.isEmpty) {
-//       if (mounted) {
-//         await showDialog(
-//           context: context,
-//           barrierDismissible: false,
-//           builder: (BuildContext dialogContext) {
-//             // Use a different context for the dialog
-//             return const BidFailureDialog(
-//               errorMessage: 'Authentication error. Please log in again.',
+//           if (result['status'] == true) {
+//             setState(() => _bids.clear());
+//             final int newBalance =
+//                 (result['data']?['wallet_balance'] as num?)?.toInt() ??
+//                 (_walletBalance - totalPoints);
+//             await _bidService.updateWalletBalance(newBalance);
+//             await showDialog(
+//               context: context,
+//               barrierDismissible: false,
+//               builder: (_) => const BidSuccessDialog(),
 //             );
-//           },
-//         );
-//       }
-//       return false;
-//     }
-//
-//     Map<String, String> bidAmountsForService = {};
-//     for (var bid in _bids) {
-//       bidAmountsForService[bid['sangam']!] = bid['points']!;
-//     }
-//
-//     final response = await _bidService.placeFinalBids(
-//       gameName: widget.screenTitle,
-//       accessToken: accessToken,
-//       registerId: registerId,
-//       deviceId: _deviceId,
-//       deviceName: _deviceName,
-//       accountStatus: accountStatus,
-//       bidAmounts: bidAmountsForService,
-//       selectedGameType: "FULLSANGAM",
-//       gameId: widget.gameId,
-//       gameType: widget.gameType,
-//       totalBidAmount: _getTotalPoints(),
+//           } else {
+//             await showDialog(
+//               context: context,
+//               barrierDismissible: false,
+//               builder: (_) => BidFailureDialog(
+//                 errorMessage:
+//                     result['msg'] ?? "Bid submission failed. Please try again.",
+//               ),
+//             );
+//           }
+//         },
+//       ),
 //     );
+//   }
 //
-//     if (response['status'] == true) {
-//       int currentWallet = walletBalance;
-//       int deductedAmount = _getTotalPoints();
-//       int newWalletBalance = currentWallet - deductedAmount;
-//       await _bidService.updateWalletBalance(newWalletBalance);
+//   Future<Map<String, dynamic>> _placeFinalBids() async {
+//     if (!mounted) return {'status': false, 'msg': 'Screen not mounted.'};
+//     setState(() => _isApiCalling = true);
 //
-//       if (mounted) {
-//         setState(() {
-//           walletBalance = newWalletBalance;
-//         });
-//         // Ensure this dialog is shown after the current context allows it.
-//         // It's already handled by the BidConfirmationDialog's onConfirm,
-//         // which dismisses itself and then calls _placeFinalBids().
-//         // So, this showDialog will correctly appear.
-//         await showDialog(
-//           context: context,
-//           barrierDismissible: false,
-//           builder: (BuildContext dialogContext) {
-//             // Use a different context for the dialog
-//             return const BidSuccessDialog();
-//           },
-//         );
-//         _clearMessage();
+//     try {
+//       if (_accessToken.isEmpty || _registerId.isEmpty) {
+//         return {
+//           'status': false,
+//           'msg': 'Authentication error. Please log in again.',
+//         };
 //       }
-//       return true;
-//     } else {
-//       String errorMessage = response['msg'] ?? "Unknown error occurred.";
-//       if (mounted) {
-//         // Ensure this dialog is shown after the current context allows it.
-//         await showDialog(
-//           context: context,
-//           barrierDismissible: false,
-//           builder: (BuildContext dialogContext) {
-//             // Use a different context for the dialog
-//             return BidFailureDialog(errorMessage: errorMessage);
-//           },
-//         );
+//
+//       // Build "openPanna-closePanna" -> "points" map (already our internal format)
+//       final Map<String, String> bidAmountsMap = {
+//         for (final b in _bids)
+//           '${b['openPanna']!}-${b['closePanna']!}': b['points']!,
+//       };
+//
+//       if (bidAmountsMap.isEmpty) {
+//         return {'status': false, 'msg': 'No valid bids to submit.'};
 //       }
-//       return false;
+//
+//       final totalPoints = _getTotalPoints();
+//       final String payloadGameType = (widget.gameType.isNotEmpty)
+//           ? widget.gameType
+//           : 'FULLSANGAM';
+//
+//       final result = await _bidService.placeFinalBids(
+//         gameName: widget.gameName,
+//         accessToken: _accessToken,
+//         registerId: _registerId,
+//         deviceId: _deviceId,
+//         deviceName: _deviceName,
+//         accountStatus: _accountStatus,
+//         bidAmounts: bidAmountsMap,
+//         selectedGameType: payloadGameType, // important: drives split logic
+//         gameId: widget.gameId,
+//         gameType: widget.gameType,
+//         totalBidAmount: totalPoints,
+//       );
+//
+//       return result;
+//     } catch (e) {
+//       return {'status': false, 'msg': 'An unexpected error occurred: $e'};
+//     } finally {
+//       if (mounted) setState(() => _isApiCalling = false);
 //     }
 //   }
 //
+//   // ---------- UI ----------
 //   @override
 //   Widget build(BuildContext context) {
 //     return Scaffold(
@@ -1321,12 +1303,14 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
 //           ),
 //           const SizedBox(width: 6),
 //           Center(
-//             child: Text(
-//               walletBalance.toString(),
-//               style: GoogleFonts.poppins(
-//                 fontSize: 16,
-//                 fontWeight: FontWeight.bold,
-//                 color: Colors.black,
+//             child: Obx(
+//               () => Text(
+//                 '₹${userController.walletBalance.value}',
+//                 style: GoogleFonts.poppins(
+//                   fontSize: 16,
+//                   fontWeight: FontWeight.bold,
+//                   color: Colors.black,
+//                 ),
 //               ),
 //             ),
 //           ),
@@ -1346,47 +1330,55 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
 //                   child: Column(
 //                     crossAxisAlignment: CrossAxisAlignment.start,
 //                     children: [
-//                       _buildPannaInputRow(
+//                       _pannaField(
 //                         'Enter Open Panna :',
 //                         _openPannaController,
-//                         hintText: 'e.g., 123',
-//                         maxLength: 3,
+//                         hint: 'e.g., 123',
+//                         onSubmitted: _addBid,
 //                       ),
 //                       const SizedBox(height: 16),
-//                       _buildPannaInputRow(
+//                       _pannaField(
 //                         'Enter Close Panna :',
 //                         _closePannaController,
-//                         hintText: 'e.g., 456',
-//                         maxLength: 3,
+//                         hint: 'e.g., 456',
+//                         onSubmitted: _addBid,
 //                       ),
 //                       const SizedBox(height: 16),
-//                       _buildInputRow(
-//                         'Enter Points :',
-//                         _pointsController,
-//                         hintText: 'e.g., 100',
-//                         maxLength: 4,
-//                       ),
+//                       _pointsField(),
 //                       const SizedBox(height: 20),
 //                       SizedBox(
 //                         width: double.infinity,
 //                         height: 45,
 //                         child: ElevatedButton(
-//                           onPressed: _addBid,
+//                           onPressed: _isApiCalling ? null : _addBid,
 //                           style: ElevatedButton.styleFrom(
-//                             backgroundColor: Colors.orange,
+//                             backgroundColor: _isApiCalling
+//                                 ? Colors.grey
+//                                 : Colors.orange,
 //                             shape: RoundedRectangleBorder(
 //                               borderRadius: BorderRadius.circular(6),
 //                             ),
 //                           ),
-//                           child: Text(
-//                             "ADD",
-//                             style: GoogleFonts.poppins(
-//                               color: Colors.white,
-//                               fontWeight: FontWeight.w600,
-//                               letterSpacing: 0.5,
-//                               fontSize: 16,
-//                             ),
-//                           ),
+//                           child: _isApiCalling
+//                               ? const SizedBox(
+//                                   height: 20,
+//                                   width: 20,
+//                                   child: CircularProgressIndicator(
+//                                     valueColor: AlwaysStoppedAnimation<Color>(
+//                                       Colors.white,
+//                                     ),
+//                                     strokeWidth: 2,
+//                                   ),
+//                                 )
+//                               : Text(
+//                                   "ADD",
+//                                   style: GoogleFonts.poppins(
+//                                     color: Colors.white,
+//                                     fontWeight: FontWeight.w600,
+//                                     letterSpacing: .5,
+//                                     fontSize: 16,
+//                                   ),
+//                                 ),
 //                         ),
 //                       ),
 //                     ],
@@ -1397,8 +1389,8 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
 //                 if (_bids.isNotEmpty)
 //                   Padding(
 //                     padding: const EdgeInsets.symmetric(
-//                       horizontal: 16.0,
-//                       vertical: 8.0,
+//                       horizontal: 16,
+//                       vertical: 8,
 //                     ),
 //                     child: Row(
 //                       children: [
@@ -1434,8 +1426,8 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
 //                         )
 //                       : ListView.builder(
 //                           itemCount: _bids.length,
-//                           itemBuilder: (context, index) {
-//                             final bid = _bids[index];
+//                           itemBuilder: (_, i) {
+//                             final bid = _bids[i];
 //                             return Container(
 //                               margin: const EdgeInsets.symmetric(
 //                                 horizontal: 10,
@@ -1455,8 +1447,8 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
 //                               ),
 //                               child: Padding(
 //                                 padding: const EdgeInsets.symmetric(
-//                                   horizontal: 16.0,
-//                                   vertical: 8.0,
+//                                   horizontal: 16,
+//                                   vertical: 8,
 //                                 ),
 //                                 child: Row(
 //                                   children: [
@@ -1477,7 +1469,9 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
 //                                         Icons.delete,
 //                                         color: Colors.red,
 //                                       ),
-//                                       onPressed: () => _removeBid(index),
+//                                       onPressed: _isApiCalling
+//                                           ? null
+//                                           : () => _removeBid(i),
 //                                     ),
 //                                   ],
 //                                 ),
@@ -1486,9 +1480,11 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
 //                           },
 //                         ),
 //                 ),
-//                 if (_bids.isNotEmpty) _buildBottomBar(),
+//
+//                 SafeArea(top: false, child: _bottomBar()),
 //               ],
 //             ),
+//
 //             if (_messageToShow != null)
 //               Positioned(
 //                 top: 0,
@@ -1507,11 +1503,117 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
 //     );
 //   }
 //
-//   Widget _buildInputRow(
+//   // ---------- field builders ----------
+//   Widget _pointsField() {
+//     return _inputRow(
+//       'Enter Points :',
+//       _pointsController,
+//       hintText: 'e.g., 100',
+//       maxLength: 4,
+//       onSubmitted: _addBid,
+//     );
+//   }
+//
+//   Widget _pannaField(
+//     String label,
+//     TextEditingController controller, {
+//     required String hint,
+//     VoidCallback? onSubmitted,
+//   }) {
+//     return Row(
+//       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//       children: [
+//         Text(label, style: GoogleFonts.poppins(fontSize: 16)),
+//         SizedBox(
+//           width: 150,
+//           height: 40,
+//           child: Autocomplete<String>(
+//             fieldViewBuilder: (context, textCtrl, focusNode, _) {
+//               textCtrl.text = controller.text;
+//               textCtrl.selection = TextSelection.fromPosition(
+//                 TextPosition(offset: textCtrl.text.length),
+//               );
+//
+//               return TextField(
+//                 cursorColor: Colors.orange,
+//                 controller: textCtrl,
+//                 focusNode: focusNode,
+//                 keyboardType: TextInputType.number,
+//                 inputFormatters: [
+//                   FilteringTextInputFormatter.digitsOnly,
+//                   LengthLimitingTextInputFormatter(3),
+//                 ],
+//                 onChanged: (v) => controller.text = v,
+//                 decoration: InputDecoration(
+//                   hintText: hint,
+//                   contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+//                   border: const OutlineInputBorder(
+//                     borderRadius: BorderRadius.all(Radius.circular(20)),
+//                     borderSide: BorderSide(color: Colors.black),
+//                   ),
+//                   enabledBorder: const OutlineInputBorder(
+//                     borderRadius: BorderRadius.all(Radius.circular(20)),
+//                     borderSide: BorderSide(color: Colors.black),
+//                   ),
+//                   focusedBorder: const OutlineInputBorder(
+//                     borderRadius: BorderRadius.all(Radius.circular(20)),
+//                     borderSide: BorderSide(color: Colors.orange, width: 2),
+//                   ),
+//                   suffixIcon: const Icon(
+//                     Icons.arrow_forward,
+//                     color: Colors.orange,
+//                     size: 20,
+//                   ),
+//                 ),
+//                 onSubmitted: (_) => onSubmitted?.call(),
+//               );
+//             },
+//             optionsBuilder: (value) {
+//               if (value.text.isEmpty) return const Iterable<String>.empty();
+//               return _allPannas.where((s) => s.startsWith(value.text));
+//             },
+//             onSelected: (s) {
+//               controller.text = s;
+//               onSubmitted?.call();
+//             },
+//             optionsViewBuilder: (context, onSelected, options) {
+//               final list = options.toList(growable: false);
+//               return Align(
+//                 alignment: Alignment.topLeft,
+//                 child: Material(
+//                   elevation: 4,
+//                   child: SizedBox(
+//                     height: list.length > 5 ? 200 : list.length * 48,
+//                     width: 150,
+//                     child: ListView.builder(
+//                       padding: EdgeInsets.zero,
+//                       itemCount: list.length,
+//                       itemBuilder: (_, i) => ListTile(
+//                         dense: true,
+//                         title: Text(
+//                           list[i],
+//                           style: GoogleFonts.poppins(fontSize: 14),
+//                         ),
+//                         onTap: () => onSelected(list[i]),
+//                       ),
+//                     ),
+//                   ),
+//                 ),
+//               );
+//             },
+//           ),
+//         ),
+//       ],
+//     );
+//   }
+//
+//   Widget _inputRow(
 //     String label,
 //     TextEditingController controller, {
 //     String hintText = '',
 //     int? maxLength,
+//     bool enabled = true,
+//     VoidCallback? onSubmitted,
 //   }) {
 //     return Row(
 //       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1530,6 +1632,8 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
 //                 LengthLimitingTextInputFormatter(maxLength),
 //             ],
 //             onTap: _clearMessage,
+//             enabled: enabled,
+//             onSubmitted: (_) => onSubmitted?.call(),
 //             decoration: InputDecoration(
 //               hintText: hintText,
 //               contentPadding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1557,123 +1661,9 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
 //     );
 //   }
 //
-//   Widget _buildPannaInputRow(
-//     String label,
-//     TextEditingController controller, {
-//     String hintText = '',
-//     int? maxLength,
-//   }) {
-//     return Row(
-//       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//       children: [
-//         Text(label, style: GoogleFonts.poppins(fontSize: 16)),
-//         SizedBox(
-//           width: 150,
-//           height: 40,
-//           child: Autocomplete<String>(
-//             fieldViewBuilder:
-//                 (
-//                   BuildContext context,
-//                   TextEditingController textEditingController,
-//                   FocusNode focusNode,
-//                   VoidCallback onFieldSubmitted,
-//                 ) {
-//                   controller.text = textEditingController.text;
-//                   controller.selection = textEditingController.selection;
-//
-//                   return TextField(
-//                     controller: textEditingController,
-//                     focusNode: focusNode,
-//                     keyboardType: TextInputType.number,
-//                     inputFormatters: [
-//                       FilteringTextInputFormatter.digitsOnly,
-//                       if (maxLength != null)
-//                         LengthLimitingTextInputFormatter(maxLength),
-//                     ],
-//                     onTap: _clearMessage,
-//                     decoration: InputDecoration(
-//                       hintText: hintText,
-//                       contentPadding: const EdgeInsets.symmetric(
-//                         horizontal: 12,
-//                       ),
-//                       border: const OutlineInputBorder(
-//                         borderRadius: BorderRadius.all(Radius.circular(20)),
-//                         borderSide: BorderSide(color: Colors.black),
-//                       ),
-//                       enabledBorder: const OutlineInputBorder(
-//                         borderRadius: BorderRadius.all(Radius.circular(20)),
-//                         borderSide: BorderSide(color: Colors.black),
-//                       ),
-//                       focusedBorder: const OutlineInputBorder(
-//                         borderRadius: BorderRadius.all(Radius.circular(20)),
-//                         borderSide: BorderSide(color: Colors.orange, width: 2),
-//                       ),
-//                       suffixIcon: const Icon(
-//                         Icons.arrow_forward,
-//                         color: Colors.orange,
-//                         size: 20,
-//                       ),
-//                     ),
-//                     onSubmitted: (value) => onFieldSubmitted(),
-//                   );
-//                 },
-//             optionsBuilder: (TextEditingValue textEditingValue) {
-//               if (textEditingValue.text.isEmpty) {
-//                 return const Iterable<String>.empty();
-//               }
-//               return _allPannas.where((String option) {
-//                 return option.startsWith(textEditingValue.text);
-//               });
-//             },
-//             onSelected: (String selection) {
-//               controller.text = selection;
-//             },
-//             optionsViewBuilder:
-//                 (
-//                   BuildContext context,
-//                   AutocompleteOnSelected<String> onSelected,
-//                   Iterable<String> options,
-//                 ) {
-//                   return Align(
-//                     alignment: Alignment.topLeft,
-//                     child: Material(
-//                       elevation: 4.0,
-//                       child: SizedBox(
-//                         height: options.length > 5
-//                             ? 200.0
-//                             : options.length * 48.0,
-//                         width: 150,
-//                         child: ListView.builder(
-//                           padding: EdgeInsets.zero,
-//                           itemCount: options.length,
-//                           itemBuilder: (BuildContext context, int index) {
-//                             final String option = options.elementAt(index);
-//                             return GestureDetector(
-//                               onTap: () {
-//                                 onSelected(option);
-//                               },
-//                               child: ListTile(
-//                                 title: Text(
-//                                   option,
-//                                   style: GoogleFonts.poppins(fontSize: 14),
-//                                 ),
-//                               ),
-//                             );
-//                           },
-//                         ),
-//                       ),
-//                     ),
-//                   );
-//                 },
-//           ),
-//         ),
-//       ],
-//     );
-//   }
-//
-//   Widget _buildBottomBar() {
-//     int totalBids = _bids.length;
-//     int totalPoints = _getTotalPoints();
+//   Widget _bottomBar() {
+//     final totalBids = _bids.length;
+//     final totalPoints = _getTotalPoints();
 //
 //     return Container(
 //       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1691,60 +1681,64 @@ class _FullSangamBoardScreenState extends State<FullSangamBoardScreen> {
 //       child: Row(
 //         mainAxisAlignment: MainAxisAlignment.spaceBetween,
 //         children: [
-//           Column(
-//             crossAxisAlignment: CrossAxisAlignment.start,
-//             children: [
-//               Text(
-//                 'Bids',
-//                 style: GoogleFonts.poppins(
-//                   fontSize: 14,
-//                   color: Colors.grey[700],
-//                 ),
-//               ),
-//               Text(
-//                 '$totalBids',
-//                 style: GoogleFonts.poppins(
-//                   fontSize: 18,
-//                   fontWeight: FontWeight.bold,
-//                 ),
-//               ),
-//             ],
-//           ),
-//           Column(
-//             crossAxisAlignment: CrossAxisAlignment.start,
-//             children: [
-//               Text(
-//                 'Points',
-//                 style: GoogleFonts.poppins(
-//                   fontSize: 14,
-//                   color: Colors.grey[700],
-//                 ),
-//               ),
-//               Text(
-//                 '$totalPoints',
-//                 style: GoogleFonts.poppins(
-//                   fontSize: 18,
-//                   fontWeight: FontWeight.bold,
-//                 ),
-//               ),
-//             ],
-//           ),
+//           _SummaryTile(title: 'Bid', value: '$totalBids'),
+//           _SummaryTile(title: 'Total', value: '$totalPoints'),
 //           ElevatedButton(
-//             onPressed: _showConfirmationDialog,
+//             onPressed: (_isApiCalling || _bids.isEmpty)
+//                 ? null
+//                 : _showConfirmationDialog,
 //             style: ElevatedButton.styleFrom(
-//               backgroundColor: Colors.orange[700],
+//               backgroundColor: (_isApiCalling || _bids.isEmpty)
+//                   ? Colors.grey
+//                   : Colors.orange,
 //               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
 //               shape: RoundedRectangleBorder(
 //                 borderRadius: BorderRadius.circular(8),
 //               ),
+//               elevation: 3,
 //             ),
-//             child: Text(
-//               'SUBMIT',
-//               style: GoogleFonts.poppins(color: Colors.white, fontSize: 16),
-//             ),
+//             child: _isApiCalling
+//                 ? const SizedBox(
+//                     width: 18,
+//                     height: 18,
+//                     child: CircularProgressIndicator(
+//                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+//                       strokeWidth: 2,
+//                     ),
+//                   )
+//                 : Text(
+//                     'SUBMIT',
+//                     style: GoogleFonts.poppins(
+//                       color: Colors.white,
+//                       fontSize: 16,
+//                     ),
+//                   ),
 //           ),
 //         ],
 //       ),
+//     );
+//   }
+// }
+//
+// class _SummaryTile extends StatelessWidget {
+//   final String title;
+//   final String value;
+//   const _SummaryTile({required this.title, required this.value});
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Column(
+//       crossAxisAlignment: CrossAxisAlignment.start,
+//       children: [
+//         Text(
+//           title,
+//           style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[700]),
+//         ),
+//         Text(
+//           value,
+//           style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold),
+//         ),
+//       ],
 //     );
 //   }
 // }

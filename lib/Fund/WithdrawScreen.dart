@@ -2,12 +2,14 @@ import 'dart:convert';
 import 'dart:developer'; // For log
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http; // Import http package
 import 'package:new_sara/ulits/Constents.dart';
 
-import '../Helper/TranslationHelper.dart'; // Assuming this path is correct
+import '../Helper/TranslationHelper.dart';
+import '../Helper/UserController.dart'; // Assuming this path is correct
 
 class WithdrawScreen extends StatefulWidget {
   const WithdrawScreen({super.key});
@@ -25,7 +27,9 @@ class WithdrawalMethod {
 }
 
 class _WithdrawScreenState extends State<WithdrawScreen> {
-  late int currentBalance;
+  // --- State ---
+  int currentBalance = 0; // fixed: no 'late' needed, default 0
+
   final TextEditingController amountController = TextEditingController();
   final TextEditingController paymentNumberController =
       TextEditingController(); // Used for UPI ID/Phone number
@@ -34,10 +38,13 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
   final TextEditingController accountNumberController = TextEditingController();
   final TextEditingController ifscCodeController = TextEditingController();
 
+  final UserController userController = Get.isRegistered<UserController>()
+      ? Get.find<UserController>()
+      : Get.put(UserController());
+
   String selectedMethod = WithdrawalMethod.googlePay; // Default selected method
-  String currentLangCode = GetStorage().read("language") ?? "en";
-  final int minimumWithdrawalAmount =
-      GetStorage().read("minimumWithdrawalAmount") ?? 1000;
+  String currentLangCode = GetStorage().read("language")?.toString() ?? "en";
+  late final int minimumWithdrawalAmount; // computed in initState
   final Map<String, String> _translationCache = {};
 
   // Constants for withdrawal methods
@@ -46,7 +53,8 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCurrentBalance();
+    minimumWithdrawalAmount = _readMinWithdrawalFromStorage();
+    _loadCurrentBalance(); // safe, no setState needed in init
   }
 
   @override
@@ -60,18 +68,40 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
     super.dispose();
   }
 
-  void _loadCurrentBalance() {
-    final dynamic raw = GetStorage().read("walletBalance");
-    if (mounted) {
-      setState(() {
-        if (raw is int) {
-          currentBalance = raw;
-        } else if (raw is String) {
-          currentBalance = int.tryParse(raw) ?? 0;
-        } else {
-          currentBalance = 0;
-        }
-      });
+  // ---- Helpers ----
+
+  int _readMinWithdrawalFromStorage() {
+    final v = GetStorage().read("minimumWithdrawalAmount");
+    if (v is int) return v;
+    if (v is double) return v.toInt();
+    if (v is String) {
+      final parsed = int.tryParse(v);
+      if (parsed != null) return parsed;
+      final asDouble = double.tryParse(v);
+      if (asDouble != null) return asDouble.toInt();
+    }
+    return 1000; // default fallback
+  }
+
+  void _loadCurrentBalance({bool refreshUI = false}) {
+    // This is robust to String/num from GetX Rx or any source.
+    final raw = userController.walletBalance.value;
+    double asDouble;
+
+    if (raw is num) {
+      asDouble = raw as double;
+    } else if (raw is String) {
+      asDouble = double.tryParse(raw) ?? 0.0;
+    } else {
+      asDouble = 0.0;
+    }
+
+    final next = asDouble.floor(); // or .round() if you prefer
+
+    if (refreshUI && mounted) {
+      setState(() => currentBalance = next);
+    } else {
+      currentBalance = next;
     }
   }
 
@@ -80,10 +110,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
     if (_translationCache.containsKey(text)) {
       return _translationCache[text]!;
     }
-    String translated = await TranslationHelper.translate(
-      text,
-      currentLangCode,
-    );
+    final translated = await TranslationHelper.translate(text, currentLangCode);
     _translationCache[text] = translated;
     return translated;
   }
@@ -238,11 +265,21 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
   Future<void> _performWithdrawal() async {
     final amountText = amountController.text.trim();
     final paymentDetail = paymentNumberController.text.trim();
-    final String? accessToken = GetStorage().read('accessToken');
-    final String registerId = GetStorage().read('registerId') ?? '';
+    final String? accessToken = GetStorage().read('accessToken')?.toString();
+    final String registerId = GetStorage().read('registerId')?.toString() ?? '';
+
+    // Basic auth guard
+    if (accessToken == null || accessToken.isEmpty || registerId.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(await _t("Please log in again to continue."))),
+      );
+      return;
+    }
 
     // Input validation
     if (amountText.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(await _t("Please enter an amount."))),
       );
@@ -250,6 +287,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
     }
     final int? amount = int.tryParse(amountText);
     if (amount == null || amount <= 0) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(await _t("Please enter a valid amount."))),
       );
@@ -257,6 +295,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
     }
 
     if (amount < minimumWithdrawalAmount) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -268,6 +307,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
     }
 
     if (amount > currentBalance) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(await _t("Insufficient balance."))),
       );
@@ -284,6 +324,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
       case WithdrawalMethod.googlePay:
         withdrawType = "googlePay";
         if (paymentDetail.isEmpty) {
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(await _t("Please enter Google Pay UPI ID.")),
@@ -296,6 +337,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
       case WithdrawalMethod.phonePe:
         withdrawType = "phonePe";
         if (paymentDetail.isEmpty) {
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(await _t("Please enter PhonePe UPI ID."))),
           );
@@ -306,6 +348,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
       case WithdrawalMethod.paytm:
         withdrawType = "paytm";
         if (paymentDetail.isEmpty) {
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(await _t("Please enter Paytm Number."))),
           );
@@ -320,6 +363,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
             holderNameController.text.trim().isEmpty ||
             accountNumberController.text.trim().isEmpty ||
             ifscCodeController.text.trim().isEmpty) {
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(await _t("Please fill all bank details."))),
           );
@@ -331,6 +375,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
         requestBody["ifscCode"] = ifscCodeController.text.trim();
         break;
       default:
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(await _t("Please select a withdrawal method.")),
@@ -347,11 +392,11 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
       final response = await http.post(
         Uri.parse('${_apiBaseUrl}withdraw-fund-request'),
         headers: {
-          'deviceId': 'qwert', // Consider making these dynamic or from a config
-          'deviceName':
-              'sm2233', // Consider making these dynamic or from a config
-          'accessStatus': '1', // Consider making these dynamic or from a config
-          'Content-Type': 'application/json',
+          'deviceId': 'qwert', // TODO: make dynamic/config-driven
+          'deviceName': 'sm2233', // TODO: make dynamic/config-driven
+          'accessStatus': '1', // TODO: make dynamic/config-driven
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json',
           'Authorization': 'Bearer $accessToken',
         },
         body: json.encode(requestBody),
@@ -359,6 +404,8 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
 
       log("Withdraw Response Status: ${response.statusCode}");
       log("Withdraw Response Body: ${response.body}");
+
+      if (!mounted) return;
 
       if (response.statusCode == 200) {
         final responseBody = json.decode(response.body);
@@ -371,7 +418,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
             ),
           );
           _clearFields();
-          _loadCurrentBalance(); // Refresh balance after successful withdrawal
+          _loadCurrentBalance(refreshUI: true); // Refresh balance after success
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -390,6 +437,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
       }
     } catch (e) {
       log("Error during withdrawal request: $e");
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(await _t("An error occurred: $e"))),
       );
@@ -405,6 +453,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
     ifscCodeController.clear();
   }
 
+  // ---- UI ----
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -413,9 +462,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
       appBar: AppBar(
         backgroundColor: Colors.grey.shade300,
         leading: IconButton(
-          onPressed: () {
-            Navigator.pop(context);
-          },
+          onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios_new),
         ),
         title: FutureBuilder<String>(

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:developer'; // For log() function
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,7 +6,7 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:new_sara/BidService.dart'; // Ensure this path is correct
+import 'package:new_sara/BidService.dart';
 
 import '../../../Helper/UserController.dart';
 import '../../../components/AnimatedMessageBar.dart';
@@ -17,7 +16,7 @@ import '../../../components/BidSuccessDialog.dart';
 
 class DoublePanaBetScreen extends StatefulWidget {
   final String title;
-  final String gameCategoryType;
+  final String gameCategoryType; // "doublePana"
   final int gameId;
   final String gameName;
   final bool selectionStatus;
@@ -36,15 +35,17 @@ class DoublePanaBetScreen extends StatefulWidget {
 }
 
 class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
+  // ---------- session + options ----------
   List<String> gameTypesOptions = [];
+  String selectedGameBetType = "Open"; // UI selector only (Open | Close)
+  String get _sessionUpper => selectedGameBetType.toUpperCase();
 
-  // Initialize selectedGameBetType to avoid LateInitializationError
-  String selectedGameBetType = "Open";
-
+  // ---------- inputs ----------
   final TextEditingController digitController = TextEditingController();
   final TextEditingController pointsController = TextEditingController();
 
-  List<String> doublePanaOptions = [
+  // valid double-pana list
+  final List<String> doublePanaOptions = const [
     "100",
     "110",
     "112",
@@ -136,22 +137,33 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
     "900",
     "990",
   ];
-  List<String> filteredDigitOptions = [];
-  bool _isDigitSuggestionsVisible = false;
 
-  List<Map<String, String>> addedEntries = [];
-  late GetStorage storage;
-  late BidService _bidService;
+  // suggestions
+  List<String> _suggestions = [];
+  bool _showSuggestions = false;
 
+  /// keep entries separate by session to avoid cross-contamination
+  /// each item: {digit, amount, type:"OPEN"/"CLOSE", gameType:"doublePana"}
+  final Map<String, List<Map<String, String>>> _entriesBySession = {
+    'OPEN': <Map<String, String>>[],
+    'CLOSE': <Map<String, String>>[],
+  };
+
+  // ---------- services / auth ----------
+  late final GetStorage storage;
+  late final BidService _bidService;
   late String accessToken;
   late String registerId;
-  late String preferredLanguage;
   bool accountStatus = false;
+
+  // wallet
   late int walletBalance;
 
+  // device
   final String _deviceId = 'test_device_id_flutter';
   final String _deviceName = 'test_device_name_flutter';
 
+  // msg bar
   String? _messageToShow;
   bool _isErrorForMessage = false;
   Key _messageBarKey = UniqueKey();
@@ -159,7 +171,9 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
 
   bool _isApiCalling = false;
 
-  final UserController userController = Get.put(UserController());
+  final UserController userController = Get.isRegistered<UserController>()
+      ? Get.find<UserController>()
+      : Get.put(UserController());
 
   @override
   void initState() {
@@ -167,99 +181,41 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
     storage = GetStorage();
     _bidService = BidService(storage);
     _loadInitialData();
-    double walletBalanceDouble = double.parse(
-      userController.walletBalance.value,
-    );
-    walletBalance = walletBalanceDouble.toInt();
 
-    _setInitialGameTypeOptions();
-    log(
-      'DoublePanaBetScreen: initState called. Initial selectionStatus: ${widget.selectionStatus}, gameTypesOptions: $gameTypesOptions, selectedGameBetType: $selectedGameBetType',
-    );
+    final num? bal = num.tryParse(userController.walletBalance.value);
+    walletBalance = bal?.toInt() ?? 0;
+
+    _setupGameTypeOptions();
     digitController.addListener(_onDigitChanged);
   }
 
-  void _setInitialGameTypeOptions() {
+  void _setupGameTypeOptions() {
     setState(() {
-      // NEW LOGIC BASED ON YOUR REQUEST:
-      if (widget.selectionStatus == false) {
-        // If selectionStatus is false
-        gameTypesOptions = ["Close"]; // Show only "Close"
-        log(
-          'DoublePanaBetScreen: selectionStatus is FALSE, gameTypesOptions set to: $gameTypesOptions',
-        );
-      } else {
-        // Else (if selectionStatus is true)
-        gameTypesOptions = ["Open", "Close"]; // Show both "Open" and "Close"
-        log(
-          'DoublePanaBetScreen: selectionStatus is TRUE, gameTypesOptions set to: $gameTypesOptions',
-        );
-      }
-
-      // Ensure selectedGameBetType is always one of the valid options after gameTypesOptions changes
-      // This handles cases where the previously selected type might no longer be available.
+      gameTypesOptions = widget.selectionStatus ? ["Open", "Close"] : ["Close"];
       if (!gameTypesOptions.contains(selectedGameBetType)) {
-        selectedGameBetType =
-            gameTypesOptions.first; // Set to the first available option
-        log(
-          'DoublePanaBetScreen: selectedGameBetType reset to: $selectedGameBetType as previous was invalid.',
-        );
-      } else {
-        log(
-          'DoublePanaBetScreen: selectedGameBetType is already valid: $selectedGameBetType',
-        );
+        selectedGameBetType = gameTypesOptions.first;
       }
     });
-  }
-
-  void _onDigitChanged() {
-    final query = digitController.text.trim();
-    if (query.isNotEmpty) {
-      setState(() {
-        filteredDigitOptions = doublePanaOptions
-            .where((digit) => digit.startsWith(query))
-            .toList();
-        _isDigitSuggestionsVisible = filteredDigitOptions.isNotEmpty;
-      });
-    } else {
-      setState(() {
-        filteredDigitOptions = [];
-        _isDigitSuggestionsVisible = false;
-      });
-    }
   }
 
   Future<void> _loadInitialData() async {
     accessToken = storage.read('accessToken') ?? '';
     registerId = storage.read('registerId') ?? '';
     accountStatus = userController.accountStatus.value;
-    preferredLanguage = storage.read('selectedLanguage') ?? 'en';
 
-    final dynamic storedWalletBalance = storage.read('walletBalance');
-    if (storedWalletBalance is int) {
-      walletBalance = storedWalletBalance;
-    } else if (storedWalletBalance is String) {
-      walletBalance = int.tryParse(storedWalletBalance) ?? 0;
-    } else {
-      walletBalance = 0;
+    final dynamic stored = storage.read('walletBalance');
+    if (stored is int) {
+      walletBalance = stored;
+    } else if (stored is String) {
+      walletBalance = int.tryParse(stored) ?? walletBalance;
     }
-    log(
-      'DoublePanaBetScreen: Initial data loaded - accessToken: ${accessToken.isNotEmpty}, registerId: ${registerId.isNotEmpty}, accountStatus: $accountStatus, walletBalance: $walletBalance',
-    );
   }
 
   @override
   void didUpdateWidget(covariant DoublePanaBetScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    log(
-      'DoublePanaBetScreen: didUpdateWidget called. Old selectionStatus: ${oldWidget.selectionStatus}, New selectionStatus: ${widget.selectionStatus}',
-    );
-    // Update options if selectionStatus changes
     if (widget.selectionStatus != oldWidget.selectionStatus) {
-      log(
-        'DoublePanaBetScreen: selectionStatus changed! Recalculating game type options.',
-      );
-      _setInitialGameTypeOptions();
+      _setupGameTypeOptions();
     }
   }
 
@@ -269,163 +225,134 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
     digitController.dispose();
     pointsController.dispose();
     _messageDismissTimer?.cancel();
-    log('DoublePanaBetScreen: dispose called.');
     super.dispose();
   }
 
-  void _showMessage(String message, {bool isError = false}) {
+  // ---------- helpers ----------
+  void _showMessage(String msg, {bool isError = false}) {
     _messageDismissTimer?.cancel();
     if (!mounted) return;
     setState(() {
-      _messageToShow = message;
+      _messageToShow = msg;
       _isErrorForMessage = isError;
       _messageBarKey = UniqueKey();
     });
     _messageDismissTimer = Timer(const Duration(seconds: 3), () {
-      _clearMessage();
+      if (mounted) setState(() => _messageToShow = null);
     });
-    log('DoublePanaBetScreen: Showing message: "$message" (isError: $isError)');
   }
 
-  void _clearMessage() {
-    if (mounted) {
+  void _onDigitChanged() {
+    final q = digitController.text.trim();
+    if (q.isEmpty) {
       setState(() {
-        _messageToShow = null;
+        _suggestions = [];
+        _showSuggestions = false;
       });
+      return;
     }
-    log('DoublePanaBetScreen: Message cleared.');
+    setState(() {
+      _suggestions = doublePanaOptions.where((d) => d.startsWith(q)).toList();
+      _showSuggestions = _suggestions.isNotEmpty;
+    });
   }
 
+  List<Map<String, String>> _allEntries() => [
+    ..._entriesBySession['OPEN']!,
+    ..._entriesBySession['CLOSE']!,
+  ];
+
+  int _totalPointsAll() => _allEntries().fold(
+    0,
+    (s, e) => s + (int.tryParse(e['amount'] ?? '0') ?? 0),
+  );
+
+  int _totalPointsForSession(String sessionUpper) =>
+      _entriesBySession[sessionUpper]!.fold(
+        0,
+        (s, e) => s + (int.tryParse(e['amount'] ?? '0') ?? 0),
+      );
+
+  bool _hasEntries(String sessionUpper) =>
+      _entriesBySession[sessionUpper]!.isNotEmpty;
+
+  // ---------- add/remove ----------
   void _addEntry() {
-    _clearMessage();
     if (_isApiCalling) return;
 
     final digit = digitController.text.trim();
-    final points = pointsController.text.trim();
+    final pointsStr = pointsController.text.trim();
 
-    if (digit.isEmpty || digit.length != 3 || int.tryParse(digit) == null) {
-      _showMessage('Enter a valid 3-digit number.', isError: true);
+    if (digit.length != 3 ||
+        int.tryParse(digit) == null ||
+        !doublePanaOptions.contains(digit)) {
+      _showMessage(
+        'Enter a valid Double Pana (3-digit) number.',
+        isError: true,
+      );
       return;
     }
 
-    if (!doublePanaOptions.contains(digit)) {
-      _showMessage('Invalid Double Patti number.', isError: true);
-      return;
-    }
-
-    if (points.isEmpty) {
-      _showMessage('Please enter an amount.', isError: true);
-      return;
-    }
-
-    int? parsedPoints = int.tryParse(points);
-    if (parsedPoints == null || parsedPoints < 10 || parsedPoints > 1000) {
+    final pts = int.tryParse(pointsStr);
+    if (pts == null || pts < 10 || pts > 1000) {
       _showMessage('Points must be between 10 and 1000.', isError: true);
       return;
     }
 
-    final newEntry = {
-      "digit": digit,
-      "amount": points,
-      "type": selectedGameBetType,
-      "gameType": widget.gameCategoryType,
-    };
-
-    final existingIndex = addedEntries.indexWhere(
-      (e) => e['digit'] == digit && e['type'] == selectedGameBetType,
-    );
+    final list = _entriesBySession[_sessionUpper]!;
+    final idx = list.indexWhere((e) => e['digit'] == digit);
 
     setState(() {
-      if (existingIndex != -1) {
-        int existing = int.parse(addedEntries[existingIndex]['amount']!);
-        addedEntries[existingIndex]['amount'] = (existing + parsedPoints)
-            .toString();
-        _showMessage("Updated bid for $digit.");
+      if (idx != -1) {
+        final curr = int.tryParse(list[idx]['amount'] ?? '0') ?? 0;
+        list[idx]['amount'] = (curr + pts).toString();
+        _showMessage('Updated: $digit ($_sessionUpper)');
       } else {
-        addedEntries.add(newEntry);
-        _showMessage("Added bid: $digit - $points points");
+        list.add({
+          "digit": digit, // PANNA
+          "amount": pointsStr,
+          "type": _sessionUpper, // "OPEN"/"CLOSE"
+          "gameType": widget.gameCategoryType, // "doublePana"
+        });
+        _showMessage('Added: $digit ($_sessionUpper)');
       }
       digitController.clear();
       pointsController.clear();
-      _isDigitSuggestionsVisible = false;
+      _showSuggestions = false;
     });
-    log('DoublePanaBetScreen: _addEntry called. Added entries: $addedEntries');
   }
 
-  void _removeEntry(int index) {
-    _clearMessage();
+  void _removeEntry(String sessionUpper, int index) {
     if (_isApiCalling) return;
-
+    final list = _entriesBySession[sessionUpper]!;
+    final removed = list[index]['digit'];
     setState(() {
-      final removed = addedEntries[index];
-      addedEntries.removeAt(index);
-      _showMessage("Removed bid: ${removed['digit']}");
+      list.removeAt(index);
     });
-    log(
-      'DoublePanaBetScreen: _removeEntry called. Remaining entries: $addedEntries',
-    );
+    _showMessage('Removed: $removed ($sessionUpper)');
   }
 
-  int _getTotalPoints() {
-    return addedEntries.fold(
-      0,
-      (sum, item) => sum + (int.tryParse(item['amount'] ?? '0') ?? 0),
-    );
-  }
+  // ---------- submit (per-session) ----------
+  Future<bool> _submitSession(String sessionUpper) async {
+    final list = _entriesBySession[sessionUpper]!;
+    if (list.isEmpty) return true; // nothing to do for this session
 
-  int _getTotalPointsForSelectedGameType() {
-    return addedEntries
-        .where(
-          (entry) =>
-              (entry["type"] ?? "").toUpperCase() ==
-              selectedGameBetType.toUpperCase(),
-        )
-        .fold(
-          0,
-          (sum, item) => sum + (int.tryParse(item['amount'] ?? '0') ?? 0),
-        );
-  }
-
-  Future<bool> _placeFinalBids() async {
-    final Map<String, String> bidPayload = {};
-    int currentBatchTotalPoints = 0;
-
-    for (var entry in addedEntries) {
-      if ((entry["type"] ?? "").toUpperCase() ==
-          selectedGameBetType.toUpperCase()) {
-        String digit = entry["digit"] ?? "";
-        String amount = entry["amount"] ?? "0";
-
-        if (digit.isNotEmpty && int.tryParse(amount) != null) {
-          bidPayload[digit] = amount;
-          currentBatchTotalPoints += int.parse(amount);
-        }
-      }
-    }
-
-    log(
-      'DoublePanaBetScreen: bidPayload (Map<String,String>) being sent to BidService: $bidPayload',
-    );
-    log(
-      'DoublePanaBetScreen: currentBatchTotalPoints: $currentBatchTotalPoints',
-    );
-
-    if (bidPayload.isEmpty) {
-      if (!mounted) return false;
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const BidFailureDialog(
-          errorMessage: 'No valid bids for the selected game type.',
-        ),
+    // Build payload & sum
+    final payload = <String, String>{};
+    int sum = 0;
+    for (final e in list) {
+      final key = e['digit'] ?? '';
+      final amt = int.tryParse(e['amount'] ?? '0') ?? 0;
+      if (key.isEmpty || amt <= 0) continue;
+      payload.update(
+        key,
+        (old) => (int.parse(old) + amt).toString(),
+        ifAbsent: () => amt.toString(),
       );
-      log('DoublePanaBetScreen: Bid failed - No valid bids.');
-      return false;
+      sum += amt;
     }
 
     if (accessToken.isEmpty || registerId.isEmpty) {
-      if (!mounted) return false;
-
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -433,7 +360,6 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
           errorMessage: 'Authentication error. Please log in again.',
         ),
       );
-      log('DoublePanaBetScreen: Bid failed - Authentication error.');
       return false;
     }
 
@@ -445,64 +371,23 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
         deviceId: _deviceId,
         deviceName: _deviceName,
         accountStatus: accountStatus,
-        bidAmounts: bidPayload,
-        selectedGameType: selectedGameBetType,
+        bidAmounts: payload, // PANNA -> points
+        selectedGameType: sessionUpper, // OPEN / CLOSE
         gameId: widget.gameId,
-        gameType: widget.gameCategoryType,
-        totalBidAmount: currentBatchTotalPoints,
+        gameType: widget.gameCategoryType, // "doublePana"
+        totalBidAmount: sum,
       );
 
-      if (!mounted) return false;
-
       if (result['status'] == true) {
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => const BidSuccessDialog(),
-        );
+        // Deduct and persist
+        final newBal = walletBalance - sum;
+        setState(() => walletBalance = newBal);
+        _bidService.updateWalletBalance(newBal);
 
-        final responseData = result['data'];
-        if (responseData != null &&
-            responseData.containsKey('updatedWalletBalance')) {
-          final dynamic updatedBalanceRaw =
-              responseData['updatedWalletBalance'];
-          final int updatedBalance =
-              int.tryParse(updatedBalanceRaw.toString()) ??
-              (walletBalance - currentBatchTotalPoints);
-          if (mounted) {
-            setState(() {
-              walletBalance = updatedBalance;
-            });
-          }
-          _bidService.updateWalletBalance(updatedBalance);
-          log(
-            'DoublePanaBetScreen: Bid success! Wallet updated from API: $updatedBalance',
-          );
-        } else {
-          final newWalletBalance = walletBalance - currentBatchTotalPoints;
-          if (mounted) {
-            setState(() {
-              walletBalance = newWalletBalance;
-            });
-          }
-          _bidService.updateWalletBalance(newWalletBalance);
-          log(
-            'DoublePanaBetScreen: Bid success! Wallet updated locally: $newWalletBalance',
-          );
-        }
-
-        if (mounted) {
-          setState(() {
-            addedEntries.removeWhere(
-              (element) =>
-                  (element["type"] ?? "").toUpperCase() ==
-                  selectedGameBetType.toUpperCase(),
-            );
-          });
-          log(
-            'DoublePanaBetScreen: Removed successful bids from addedEntries: $addedEntries',
-          );
-        }
+        // Clear only this session after success
+        setState(() {
+          _entriesBySession[sessionUpper]!.clear();
+        });
         return true;
       } else {
         await showDialog(
@@ -512,16 +397,9 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
             errorMessage: result['msg'] ?? 'Something went wrong',
           ),
         );
-        log('DoublePanaBetScreen: Bid failed - API message: ${result['msg']}');
         return false;
       }
     } catch (e) {
-      log(
-        'DoublePanaBetScreen: Error during bid placement: $e',
-        name: 'DoublePanaBetScreenBidError',
-      );
-      if (!mounted) return false;
-
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -533,89 +411,81 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
     }
   }
 
+  // ---------- unified confirmation ----------
   void _showConfirmationDialog() {
-    _clearMessage();
+    final all = _allEntries();
+    final totalPoints = _totalPointsAll();
 
-    final int totalPointsForCurrentType = _getTotalPointsForSelectedGameType();
-
-    if (totalPointsForCurrentType == 0) {
-      _showMessage(
-        "No bids added for the selected game type to submit.",
-        isError: true,
-      );
-      log(
-        'DoublePanaBetScreen: Confirmation denied - No bids for current type.',
-      );
+    if (all.isEmpty) {
+      _showMessage('No bids added.', isError: true);
+      return;
+    }
+    if (walletBalance < totalPoints) {
+      _showMessage('Insufficient wallet balance.', isError: true);
       return;
     }
 
-    if (walletBalance < totalPointsForCurrentType) {
-      _showMessage(
-        "Insufficient wallet balance for selected game type.",
-        isError: true,
-      );
-      log(
-        'DoublePanaBetScreen: Confirmation denied - Insufficient balance. Wallet: $walletBalance, Required: $totalPointsForCurrentType',
-      );
-      return;
-    }
-
-    final formattedDate = DateFormat(
-      'dd MMM yyyy, hh:mm a',
-    ).format(DateTime.now());
-
-    final List<Map<String, String>> bidsToShowInDialog = addedEntries
-        .where(
-          (entry) =>
-              (entry["type"] ?? "").toUpperCase() ==
-              selectedGameBetType.toUpperCase(),
+    // Build FRESH rows for dialog including BOTH sessions
+    final rows = all
+        .map(
+          (e) => {
+            "digit": e['digit']!, // show PANNA in Digits column
+            "points": e['amount']!,
+            "type": e['type']!, // OPEN / CLOSE
+            "pana": e['digit']!, // compatibility
+          },
         )
-        .toList();
-    log(
-      'DoublePanaBetScreen: Showing confirmation dialog for ${bidsToShowInDialog.length} bids, total points: $totalPointsForCurrentType',
-    );
+        .toList(growable: false);
+
+    final whenStr = DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now());
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => BidConfirmationDialog(
-        gameTitle: widget.gameName,
-        gameDate: formattedDate,
-        bids: bidsToShowInDialog.map((bid) {
-          return {
-            "digit": bid['digit']!,
-            "points": bid['amount']!,
-            "type": "${bid['gameType']} (${bid['type']})",
-            "pana": bid['digit']!,
-          };
-        }).toList(),
-        totalBids: bidsToShowInDialog.length,
-        totalBidsAmount: totalPointsForCurrentType,
+      builder: (_) => BidConfirmationDialog(
+        gameTitle: "${widget.gameName}, Double Pana",
+        gameDate: whenStr,
+        bids: rows,
+        totalBids: rows.length,
+        totalBidsAmount: totalPoints,
         walletBalanceBeforeDeduction: walletBalance,
-        walletBalanceAfterDeduction: (walletBalance - totalPointsForCurrentType)
-            .toString(),
+        walletBalanceAfterDeduction: (walletBalance - totalPoints).toString(),
         gameId: widget.gameId.toString(),
         gameType: widget.gameCategoryType,
         onConfirm: () async {
-          // Navigator.of(context).pop(); // Dialog is popped internally by BidConfirmationDialog on confirm
-          log(
-            'DoublePanaBetScreen: Bid confirmation accepted. Initiating final bid placement.',
-          );
+          if (!mounted) return;
           setState(() => _isApiCalling = true);
-          await _placeFinalBids();
+
+          // Submit both sessions sequentially (OPEN then CLOSE)
+          bool ok = true;
+          if (_hasEntries('OPEN')) {
+            ok = await _submitSession('OPEN');
+          }
+          if (ok && _hasEntries('CLOSE')) {
+            ok = await _submitSession('CLOSE');
+          }
+
           if (mounted) setState(() => _isApiCalling = false);
-          log('DoublePanaBetScreen: Final bid placement process completed.');
+
+          if (ok) {
+            // success dialog once for the combined operation
+            await showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (_) => const BidSuccessDialog(),
+            );
+          }
         },
       ),
     );
   }
 
+  // ---------- UI ----------
   @override
   Widget build(BuildContext context) {
-    // Log the current state before building
-    log(
-      'DoublePanaBetScreen: Building widget. Current gameTypesOptions: $gameTypesOptions, selectedGameBetType: $selectedGameBetType',
-    );
+    // SUBMIT enabled if there is ANY bid now (previously was just current session)
+    final canSubmitAny = _totalPointsAll() > 0 && !_isApiCalling;
+    final all = _allEntries(); // for table view
 
     return Scaffold(
       backgroundColor: Colors.grey.shade200,
@@ -668,12 +538,8 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
                     children: [
                       _inputRow("Select Game Type:", _buildDropdown()),
                       const SizedBox(height: 12),
-                      _inputRow(
-                        "Enter 3-Digit Number:",
-                        _buildDigitInputField(),
-                      ),
-                      if (_isDigitSuggestionsVisible &&
-                          filteredDigitOptions.isNotEmpty)
+                      _inputRow("Enter 3-Digit Number:", _digitField()),
+                      if (_showSuggestions && _suggestions.isNotEmpty)
                         Container(
                           margin: const EdgeInsets.only(top: 8),
                           constraints: const BoxConstraints(maxHeight: 200),
@@ -690,25 +556,20 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
                           ),
                           child: ListView.builder(
                             shrinkWrap: true,
-                            itemCount: filteredDigitOptions.length,
-                            itemBuilder: (context, index) {
-                              final suggestion = filteredDigitOptions[index];
+                            itemCount: _suggestions.length,
+                            itemBuilder: (_, i) {
+                              final s = _suggestions[i];
                               return ListTile(
-                                title: Text(suggestion),
+                                title: Text(s),
                                 onTap: () {
                                   setState(() {
-                                    digitController.text = suggestion;
-                                    _isDigitSuggestionsVisible = false;
+                                    digitController.text = s;
+                                    _showSuggestions = false;
                                     digitController.selection =
                                         TextSelection.fromPosition(
-                                          TextPosition(
-                                            offset: digitController.text.length,
-                                          ),
+                                          TextPosition(offset: s.length),
                                         );
                                   });
-                                  log(
-                                    'DoublePanaBetScreen: Digit suggestion selected: $suggestion',
-                                  );
                                 },
                               );
                             },
@@ -717,14 +578,10 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
                       const SizedBox(height: 12),
                       _inputRow(
                         "Enter Points:",
-                        _buildTextField(
-                          pointsController,
-                          "Enter Amount",
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(4),
-                          ],
-                        ),
+                        _numberField(pointsController, "Enter Amount", [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(4),
+                        ]),
                       ),
                       const SizedBox(height: 20),
                       SizedBox(
@@ -757,45 +614,39 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
                   ),
                 ),
                 const Divider(thickness: 1),
-                if (addedEntries.isNotEmpty)
+                if (all.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 8,
                     ),
                     child: Row(
-                      children: [
+                      children: const [
                         Expanded(
                           child: Text(
                             "Digit",
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
                         Expanded(
                           child: Text(
                             "Amount",
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
                         Expanded(
                           child: Text(
                             "Game Type",
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
-                        const SizedBox(width: 48),
+                        SizedBox(width: 48),
                       ],
                     ),
                   ),
-                if (addedEntries.isNotEmpty) const Divider(thickness: 1),
+                if (all.isNotEmpty) const Divider(thickness: 1),
                 Expanded(
-                  child: addedEntries.isEmpty
+                  child: all.isEmpty
                       ? Center(
                           child: Text(
                             "No bids added yet",
@@ -803,9 +654,9 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
                           ),
                         )
                       : ListView.builder(
-                          itemCount: addedEntries.length,
+                          itemCount: all.length,
                           itemBuilder: (_, index) {
-                            final entry = addedEntries[index];
+                            final e = all[index];
                             return Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
@@ -815,19 +666,19 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      entry['digit']!,
+                                      e['digit']!,
                                       style: GoogleFonts.poppins(),
                                     ),
                                   ),
                                   Expanded(
                                     child: Text(
-                                      entry['amount']!,
+                                      e['amount']!,
                                       style: GoogleFonts.poppins(),
                                     ),
                                   ),
                                   Expanded(
                                     child: Text(
-                                      '${entry['gameType']} (${entry['type']})',
+                                      e['type']!,
                                       style: GoogleFonts.poppins(),
                                     ),
                                   ),
@@ -838,7 +689,12 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
                                     ),
                                     onPressed: _isApiCalling
                                         ? null
-                                        : () => _removeEntry(index),
+                                        : () => _removeEntry(
+                                            e['type']!.toUpperCase(),
+                                            _entriesBySession[e['type']!
+                                                    .toUpperCase()]!
+                                                .indexOf(e),
+                                          ),
                                   ),
                                 ],
                               ),
@@ -846,9 +702,10 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
                           },
                         ),
                 ),
-                if (addedEntries.isNotEmpty) _buildBottomBar(),
+                if (all.isNotEmpty) _bottomBar(canSubmitAny),
               ],
             ),
+
             if (_messageToShow != null)
               Positioned(
                 top: 0,
@@ -858,7 +715,7 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
                   key: _messageBarKey,
                   message: _messageToShow!,
                   isError: _isErrorForMessage,
-                  onDismissed: _clearMessage,
+                  onDismissed: () => setState(() => _messageToShow = null),
                 ),
               ),
           ],
@@ -867,17 +724,17 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
     );
   }
 
+  // ---------- small UI helpers ----------
   Widget _inputRow(String label, Widget field) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 1),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             flex: 2,
             child: Padding(
-              padding: const EdgeInsets.only(top: 8.0),
+              padding: const EdgeInsets.only(top: 8),
               child: Text(
                 label,
                 style: GoogleFonts.poppins(
@@ -894,32 +751,6 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
   }
 
   Widget _buildDropdown() {
-    // Ensure gameTypesOptions is not empty before building dropdown
-    // This check also prevents issues if, for some reason, it becomes empty
-    if (gameTypesOptions.isEmpty) {
-      log(
-        'DoublePanaBetScreen: gameTypesOptions is empty, showing placeholder dropdown.',
-      );
-      return SizedBox(
-        width: 150,
-        height: 35,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Colors.black54),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Center(
-            child: Text(
-              "No options",
-              style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey),
-            ),
-          ),
-        ),
-      );
-    }
-
     return SizedBox(
       width: 150,
       height: 35,
@@ -933,43 +764,32 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
         child: DropdownButtonHideUnderline(
           child: DropdownButton<String>(
             isExpanded: true,
-            // Ensure selectedGameBetType is always one of the valid options
-            // This re-check helps if external changes somehow invalidate it.
             value: gameTypesOptions.contains(selectedGameBetType)
                 ? selectedGameBetType
                 : gameTypesOptions.first,
-            // Fallback to the first item if current value is not in options
             icon: const Icon(Icons.keyboard_arrow_down),
             onChanged: _isApiCalling
                 ? null
-                : (String? newValue) {
-                    setState(() {
-                      if (newValue != null) {
-                        selectedGameBetType = newValue;
-                        _clearMessage();
-                        log(
-                          'DoublePanaBetScreen: Dropdown value changed to: $newValue',
-                        );
-                      }
-                    });
+                : (v) {
+                    if (v == null) return;
+                    setState(() => selectedGameBetType = v);
                   },
-            items: gameTypesOptions.map<DropdownMenuItem<String>>((
-              String value,
-            ) {
-              return DropdownMenuItem<String>(
-                value: value,
-                child: Text(value, style: GoogleFonts.poppins(fontSize: 14)),
-              );
-            }).toList(),
+            items: gameTypesOptions
+                .map(
+                  (v) => DropdownMenuItem(
+                    value: v,
+                    child: Text(v, style: GoogleFonts.poppins(fontSize: 14)),
+                  ),
+                )
+                .toList(),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildDigitInputField() {
+  Widget _digitField() {
     return SizedBox(
-      width: double.infinity,
       height: 35,
       child: TextFormField(
         controller: digitController,
@@ -981,18 +801,9 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
           FilteringTextInputFormatter.digitsOnly,
         ],
         onTap: () {
-          _clearMessage();
-          if (digitController.text.isNotEmpty) {
-            _onDigitChanged();
-          }
-          log(
-            'DoublePanaBetScreen: Digit input field tapped. Current text: ${digitController.text}',
-          );
+          if (digitController.text.isNotEmpty) _onDigitChanged();
         },
-        onChanged: (value) {
-          _onDigitChanged();
-          log('DoublePanaBetScreen: Digit input field changed: $value');
-        },
+        onChanged: (_) => _onDigitChanged(),
         enabled: !_isApiCalling,
         decoration: InputDecoration(
           hintText: "Enter 3-Digit Number",
@@ -1019,21 +830,20 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
     );
   }
 
-  Widget _buildTextField(
-    TextEditingController controller,
-    String hint, {
-    List<TextInputFormatter>? inputFormatters,
-  }) {
+  Widget _numberField(
+    TextEditingController c,
+    String hint,
+    List<TextInputFormatter> fmts,
+  ) {
     return SizedBox(
       width: 150,
       height: 35,
       child: TextFormField(
-        controller: controller,
+        controller: c,
         cursorColor: Colors.orange,
         keyboardType: TextInputType.number,
         style: GoogleFonts.poppins(fontSize: 14),
-        inputFormatters: inputFormatters,
-        onTap: _clearMessage,
+        inputFormatters: fmts,
         enabled: !_isApiCalling,
         decoration: InputDecoration(
           hintText: hint,
@@ -1060,9 +870,9 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
     );
   }
 
-  Widget _buildBottomBar() {
-    int totalBids = addedEntries.length;
-    int totalPoints = _getTotalPoints();
+  Widget _bottomBar(bool canSubmitAny) {
+    final totalBids = _allEntries().length;
+    final totalPoints = _totalPointsAll();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1119,15 +929,9 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
             ],
           ),
           ElevatedButton(
-            onPressed:
-                (_isApiCalling || _getTotalPointsForSelectedGameType() == 0)
-                ? null
-                : _showConfirmationDialog,
+            onPressed: canSubmitAny ? _showConfirmationDialog : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor:
-                  (_isApiCalling || _getTotalPointsForSelectedGameType() == 0)
-                  ? Colors.grey
-                  : Colors.orange,
+              backgroundColor: canSubmitAny ? Colors.orange : Colors.grey,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

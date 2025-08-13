@@ -2,8 +2,7 @@ import 'dart:convert';
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
-import 'package:get/get_core/src/get_main.dart';
-import 'package:get/get_instance/get_instance.dart';
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
@@ -17,18 +16,15 @@ import '../components/closeBidDialogue.dart';
 import '../game/GameScreen.dart';
 import '../ulits/Constents.dart';
 
-// Placeholder for TranslationHelper - Assuming this is an external helper
+// Placeholder for TranslationHelper
 class TranslationHelper {
   static Future<String> translate(String text, String lang) async {
-    // In a real application, this would involve an actual translation service
-    // For demonstration, we just return the text.
-    await Future.delayed(Duration(milliseconds: 5)); // Simulate network delay
+    await Future.delayed(const Duration(milliseconds: 5));
     return text;
   }
 }
 
-// --- Data Models ---
-// HomeData.dart content
+// ---------------- Data Models ----------------
 class HomeData {
   final bool status;
   final String msg;
@@ -37,11 +33,15 @@ class HomeData {
   HomeData({required this.status, required this.msg, this.result});
 
   factory HomeData.fromJson(Map<String, dynamic> json) => HomeData(
-    status: json["status"],
-    msg: json["msg"],
+    status: _b(json["status"]),
+    msg: json["msg"]?.toString() ?? '',
     result: json["info"] == null
         ? null
-        : List<Info>.from(json["info"].map((x) => Info.fromJson(x))),
+        : List<Info>.from(
+            (json["info"] as List).map(
+              (x) => Info.fromJson(x as Map<String, dynamic>),
+            ),
+          ),
   );
 }
 
@@ -69,19 +69,29 @@ class Info {
   });
 
   factory Info.fromJson(Map<String, dynamic> json) => Info(
-    gameId: json["gameId"],
-    gameName: json["gameName"],
-    openTime: json["openTime"],
-    closeTime: json["closeTime"],
-    result: json["result"],
-    statusText: json["statusText"],
-    playStatus: json["playStatus"],
-    openSessionStatus: json["openSessionStatus"],
-    closeSessionStatus: json["closeSessionStatus"],
+    gameId: int.tryParse(json["gameId"].toString()) ?? 0,
+    gameName: json["gameName"]?.toString() ?? '',
+    openTime: json["openTime"]?.toString() ?? '',
+    closeTime: json["closeTime"]?.toString() ?? '',
+    result: json["result"]?.toString() ?? '',
+    statusText: json["statusText"]?.toString() ?? '',
+    playStatus: _b(json["playStatus"]),
+    openSessionStatus: _b(json["openSessionStatus"]),
+    closeSessionStatus: _b(json["closeSessionStatus"]),
   );
 }
 
-// --- NEW DATA MODEL FOR CONTACTS ---
+// Robust bool parser
+bool _b(dynamic v) {
+  if (v is bool) return v;
+  if (v is num) return v != 0;
+  if (v is String) {
+    final s = v.trim().toLowerCase();
+    return s == '1' || s == 'true' || s == 'yes' || s == 'y';
+  }
+  return false;
+}
+
 class ContactDetails {
   final String? mobileNo;
   final String? whatsappNo;
@@ -98,9 +108,10 @@ class ContactDetails {
   });
 }
 
-HomeData homeDataFromJson(String str) => HomeData.fromJson(json.decode(str));
+HomeData homeDataFromJson(String str) =>
+    HomeData.fromJson(json.decode(str) as Map<String, dynamic>);
 
-// --- HomePage Widget ---
+// ---------------- HomePage ----------------
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -110,20 +121,17 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late Future<HomeData> _futureHomeData;
-  late Future<ContactDetails?> _futureContactDetails; // NEW FUTURE
+  late Future<ContactDetails?> _futureContactDetails;
   late String _preferredLanguage;
+
   final Map<String, String> _translatedUiStrings = {};
   final GetStorage _storage = GetStorage();
-  UserController userController = Get.put(UserController());
 
-  late String mobile;
-  late String mobileNumber;
-  late String name;
-  late bool? accountActiveStatus;
-  late String walletBallence;
-  bool _accountStatus = false;
+  // ✅ Use the SAME controller; don't create a new one here
+  late final UserController userController = Get.isRegistered<UserController>()
+      ? Get.find<UserController>()
+      : Get.put(UserController(), permanent: true);
 
-  // List of UI keys to pre-translate
   static const List<String> _uiKeysToTranslate = [
     "KING STARLINE",
     "King Jackpot",
@@ -137,40 +145,23 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _loadInitialData();
+
+    log('HomePage sees UserController hash: ${userController.hashCode}');
+
+    _preferredLanguage = _storage.read('selectedLanguage') ?? 'en';
+
+    // Kick off initial loads
     _preTranslateUI();
     _futureHomeData = _fetchDashboardData();
-    _futureContactDetails = fetchContactDetail(); // INITIALIZE THE NEW FUTURE
-  }
+    _futureContactDetails = fetchContactDetail();
 
-  void _loadInitialData() {
-    mobile = _storage.read('mobileNoEnc') ?? '';
-    mobileNumber = _storage.read('mobileNo') ?? '';
-    name = _storage.read('fullName') ?? '';
-    accountActiveStatus = _storage.read('accountStatus');
-    walletBallence = _storage.read('walletBalance') ?? '';
-    _preferredLanguage = _storage.read('selectedLanguage') ?? 'en';
-    _accountStatus = _storage.read('accountStatus') ?? false;
-
-    userController.accountStatus.value = _accountStatus;
-
-    // Listen for language changes and refresh UI strings
-    _storage.listenKey('selectedLanguage', (value) {
-      _preferredLanguage = value ?? 'en';
-      _preTranslateUI();
+    // If auth changes while we're on this page, refresh futures automatically
+    everAll([userController.accessToken, userController.registerId], (_) {
+      setState(() {
+        _futureHomeData = _fetchDashboardData();
+        _futureContactDetails = fetchContactDetail();
+      });
     });
-
-    _storage.write('isLoggedIn', true);
-
-    // Listen for account status changes
-    _storage.listenKey('accountStatus', (value) {
-      _accountStatus = value ?? false;
-    });
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
   }
 
   Future<void> _preTranslateUI() async {
@@ -186,60 +177,51 @@ class _HomePageState extends State<HomePage> {
     if (mounted) setState(() {});
   }
 
-  String _getTranslatedString(String key) {
-    return _translatedUiStrings[key] ?? key;
-  }
+  String _t(String key) => _translatedUiStrings[key] ?? key;
 
   Future<void> _handleRefresh() async {
-    final registerId = _storage.read('registerId') ?? '';
-    if (registerId.isNotEmpty) {
-      await _fetchAndSaveUserDetails(registerId);
-    }
-
     try {
-      final updatedHomeData = await _fetchDashboardData();
-      final updatedContactDetails = await fetchContactDetail();
+      await userController.refreshEverything();
       setState(() {
-        _futureHomeData = Future.value(updatedHomeData);
-        _futureContactDetails = Future.value(updatedContactDetails);
-        _loadInitialData();
+        _futureHomeData = _fetchDashboardData();
+        _futureContactDetails = fetchContactDetail();
       });
     } catch (e) {
       log("Error during refresh: $e");
     }
   }
 
-  // MODIFIED TO RETURN FUTURE<ContactDetails?>
   Future<ContactDetails?> fetchContactDetail() async {
     final url = Uri.parse('${Constant.apiEndpoint}contact-detail');
     final headers = {
       'deviceId': 'qwert',
       'deviceName': 'sm2233',
       'accessStatus': '1',
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ${_storage.read('accessToken')}',
+      'Content-Type': 'application/json; charset=utf-8',
+      'Accept': 'application/json',
+      'Authorization': 'Bearer ${_storage.read('accessToken') ?? ''}',
     };
 
     try {
       final response = await http.get(url, headers: headers);
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+        final data = json.decode(response.body) as Map<String, dynamic>;
         log('✅ Contact details fetched: $data');
 
-        final contactInfo = data['info']?['contactInfo'];
-        final videosInfo = data['info']?['videosInfo'];
+        final contactInfo =
+            (data['info'] as Map?)?['contactInfo'] as Map<String, dynamic>?;
+        final videosInfo =
+            (data['info'] as Map?)?['videosInfo'] as Map<String, dynamic>?;
 
         return ContactDetails(
-          mobileNo: contactInfo?['mobileNo'] as String?,
-          whatsappNo: contactInfo?['whatsappNo'] as String?,
-          appLink: contactInfo?['appLink'] as String?,
-          homepageContent: contactInfo?['homepageContent'] as String?,
-          videoDescription: videosInfo?['description'] as String?,
+          mobileNo: contactInfo?['mobileNo']?.toString(),
+          whatsappNo: contactInfo?['whatsappNo']?.toString(),
+          appLink: contactInfo?['appLink']?.toString(),
+          homepageContent: contactInfo?['homepageContent']?.toString(),
+          videoDescription: videosInfo?['description']?.toString(),
         );
       } else {
-        log(
-          '❌ Failed with status: ${response.statusCode}, body: ${response.body}',
-        );
+        log('❌ contact-detail ${response.statusCode} ${response.body}');
         return null;
       }
     } catch (e) {
@@ -248,67 +230,30 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _fetchAndSaveUserDetails(String registerId) async {
-    final url = Uri.parse('${Constant.apiEndpoint}user-details-by-register-id');
-    final String currentAccessToken = _storage.read('accessToken') ?? '';
-    log("Fetching user details for Register Id: $registerId");
-    log("Using Access Token: $currentAccessToken");
-    try {
-      final response = await http.post(
-        url,
-        headers: {
-          'deviceId': 'qwert',
-          'deviceName': 'sm2233',
-          'accessStatus': '1',
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $currentAccessToken',
-        },
-        body: jsonEncode({"registerId": registerId}),
-      );
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        final info = responseData['info'];
-        log("User details received: $info");
-        _storage.write('userId', info['userId']);
-        _storage.write('fullName', info['fullName']);
-        _storage.write('emailId', info['emailId']);
-        _storage.write('mobileNo', info['mobileNo']);
-        _storage.write('mobileNoEnc', info['mobileNoEnc']);
-        _storage.write('walletBalance', info['walletBalance']);
-        _storage.write('profilePicture', info['profilePicture']);
-        _storage.write('accountStatus', info['accountStatus']);
-        _storage.write('betStatus', info['betStatus']);
-
-        log("✅ User details saved to GetStorage.");
-      } else {
-        log(
-          "❌ Failed to fetch user details: ${response.statusCode} => ${response.body}",
-        );
-      }
-    } catch (e) {
-      log("❌ Exception fetching user details: $e");
-    }
-  }
-
   Future<HomeData> _fetchDashboardData() async {
-    final String currentAccessToken = _storage.read('accessToken') ?? '';
-    final String currentRegisterId = _storage.read('registerId') ?? '';
+    final String token = _storage.read('accessToken') ?? '';
+    final String regId = _storage.read('registerId') ?? '';
 
-    if (currentAccessToken.isEmpty || currentRegisterId.isEmpty) {
-      log("❌ Aborting API call: Missing access token or register ID.");
-      return HomeData(status: false, msg: "User not logged in", result: []);
+    if (token.isEmpty || regId.isEmpty) {
+      log("❌ Aborting game-list: Missing access token or register ID.");
+      return HomeData(
+        status: false,
+        msg: "User not logged in",
+        result: const [],
+      );
     }
 
     final response = await http.post(
       Uri.parse("${Constant.apiEndpoint}game-list"),
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json; charset=utf-8",
+        "Accept": "application/json",
         "deviceId": "qwert",
         "deviceName": "sm2233",
         "accessStatus": "1",
-        "Authorization": "Bearer $currentAccessToken",
+        "Authorization": "Bearer $token",
       },
-      body: json.encode({"registerId": currentRegisterId}),
+      body: json.encode({"registerId": regId}),
     );
 
     if (response.statusCode == 200) {
@@ -362,55 +307,59 @@ class _HomePageState extends State<HomePage> {
 
               final results = snapshot.data!.result!;
 
-              return Container(
-                color: Colors.grey.shade300,
-                child: ListView(
-                  padding: const EdgeInsets.all(12),
-                  children: [
-                    const SizedBox(height: 5),
+              // ✅ Make the WHOLE section reactive to accountStatus changes
+              return Obx(() {
+                final acc = userController.accountStatus.value;
 
-                    // Marquee if visible
-                    if (_accountStatus)
-                      FutureBuilder<ContactDetails?>(
-                        future: _futureContactDetails,
-                        builder: (context, snapshot) {
-                          if (snapshot.hasData && snapshot.data != null) {
-                            final homepageContent =
-                                snapshot.data!.homepageContent ?? '';
-                            return SizedBox(
-                              height: 30,
-                              child: Marquee(
-                                text: homepageContent.isNotEmpty
-                                    ? homepageContent +
-                                          List.filled(10, '\t').join()
-                                    : '',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 22,
+                return Container(
+                  color: Colors.grey.shade300,
+                  child: ListView(
+                    padding: const EdgeInsets.all(12),
+                    children: [
+                      const SizedBox(height: 5),
+
+                      // Marquee
+                      if (acc)
+                        FutureBuilder<ContactDetails?>(
+                          future: _futureContactDetails,
+                          builder: (context, snapshot) {
+                            if (snapshot.hasData && snapshot.data != null) {
+                              final homepageContent =
+                                  snapshot.data!.homepageContent ?? '';
+                              if (homepageContent.isEmpty) {
+                                return const SizedBox.shrink();
+                              }
+                              return SizedBox(
+                                height: 30,
+                                child: Marquee(
+                                  text:
+                                      homepageContent +
+                                      List.filled(10, '\t').join(),
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 22,
+                                  ),
+                                  scrollAxis: Axis.horizontal,
+                                  blankSpace: 50.0,
+                                  velocity: 30.0,
                                 ),
-                                scrollAxis: Axis.horizontal,
-                                blankSpace: 50.0,
-                                velocity: 30.0,
-                              ),
-                            );
-                          }
-                          return const SizedBox.shrink(); // Hide the marquee if data is not available
-                        },
-                      ),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
 
-                    if (_accountStatus) const SizedBox(height: 12),
+                      if (acc) const SizedBox(height: 12),
 
-                    // Category Buttons if visible
-                    if (_accountStatus)
-                      SizedBox(
-                        width: double.infinity,
-                        child: Row(
+                      // Category Buttons
+                      if (acc)
+                        Row(
                           children: [
                             const SizedBox(width: 8),
                             Expanded(
                               child: _CustomCategoryButton(
-                                title: _getTranslatedString("KING STARLINE"),
+                                title: _t("KING STARLINE"),
                                 onTap: () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
@@ -424,7 +373,7 @@ class _HomePageState extends State<HomePage> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: _CustomCategoryButton(
-                                title: _getTranslatedString("King Jackpot"),
+                                title: _t("King Jackpot"),
                                 onTap: () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
@@ -437,78 +386,74 @@ class _HomePageState extends State<HomePage> {
                             const SizedBox(width: 8),
                           ],
                         ),
-                      ),
 
-                    if (_accountStatus) const SizedBox(height: 16),
+                      if (acc) const SizedBox(height: 16),
 
-                    // NEW FUTURE BUILDER FOR CONTACT DETAILS
-                    if (_accountStatus)
-                      FutureBuilder<ContactDetails?>(
-                        future: _futureContactDetails,
-                        builder: (context, contactSnapshot) {
-                          if (contactSnapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.orange,
-                              ),
-                            );
-                          }
-                          if (contactSnapshot.hasData &&
-                              contactSnapshot.data != null) {
-                            final contactData = contactSnapshot.data!;
-                            _storage.write(
-                              'whatsappNo',
-                              contactData.whatsappNo,
-                            );
-                            return Center(
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
+                      // Contact row
+                      if (acc)
+                        FutureBuilder<ContactDetails?>(
+                          future: _futureContactDetails,
+                          builder: (context, contactSnapshot) {
+                            if (contactSnapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.orange,
+                                ),
+                              );
+                            }
+                            if (contactSnapshot.hasData &&
+                                contactSnapshot.data != null) {
+                              final contactData = contactSnapshot.data!;
+                              // Optional: cache whatsapp in storage
+                              if ((contactData.whatsappNo ?? '').isNotEmpty) {
+                                _storage.write(
+                                  'whatsappNo',
+                                  contactData.whatsappNo,
+                                );
+                              }
+                              return Row(
                                 children: [
-                                  // Pass the whatsapp number to the widget
                                   _ContactItem(contactData.whatsappNo ?? 'N/A'),
                                   const Spacer(),
                                   _ContactItem(contactData.mobileNo ?? 'N/A'),
                                 ],
-                              ),
+                              );
+                            }
+                            return const Center(
+                              child: Text("Contact info unavailable."),
                             );
-                          }
-                          // If there's an error or no data, show a default message or nothing
-                          return const Center(
-                            child: Text("Contact info unavailable."),
-                          );
-                        },
+                          },
+                        ),
+
+                      if (acc) const SizedBox(height: 16),
+
+                      // Game Cards (always visible as per your original code)
+                      ...results.map(
+                        (game) => _GameCard(
+                          id: game.gameId,
+                          title: game.gameName,
+                          result: game.result,
+                          open: game.openTime,
+                          close: game.closeTime,
+                          openBidLastTime: game.openTime,
+                          closeBidLastTime: game.closeTime,
+                          status: game.statusText,
+                          statusColor:
+                              game.statusText.toLowerCase().contains("open")
+                              ? Colors.green
+                              : Colors.red,
+                          accountStatus: acc,
+                          openSessionStatus: game.openSessionStatus,
+                          closeSessionStatus: game.closeSessionStatus,
+                          getTranslatedString: _t,
+                        ),
                       ),
-
-                    if (_accountStatus) const SizedBox(height: 16),
-
-                    // Game Cards
-                    ...results
-                        .map(
-                          (game) => _GameCard(
-                            id: game.gameId,
-                            title: game.gameName,
-                            result: game.result,
-                            open: game.openTime,
-                            close: game.closeTime,
-                            openBidLastTime: game.openTime,
-                            closeBidLastTime: game.closeTime,
-                            status: game.statusText,
-                            statusColor:
-                                game.statusText.toLowerCase().contains("open")
-                                ? Colors.green
-                                : Colors.red,
-                            accountStatus: _accountStatus,
-                            openSessionStatus: game.openSessionStatus,
-                            closeSessionStatus: game.closeSessionStatus,
-                            getTranslatedString: _getTranslatedString,
-                          ),
-                        )
-                        .toList(),
-                  ],
-                ),
-              );
+                    ],
+                  ),
+                );
+              });
             },
           ),
         ),
@@ -517,7 +462,7 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// --- Extracted Widgets ---
+// ---------------- Extracted Widgets ----------------
 class _CustomCategoryButton extends StatelessWidget {
   final String title;
   final VoidCallback onTap;
@@ -583,11 +528,14 @@ class _ContactItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () async {
-        final cleanNumber = number.replaceAll('+91', '').replaceAll(' ', '');
+        final cleanNumber = number
+            .replaceAll('+91', '')
+            .replaceAll(' ', '')
+            .trim();
         final url = Uri.parse("https://wa.me/$cleanNumber");
 
         if (await canLaunchUrl(url)) {
-          await launchUrl(url);
+          await launchUrl(url, mode: LaunchMode.externalApplication);
         } else {
           log("Could not launch $url");
         }
@@ -630,7 +578,7 @@ class _GameCard extends StatelessWidget {
   final bool accountStatus;
   final bool openSessionStatus;
   final bool closeSessionStatus;
-  final Function(String) getTranslatedString;
+  final String Function(String) getTranslatedString;
 
   const _GameCard({
     required this.id,
@@ -666,6 +614,7 @@ class _GameCard extends StatelessWidget {
       ),
       child: Row(
         children: [
+          // Left: title + result + times
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -704,6 +653,8 @@ class _GameCard extends StatelessWidget {
               ],
             ),
           ),
+
+          // Right: CTA (only if account active)
           if (accountStatus)
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -718,8 +669,9 @@ class _GameCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 GestureDetector(
                   onTap: () {
-                    if (status.toLowerCase().contains("closed for today") ||
-                        status.toLowerCase().contains("holiday for today")) {
+                    final s = status.toLowerCase();
+                    if (s.contains("closed for today") ||
+                        s.contains("holiday for today")) {
                       closeBidDialogue(
                         context: context,
                         gameName: title,

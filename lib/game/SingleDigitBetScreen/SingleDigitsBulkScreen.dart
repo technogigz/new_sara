@@ -394,7 +394,7 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
       width: 150,
       child: TextFormField(
         controller: pointsController,
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         keyboardType: TextInputType.number,
         inputFormatters: [
           FilteringTextInputFormatter.digitsOnly,
@@ -419,12 +419,12 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.orange, width: 2),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
           ),
         ),
         onTap: () {
           setState(() {
-            textFieldBorderColor = Colors.orange;
+            textFieldBorderColor = Colors.red;
             _clearMessage();
           });
         },
@@ -481,7 +481,7 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
                 decoration: BoxDecoration(
                   color: _isApiCalling
                       ? Colors.grey
-                      : Colors.orange, // Dim if disabled
+                      : Colors.red, // Dim if disabled
                   borderRadius: BorderRadius.circular(8),
                   boxShadow: _isApiCalling
                       ? []
@@ -756,7 +756,7 @@ class _SingleDigitsBulkScreenState extends State<SingleDigitsBulkScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: (_isApiCalling || bidEntries.isEmpty)
                             ? Colors.grey
-                            : Colors.orange, // Grey out when disabled
+                            : Colors.red, // Grey out when disabled
                         padding: const EdgeInsets.symmetric(
                           horizontal: 24, // Consistent padding
                           vertical: 12,

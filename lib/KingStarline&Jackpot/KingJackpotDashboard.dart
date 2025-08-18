@@ -143,7 +143,7 @@ class _KingJackpotDashboardState extends State<KingJackpotDashboard> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: RefreshIndicator(
-                  color: Colors.orange,
+                  color: Colors.red,
                   onRefresh: () async {
                     setState(() => futureGameData = fetchGameData());
                     await futureGameData;
@@ -153,9 +153,7 @@ class _KingJackpotDashboardState extends State<KingJackpotDashboard> {
                     builder: (context, snap) {
                       if (snap.connectionState == ConnectionState.waiting) {
                         return const Center(
-                          child: CircularProgressIndicator(
-                            color: Colors.orange,
-                          ),
+                          child: CircularProgressIndicator(color: Colors.red),
                         );
                       }
 
@@ -332,14 +330,14 @@ class _KingJackpotDashboardState extends State<KingJackpotDashboard> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(40),
         border: Border.all(
-          color: isSelected ? Colors.orange : Colors.black12,
+          color: isSelected ? Colors.red : Colors.black12,
           width: 1,
         ),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: isSelected ? Colors.orange : Colors.black87,
+          color: isSelected ? Colors.red : Colors.black87,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -393,7 +391,7 @@ class _KingJackpotDashboardState extends State<KingJackpotDashboard> {
                 (isClosedByText || !canPlay)
                     ? 'assets/images/ic_clock_closed.png'
                     : 'assets/images/ic_clock_active.png',
-                color: canPlay ? Colors.orange : Colors.grey,
+                color: canPlay ? Colors.red : Colors.grey,
                 height: 30,
               ),
             ],
@@ -406,7 +404,7 @@ class _KingJackpotDashboardState extends State<KingJackpotDashboard> {
               child: Text(
                 result.trim(),
                 style: const TextStyle(
-                  color: Colors.orangeAccent,
+                  color: Colors.redAccent,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -493,7 +491,7 @@ class _KingJackpotDashboardState extends State<KingJackpotDashboard> {
             const SizedBox(height: 12),
             ElevatedButton(
               onPressed: onRetry,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
               child: Text(tr('Retry')),
             ),
           ],

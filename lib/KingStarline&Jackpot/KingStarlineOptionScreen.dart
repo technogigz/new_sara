@@ -320,9 +320,7 @@ class _KingStarlineOptionScreenState extends State<KingStarlineOptionScreen> {
       ),
       body: SafeArea(
         child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: Colors.orange),
-              )
+            ? const Center(child: CircularProgressIndicator(color: Colors.red))
             : _options.isEmpty
             ? Center(
                 child: FutureBuilder<String>(
@@ -489,6 +487,7 @@ class _KingStarlineOptionScreenState extends State<KingStarlineOptionScreen> {
                 item.image,
                 width: 40,
                 height: 40,
+                color: Colors.red,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
                   log(

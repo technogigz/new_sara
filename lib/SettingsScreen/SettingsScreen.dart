@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get_storage/get_storage.dart';
+
 import '../Helper/TranslationHelper.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -88,29 +89,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildSectionHeader(uiStrings["Notification Settings"] ?? ""),
-                _buildSwitchTile(uiStrings["Main Notification"] ?? "", mainNotif, (val) {
-                  setState(() => mainNotif = val);
-                  _saveNotification('main_notif', val);
-                }),
-                _buildSwitchTile(uiStrings["Game Notification"] ?? "", gameNotif, (val) {
-                  setState(() => gameNotif = val);
-                  _saveNotification('game_notif', val);
-                }),
-                _buildSwitchTile(uiStrings["King Starline Notification"] ?? "", starlineNotif, (val) {
-                  setState(() => starlineNotif = val);
-                  _saveNotification('starline_notif', val);
-                }),
-                _buildSwitchTile(uiStrings["King Jackpot Notification"] ?? "", jackpotNotif, (val) {
-                  setState(() => jackpotNotif = val);
-                  _saveNotification('jackpot_notif', val);
-                }),
+                _buildSwitchTile(
+                  uiStrings["Main Notification"] ?? "",
+                  mainNotif,
+                  (val) {
+                    setState(() => mainNotif = val);
+                    _saveNotification('main_notif', val);
+                  },
+                ),
+                _buildSwitchTile(
+                  uiStrings["Game Notification"] ?? "",
+                  gameNotif,
+                  (val) {
+                    setState(() => gameNotif = val);
+                    _saveNotification('game_notif', val);
+                  },
+                ),
+                _buildSwitchTile(
+                  uiStrings["King Starline Notification"] ?? "",
+                  starlineNotif,
+                  (val) {
+                    setState(() => starlineNotif = val);
+                    _saveNotification('starline_notif', val);
+                  },
+                ),
+                _buildSwitchTile(
+                  uiStrings["King Jackpot Notification"] ?? "",
+                  jackpotNotif,
+                  (val) {
+                    setState(() => jackpotNotif = val);
+                    _saveNotification('jackpot_notif', val);
+                  },
+                ),
                 const SizedBox(height: 20),
                 _buildSectionHeader(uiStrings["Language Settings"] ?? ""),
-                ...languageMap.entries.map((entry) => _buildRadioTile(
-                  entry.key,
-                  selectedLang,
-                      (val) => _saveLanguage(val!),
-                )),
+                ...languageMap.entries.map(
+                  (entry) => _buildRadioTile(
+                    entry.key,
+                    selectedLang,
+                    (val) => _saveLanguage(val!),
+                  ),
+                ),
               ],
             ),
           ),
@@ -124,7 +143,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.amber,
+        color: Colors.red,
         borderRadius: BorderRadius.circular(12), // <-- corner radius added here
       ),
       child: Center(
@@ -136,7 +155,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-
   Widget _buildSwitchTile(String title, bool value, Function(bool) onChanged) {
     return SwitchListTile(
       title: Text(title),
@@ -146,7 +164,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildRadioTile(String title, String groupVal, Function(String?) onChanged) {
+  Widget _buildRadioTile(
+    String title,
+    String groupVal,
+    Function(String?) onChanged,
+  ) {
     return RadioListTile<String>(
       value: languageMap[title]!,
       groupValue: groupVal,

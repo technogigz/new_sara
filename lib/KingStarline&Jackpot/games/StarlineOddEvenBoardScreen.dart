@@ -391,7 +391,7 @@ class _StarlineOddEvenBoardScreenState
                               groupValue: _selectedGameType,
                               onChanged: (v) =>
                                   setState(() => _selectedGameType = v),
-                              activeColor: Colors.orange,
+                              activeColor: Colors.red,
                               contentPadding: EdgeInsets.zero,
                             ),
                           ),
@@ -402,7 +402,7 @@ class _StarlineOddEvenBoardScreenState
                               groupValue: _selectedGameType,
                               onChanged: (v) =>
                                   setState(() => _selectedGameType = v),
-                              activeColor: Colors.orange,
+                              activeColor: Colors.red,
                               contentPadding: EdgeInsets.zero,
                             ),
                           ),
@@ -435,7 +435,7 @@ class _StarlineOddEvenBoardScreenState
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: _isApiCalling
                                     ? Colors.grey
-                                    : Colors.orange,
+                                    : Colors.red,
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 12,
                                 ),
@@ -631,7 +631,7 @@ class _StarlineOddEvenBoardScreenState
         border: Border.all(color: Colors.grey[300]!),
       ),
       child: TextField(
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         controller: c,
         keyboardType: TextInputType.number,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -703,7 +703,7 @@ class _StarlineOddEvenBoardScreenState
           ElevatedButton(
             onPressed: _isApiCalling ? null : _showConfirmationDialog,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _isApiCalling ? Colors.grey : Colors.orange,
+              backgroundColor: _isApiCalling ? Colors.grey : Colors.red,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

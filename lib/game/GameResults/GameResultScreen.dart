@@ -115,7 +115,7 @@ class _GameResultScreenState extends State<GameResultScreen> {
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(
-                        child: CircularProgressIndicator(color: Colors.orange),
+                        child: CircularProgressIndicator(color: Colors.red),
                       );
                     } else if (snapshot.hasError) {
                       return Center(child: Text('Error: ${snapshot.error}'));
@@ -143,7 +143,7 @@ class _GameResultScreenState extends State<GameResultScreen> {
                               Text(
                                 item.market.isNotEmpty ? item.market : "--",
                                 style: GoogleFonts.poppins(
-                                  color: Colors.orange,
+                                  color: Colors.red,
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
                                 ),

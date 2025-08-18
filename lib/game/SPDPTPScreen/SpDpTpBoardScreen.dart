@@ -534,7 +534,7 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                                   value: _session,
                                   icon: const Icon(
                                     Icons.keyboard_arrow_down,
-                                    color: Colors.orange,
+                                    color: Colors.red,
                                   ),
                                   onChanged: _isApiCalling
                                       ? null
@@ -572,7 +572,7 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                                             }
                                           });
                                         },
-                                  activeColor: Colors.orange,
+                                  activeColor: Colors.red,
                                 ),
                                 Text(
                                   'SP',
@@ -597,7 +597,7 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                                             }
                                           });
                                         },
-                                  activeColor: Colors.orange,
+                                  activeColor: Colors.red,
                                 ),
                                 Text(
                                   'DP',
@@ -622,7 +622,7 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                                             }
                                           });
                                         },
-                                  activeColor: Colors.orange,
+                                  activeColor: Colors.red,
                                 ),
                                 Text(
                                   'TP',
@@ -649,7 +649,7 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                             height: 40,
                             child: TextField(
                               controller: _digitController,
-                              cursorColor: Colors.orange,
+                              cursorColor: Colors.red,
                               keyboardType: TextInputType.number,
                               inputFormatters: [
                                 LengthLimitingTextInputFormatter(1),
@@ -679,7 +679,7 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                                     Radius.circular(20),
                                   ),
                                   borderSide: BorderSide(
-                                    color: Colors.orange,
+                                    color: Colors.red,
                                     width: 2,
                                   ),
                                 ),
@@ -704,7 +704,7 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                             height: 40,
                             child: TextField(
                               controller: _pointsController,
-                              cursorColor: Colors.orange,
+                              cursorColor: Colors.red,
                               keyboardType: TextInputType.number,
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly,
@@ -734,7 +734,7 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                                     Radius.circular(20),
                                   ),
                                   borderSide: BorderSide(
-                                    color: Colors.orange,
+                                    color: Colors.red,
                                     width: 2,
                                   ),
                                 ),
@@ -756,7 +756,7 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: _isApiCalling
                                   ? Colors.grey
-                                  : Colors.orange,
+                                  : Colors.red,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(6),
                               ),
@@ -964,7 +964,7 @@ class _SpDpTpBoardScreenState extends State<SpDpTpBoardScreen> {
                             onPressed: canSubmit ? _confirm : null,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: canSubmit
-                                  ? Colors.orange
+                                  ? Colors.red
                                   : Colors.grey,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 24,

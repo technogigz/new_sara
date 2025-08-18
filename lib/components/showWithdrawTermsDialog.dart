@@ -59,7 +59,6 @@ Future<void> showWithdrawTermsDialog(BuildContext context) {
   );
 }
 
-
 class _TermRow extends StatelessWidget {
   final String text;
   const _TermRow(this.text);
@@ -71,14 +70,9 @@ class _TermRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.thumb_up_alt_rounded, color: Colors.amber, size: 18),
+          const Icon(Icons.thumb_up_alt_rounded, color: Colors.red, size: 18),
           const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
         ],
       ),
     );

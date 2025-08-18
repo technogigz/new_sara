@@ -526,7 +526,7 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
         width: 150,
         child: TextFormField(
           controller: controller,
-          cursorColor: Colors.orange,
+          cursorColor: Colors.red,
           keyboardType: TextInputType.number,
           onTap: _clearMessage,
           textAlignVertical: TextAlignVertical.center,
@@ -548,7 +548,7 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(30),
-              borderSide: const BorderSide(color: Colors.orange, width: 2),
+              borderSide: const BorderSide(color: Colors.red, width: 2),
             ),
           ),
           style: GoogleFonts.poppins(fontSize: 14),
@@ -581,7 +581,7 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
           return TextFormField(
             controller: textCtrl,
             focusNode: focusNode,
-            cursorColor: Colors.orange,
+            cursorColor: Colors.red,
             keyboardType: TextInputType.number,
             onTap: _clearMessage,
             textAlignVertical: TextAlignVertical.center,
@@ -603,7 +603,7 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(30),
-                borderSide: const BorderSide(color: Colors.orange, width: 2),
+                borderSide: const BorderSide(color: Colors.red, width: 2),
               ),
             ),
             style: GoogleFonts.poppins(fontSize: 14),
@@ -758,7 +758,7 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
                         child: ElevatedButton(
                           onPressed: _addBid,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
+                            backgroundColor: Colors.red,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(6),
                             ),
@@ -888,7 +888,7 @@ class _StarlineSinglePannaScreenState extends State<StarlineSinglePannaScreen> {
                               child: ElevatedButton(
                                 onPressed: _showBidConfirmationDialog,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.orange,
+                                  backgroundColor: Colors.red,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),

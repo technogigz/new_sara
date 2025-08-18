@@ -405,7 +405,7 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
                             width: 150,
                             height: 40,
                             child: TextField(
-                              cursorColor: Colors.orange,
+                              cursorColor: Colors.red,
                               controller: _pointsController,
                               keyboardType: TextInputType.number,
                               inputFormatters: [
@@ -434,7 +434,7 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(20),
                                   borderSide: const BorderSide(
-                                    color: Colors.orange,
+                                    color: Colors.red,
                                     width: 2,
                                   ),
                                 ),
@@ -455,7 +455,7 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
                             width: 150,
                             height: 40,
                             child: TextField(
-                              cursorColor: Colors.orange,
+                              cursorColor: Colors.red,
                               controller: _jodiDigitController,
                               keyboardType: TextInputType.number,
                               inputFormatters: [
@@ -490,7 +490,7 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(20),
                                   borderSide: const BorderSide(
-                                    color: Colors.orange,
+                                    color: Colors.red,
                                     width: 2,
                                   ),
                                 ),
@@ -697,7 +697,7 @@ class _JodiBulkScreenState extends State<JodiBulkScreen> {
           ElevatedButton(
             onPressed: canSubmit ? _showConfirmationDialog : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: canSubmit ? Colors.orange[700] : Colors.grey,
+              backgroundColor: canSubmit ? Colors.red[700] : Colors.grey,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

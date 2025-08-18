@@ -126,7 +126,7 @@ class _EnterMobileScreenState extends State<EnterMobileScreen> {
                 children: [
                   Row(
                     children: [
-                      Container(width: 10, height: 50, color: Colors.orange),
+                      Container(width: 10, height: 50, color: Colors.red),
                       const SizedBox(width: 8),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,7 +166,7 @@ class _EnterMobileScreenState extends State<EnterMobileScreen> {
                     keyboardType: TextInputType.phone,
                     autofillHints: const [AutofillHints.telephoneNumber],
                     maxLength: 10,
-                    cursorColor: Colors.orange,
+                    cursorColor: Colors.red,
                     inputFormatters: [
                       FilteringTextInputFormatter.digitsOnly,
                       LengthLimitingTextInputFormatter(10),
@@ -188,7 +188,7 @@ class _EnterMobileScreenState extends State<EnterMobileScreen> {
                       counterText: "",
                       prefixIcon: const Icon(
                         Icons.phone_outlined,
-                        color: Colors.orange,
+                        color: Colors.red,
                       ),
                       hintText: 'Enter your mobile number',
                       filled: true,
@@ -206,7 +206,7 @@ class _EnterMobileScreenState extends State<EnterMobileScreen> {
                     child: ElevatedButton(
                       onPressed: isLoading ? null : _handleNextPressed,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFF9B233),
+                        backgroundColor: Colors.red,
                       ),
                       child: isLoading
                           ? const CircularProgressIndicator(color: Colors.black)

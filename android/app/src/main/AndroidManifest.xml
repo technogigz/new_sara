@@ -1,41 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Device features (keep optional unless truly required) -->
-    <uses-feature android:name="android.hardware.telephony" />
+    <!-- ===== Device features (optional) ===== -->
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
     <uses-feature android:name="android.hardware.fingerprint" android:required="false" />
 
-    <!-- Network & core -->
+    <!-- ===== Core permissions ===== -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
-    <!-- Biometrics (optional if you use it) -->
+    <!-- Optional (use only if you really need them in app logic) -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.USE_FINGERPRINT" />
-
-    <!-- Audio (if you record anywhere in app) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-
-    <!-- Calling (only if you directly place calls) -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
-
-    <!-- Phone state (avoid privileged variant) -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-    <!-- REMOVE: privileged/system-only permission (Play rejects) -->
-    <!-- <uses-permission android:name="android.permission.READ_PRIVILEGED_PHONE_STATE"
-         tools:ignore="ProtectedPermissions" /> -->
-
-    <!-- Storage / Media (prefer modern media permission on Android 13+) -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <!-- Legacy storage perms: uncomment ONLY if you truly need them -->
-    <!-- <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/> -->
-    <!-- <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" /> -->
-    <!-- <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/> -->
-
-    <!-- Notifications (declare once) -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-    <!-- Avoid broad package visibility unless approved by policy -->
-    <!-- <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/> -->
 
     <application
         android:name="${applicationName}"
@@ -45,14 +26,13 @@
         android:enableOnBackInvokedCallback="true"
         android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode">
 
-        <!-- Default FCM channel + icon (optional but recommended) -->
+        <!-- (Optional) FCM defaults -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="default_channel" />
-
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@drawable/ic_launcher" />
+            android:resource="@mipmap/launcher_icon" />
 
         <activity
             android:name=".MainActivity"
@@ -69,6 +49,35 @@
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
 
+            <!-- ===== App Links (HTTPS) — opens your app from your domain =====
+                 NOTE: app verification needs https://<your-domain>/.well-known/assetlinks.json
+                 Adjust host/pathPrefix to your actual callback path(s).
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="app.sarra777.net"
+                    android:pathPrefix="/deeplink" />
+                <!-- example: https://app.sarra777.net/deeplink/upi-callback?... -->
+            </intent-filter>
+
+            <!-- ===== Custom Scheme Deep Link (app-defined) =====
+                 Example: sara77://payment?status=SUCCESS&txnId=123
+                 Keep this separate from HTTPS filter.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="sara77"
+                    android:host="payment" />
+            </intent-filter>
+
+            <!-- Launcher -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -81,9 +90,11 @@
             android:value="2" />
     </application>
 
-    <!-- Android 11+ package visibility: declare what you need to open -->
+    <!-- ===== Android 11+ package visibility (queries) =====
+         Allows canLaunch/launch for these schemes/packages.
+    -->
     <queries>
-        <!-- WhatsApp native scheme (for whatsapp://send) -->
+        <!-- WhatsApp native scheme (whatsapp://) -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="whatsapp" />
@@ -95,130 +106,23 @@
             <data android:scheme="https" android:host="wa.me" />
         </intent>
 
-        <!-- Optional: generic https viewer fallback -->
+        <!-- General https viewer (safe fallback) -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
         </intent>
 
-        <!-- Optional: WhatsApp package visibility -->
-        <package android:name="com.whatsapp" />
-
-        <!-- UPI apps (optional; keep if you launch these) -->
-        <package android:name="com.google.android.apps.nbu.paisa.user" /> <!-- Google Pay -->
-        <package android:name="com.phonepe.app" />                         <!-- PhonePe -->
-        <package android:name="net.one97.paytm" />                         <!-- Paytm -->
-
-        <!-- UPI scheme (single declaration only) -->
+        <!-- UPI scheme (generic handler discovery) -->
         <intent>
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="upi"/>
         </intent>
+
+        <!-- Popular UPI packages -->
+        <package android:name="com.google.android.apps.nbu.paisa.user" /> <!-- Google Pay -->
+        <package android:name="com.phonepe.app" />                         <!-- PhonePe -->
+        <package android:name="net.one97.paytm" />                         <!-- Paytm (Play Store pkg) -->
+        <package android:name="com.whatsapp" />                            <!-- WhatsApp (optional) -->
     </queries>
 
 </manifest>
-
-<!--<manifest xmlns:tools="http://schemas.android.com/tools"-->
-<!--    xmlns:android="http://schemas.android.com/apk/res/android">-->
-
-<!--    <uses-feature-->
-<!--        android:name="android.hardware.telephony" />-->
-<!--    <uses-feature android:name="android.hardware.fingerprint" android:required="false" />-->
-
-<!--    <uses-permission android:name="android.permission.INTERNET"/>-->
-<!--    <uses-permission android:name="android.permission.USE_BIOMETRIC" />-->
-<!--    <uses-permission android:name="android.permission.USE_FINGERPRINT" />-->
-<!--    <uses-permission android:name="android.permission.RECORD_AUDIO" />-->
-<!--    <uses-permission android:name="android.permission.CALL_PHONE" />-->
-<!--    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>-->
-<!--    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />-->
-<!--    <uses-permission android:name="android.permission.READ_PHONE_STATE" />-->
-<!--    <uses-permission android:name="android.permission.READ_PRIVILEGED_PHONE_STATE"-->
-<!--        tools:ignore="ProtectedPermissions" />-->
-
-<!--    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />-->
-<!--    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>-->
-<!--    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>-->
-
-<!--    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />-->
-<!--    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />-->
-
-<!--    <application-->
-<!--        android:label="Sara777"-->
-<!--        android:name="${applicationName}"-->
-<!--        android:icon="@mipmap/launcher_icon"-->
-<!--        android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"-->
-<!--        android:hardwareAccelerated="true"-->
-<!--        android:enableOnBackInvokedCallback="true">-->
-<!--        <activity-->
-<!--            android:name=".MainActivity"-->
-<!--            android:exported="true"-->
-<!--            android:launchMode="singleTop"-->
-<!--            android:taskAffinity=""-->
-<!--            android:theme="@style/LaunchTheme"-->
-<!--            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"-->
-<!--            android:hardwareAccelerated="true"-->
-<!--            android:windowSoftInputMode="adjustResize">-->
-<!--            &lt;!&ndash; Specifies an Android theme to apply to this Activity as soon as-->
-<!--                 the Android process has started. This theme is visible to the user-->
-<!--                 while the Flutter UI initializes. After that, this theme continues-->
-<!--                 to determine the Window background behind the Flutter UI. &ndash;&gt;-->
-<!--            <meta-data-->
-<!--              android:name="io.flutter.embedding.android.NormalTheme"-->
-<!--              android:resource="@style/NormalTheme"-->
-<!--              />-->
-<!--            <intent-filter>-->
-<!--                <action android:name="android.intent.action.MAIN"/>-->
-<!--                <category android:name="android.intent.category.LAUNCHER"/>-->
-<!--            </intent-filter>-->
-<!--        </activity>-->
-<!--        &lt;!&ndash; Don't delete the meta-data below.-->
-<!--             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java &ndash;&gt;-->
-<!--        <meta-data-->
-<!--            android:name="flutterEmbedding"-->
-<!--            android:value="2" />-->
-<!--    </application>-->
-<!--    &lt;!&ndash; Required to query activities that can process text, see:-->
-<!--         https://developer.android.com/training/package-visibility and-->
-<!--         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.-->
-
-<!--         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. &ndash;&gt;-->
-<!--    <queries>-->
-<!--        &lt;!&ndash; For opening WhatsApp links &ndash;&gt;-->
-<!--        <intent>-->
-<!--            <action android:name="android.intent.action.VIEW" />-->
-<!--            <data android:scheme="https" android:host="wa.me" />-->
-<!--        </intent>-->
-
-<!--        &lt;!&ndash; For browser fallback (like launching flutter.dev) &ndash;&gt;-->
-<!--        <intent>-->
-<!--            <action android:name="android.intent.action.VIEW" />-->
-<!--            <data android:scheme="https" />-->
-<!--        </intent>-->
-
-<!--        &lt;!&ndash; Optional: To allow opening WhatsApp directly via package &ndash;&gt;-->
-<!--        <package android:name="com.whatsapp" />-->
-
-<!--        &lt;!&ndash;  ****** ADD THESE UPI-RELATED QUERIES HERE ****** &ndash;&gt;-->
-<!--        &lt;!&ndash; For Google Pay &ndash;&gt;-->
-<!--        <package android:name="com.google.android.apps.nbu.paisa.user" />-->
-<!--        &lt;!&ndash; For PhonePe &ndash;&gt;-->
-<!--        <package android:name="com.phonepe.app" />-->
-<!--        &lt;!&ndash; For Paytm &ndash;&gt;-->
-<!--        <package android:name="net.one97.paytm" />-->
-<!--        &lt;!&ndash; For general UPI intents (crucial for upi:// scheme) &ndash;&gt;-->
-<!--        <intent>-->
-<!--            <action android:name="android.intent.action.VIEW" />-->
-<!--            <data android:scheme="upi" />-->
-<!--        </intent>-->
-<!--        &lt;!&ndash;  ****** END OF UPI QUERIES ****** &ndash;&gt;-->
-
-<!--            <intent>-->
-<!--                <action android:name="android.intent.action.VIEW"/>-->
-<!--                <data android:scheme="upi"/>-->
-<!--            </intent>-->
-
-
-<!--    </queries>-->
-
-<!--</manifest>-->

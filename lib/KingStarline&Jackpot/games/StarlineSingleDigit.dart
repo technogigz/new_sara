@@ -85,7 +85,7 @@ class _StarlineSingleDigitBetScreenState
 
   late String _registerId;
   bool _accountStatus = false;
-  int _walletBalance = 0;
+  late int _walletBalance;
   bool _isApiCalling = false;
 
   String? _messageToShow;
@@ -97,6 +97,9 @@ class _StarlineSingleDigitBetScreenState
       ? Get.find<UserController>()
       : Get.put(UserController());
 
+  // Worker to react to controller updates
+  Worker? _walletWorker;
+
   // UI-only (if provided); not required for API
   String? _resolvedSessionTime;
 
@@ -105,8 +108,11 @@ class _StarlineSingleDigitBetScreenState
     super.initState();
     _bidService = StarlineBidService(_storage);
 
-    final num? wb = num.tryParse(userController.walletBalance.value);
-    _walletBalance = wb?.toInt() ?? 0;
+    // ---- Wallet source of truth: UserController ----
+    // Initial value: try controller first, then storage (digits only)
+    double walletBalance = double.parse(userController.walletBalance.value);
+    int walletBalanceInt = walletBalance.toInt();
+    _walletBalance = walletBalanceInt;
 
     _loadInitialData();
     digitController.addListener(_onDigitChanged);
@@ -143,11 +149,6 @@ class _StarlineSingleDigitBetScreenState
   Future<void> _loadInitialData() async {
     _registerId = _storage.read('registerId') ?? '';
     _accountStatus = userController.accountStatus.value;
-    // live wallet sync
-    _storage.listenKey('walletBalance', (value) {
-      final int newBal = int.tryParse(value?.toString() ?? '0') ?? 0;
-      if (mounted) setState(() => _walletBalance = newBal);
-    });
   }
 
   @override
@@ -156,6 +157,7 @@ class _StarlineSingleDigitBetScreenState
     digitController.dispose();
     pointsController.dispose();
     _messageDismissTimer?.cancel();
+    _walletWorker?.dispose();
     super.dispose();
   }
 
@@ -409,6 +411,7 @@ class _StarlineSingleDigitBetScreenState
           _isDigitSuggestionsVisible = false;
         });
 
+        // Persist + broadcast
         await _bidService.updateWalletBalance(newBalance);
         userController.walletBalance.value = newBalance.toString();
 
@@ -530,7 +533,7 @@ class _StarlineSingleDigitBetScreenState
                             style: ElevatedButton.styleFrom(
                               backgroundColor: _isApiCalling
                                   ? Colors.grey
-                                  : Colors.orange,
+                                  : Colors.red,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(6),
                               ),
@@ -694,7 +697,7 @@ class _StarlineSingleDigitBetScreenState
           height: 35,
           child: TextFormField(
             controller: digitController,
-            cursorColor: Colors.orange,
+            cursorColor: Colors.red,
             keyboardType: const TextInputType.numberWithOptions(
               signed: false,
               decimal: false,
@@ -724,7 +727,7 @@ class _StarlineSingleDigitBetScreenState
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(30),
-                borderSide: const BorderSide(color: Colors.orange, width: 2),
+                borderSide: const BorderSide(color: Colors.red, width: 2),
               ),
             ),
           ),
@@ -774,7 +777,7 @@ class _StarlineSingleDigitBetScreenState
       height: 35,
       child: TextFormField(
         controller: controller,
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         keyboardType: const TextInputType.numberWithOptions(
           signed: false,
           decimal: false,
@@ -801,7 +804,7 @@ class _StarlineSingleDigitBetScreenState
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.orange, width: 2),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
           ),
         ),
       ),
@@ -837,7 +840,7 @@ class _StarlineSingleDigitBetScreenState
             style: ElevatedButton.styleFrom(
               backgroundColor: (_isApiCalling || _addedEntries.isEmpty)
                   ? Colors.grey
-                  : Colors.orange,
+                  : Colors.red,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

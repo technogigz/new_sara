@@ -67,7 +67,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
               children: [
                 Row(
                   children: [
-                    Container(width: 10, height: 50, color: Colors.orange),
+                    Container(width: 10, height: 50, color: Colors.red),
                     const SizedBox(width: 8),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -114,7 +114,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: const BoxDecoration(
-                          color: Colors.orange,
+                          color: Colors.red,
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
@@ -125,7 +125,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: TextField(
-                          cursorColor: Colors.orange,
+                          cursorColor: Colors.red,
                           controller: _usernameController,
                           decoration: const InputDecoration(
                             hintText: 'Enter username',
@@ -143,7 +143,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                   child: ElevatedButton(
                     onPressed: _onNextPressed,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
+                      backgroundColor: Colors.red,
                       textStyle: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -239,7 +239,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 //             children: [
 //               Row(
 //                 children: [
-//                   Container(width: 10, height: 50, color: Colors.orange),
+//                   Container(width: 10, height: 50, color: Colors.red),
 //                   const SizedBox(width: 8),
 //                   Column(
 //                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,7 +288,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 //                     Container(
 //                       padding: const EdgeInsets.all(8),
 //                       decoration: const BoxDecoration(
-//                         color: Colors.orange,
+//                         color: Colors.red,
 //                         shape: BoxShape.circle,
 //                       ),
 //                       child: const Icon(
@@ -299,7 +299,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 //                     const SizedBox(width: 12),
 //                     Expanded(
 //                       child: TextField(
-//                         cursorColor: Colors.orange,
+//                         cursorColor: Colors.red,
 //                         controller: _usernameController,
 //                         decoration: const InputDecoration(
 //                           hintText: 'Enter username',
@@ -317,7 +317,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 //                 child: ElevatedButton(
 //                   onPressed: _onNextPressed,
 //                   style: ElevatedButton.styleFrom(
-//                     backgroundColor: Colors.orange,
+//                     backgroundColor: Colors.red,
 //                     textStyle: const TextStyle(
 //                       fontSize: 16,
 //                       fontWeight: FontWeight.bold,

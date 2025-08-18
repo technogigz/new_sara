@@ -28,12 +28,20 @@ class KingJackpotBiddingClosedDialog extends StatelessWidget {
           const SizedBox(height: 16),
           const Text(
             "Bidding Is Closed For Today",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.red),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.red,
+            ),
           ),
           const SizedBox(height: 10),
           Text(
             time,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.black),
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: Colors.black,
+            ),
           ),
           const SizedBox(height: 20),
           _infoRow("Open Result Time :", resultTime),
@@ -43,13 +51,15 @@ class KingJackpotBiddingClosedDialog extends StatelessWidget {
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber,
+              backgroundColor: Colors.red,
               foregroundColor: Colors.black,
               minimumSize: const Size(double.infinity, 44),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
             ),
             child: const Text("OK"),
-          )
+          ),
         ],
       ),
     );

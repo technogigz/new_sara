@@ -525,7 +525,7 @@ class _StarlineDoublePanaBetScreenState
                         height: 45,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
+                            backgroundColor: Colors.red,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(6),
                             ),
@@ -700,9 +700,7 @@ class _StarlineDoublePanaBetScreenState
                       ElevatedButton(
                         onPressed: canSubmit ? _submitSingle : null,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: canSubmit
-                              ? Colors.orange
-                              : Colors.grey,
+                          backgroundColor: canSubmit ? Colors.red : Colors.grey,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 24,
                             vertical: 12,
@@ -822,7 +820,7 @@ class _StarlineDoublePanaBetScreenState
       height: 35,
       child: TextFormField(
         controller: digitController,
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         keyboardType: TextInputType.number,
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: [
@@ -852,7 +850,7 @@ class _StarlineDoublePanaBetScreenState
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.orange, width: 2),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
           ),
         ),
       ),
@@ -869,7 +867,7 @@ class _StarlineDoublePanaBetScreenState
       height: 35,
       child: TextFormField(
         controller: c,
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         keyboardType: TextInputType.number,
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: fmts,
@@ -892,7 +890,7 @@ class _StarlineDoublePanaBetScreenState
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.orange, width: 2),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
           ),
         ),
       ),

@@ -408,7 +408,7 @@ class _KingStarlineDashboardScreenState
             if (_isLoading)
               const Expanded(
                 child: Center(
-                  child: CircularProgressIndicator(color: Colors.amber),
+                  child: CircularProgressIndicator(color: Colors.red),
                 ),
               )
             else if (_errorMessage.isNotEmpty)
@@ -469,7 +469,7 @@ class _KingStarlineDashboardScreenState
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.amber,
+                    color: Colors.red,
                   ),
                 ),
               ),
@@ -499,7 +499,7 @@ class _KingStarlineDashboardScreenState
                   game.isClosed
                       ? 'assets/images/ic_clock_closed.png'
                       : 'assets/images/ic_clock_active.png',
-                  color: game.isClosed ? Colors.grey[600] : Colors.amber[700],
+                  color: game.isClosed ? Colors.grey[600] : Colors.red[700],
                   height: 38,
                 ),
                 const SizedBox(width: 15),
@@ -541,7 +541,7 @@ class _KingStarlineDashboardScreenState
                   child: Text(
                     game.result,
                     style: const TextStyle(
-                      color: Colors.amber,
+                      color: Colors.red,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -558,7 +558,7 @@ class _KingStarlineDashboardScreenState
                         width: 45,
                         height: 45,
                         decoration: const BoxDecoration(
-                          color: Colors.amber,
+                          color: Colors.red,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(

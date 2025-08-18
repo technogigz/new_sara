@@ -274,7 +274,7 @@ class _HomePageState extends State<HomePage> {
       body: Container(
         color: Colors.grey.shade200,
         child: RefreshIndicator(
-          color: Colors.orange,
+          color: Colors.red,
           backgroundColor: Colors.grey.shade200,
           onRefresh: _handleRefresh,
           child: FutureBuilder<HomeData>(
@@ -287,7 +287,7 @@ class _HomePageState extends State<HomePage> {
                     height: 28,
                     child: CircularProgressIndicator(
                       strokeWidth: 3,
-                      color: Colors.orange,
+                      color: Colors.red,
                     ),
                   ),
                 );
@@ -399,7 +399,7 @@ class _HomePageState extends State<HomePage> {
                               return const Center(
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.orange,
+                                  color: Colors.red,
                                 ),
                               );
                             }
@@ -480,7 +480,7 @@ class _CustomCategoryButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.orange,
+          color: Colors.red,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
@@ -632,7 +632,7 @@ class _GameCard extends StatelessWidget {
                   result,
                   style: GoogleFonts.poppins(
                     fontSize: 20,
-                    color: Colors.orange,
+                    color: Colors.red,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -697,13 +697,13 @@ class _GameCard extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.orange,
+                      color: Colors.red,
                       borderRadius: BorderRadius.circular(25),
                     ),
                     child: Icon(
                       Icons.play_arrow,
                       size: 30,
-                      color: Colors.grey.shade600,
+                      color: Colors.white,
                     ),
                   ),
                 ),

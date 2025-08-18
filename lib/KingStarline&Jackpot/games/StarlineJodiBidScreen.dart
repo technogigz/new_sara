@@ -386,7 +386,7 @@ class _StarlineJodiBidScreenState extends State<StarlineJodiBidScreen> {
                         _buildInputField(
                           controller: digitController,
                           hint: "Enter Jodi",
-                          borderColor: Colors.orange,
+                          borderColor: Colors.red,
                           selected: 'digit',
                         ),
                       ),
@@ -395,7 +395,7 @@ class _StarlineJodiBidScreenState extends State<StarlineJodiBidScreen> {
                         _buildInputField(
                           controller: amountController,
                           hint: "Enter Amount",
-                          borderColor: Colors.orange,
+                          borderColor: Colors.red,
                           selected: 'amount',
                         ),
                       ),
@@ -407,7 +407,7 @@ class _StarlineJodiBidScreenState extends State<StarlineJodiBidScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _isSubmitting
                                 ? Colors.grey
-                                : Colors.orange,
+                                : Colors.red,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(6),
                             ),
@@ -514,7 +514,7 @@ class _StarlineJodiBidScreenState extends State<StarlineJodiBidScreen> {
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(2),
             ],
-            cursorColor: Colors.orange,
+            cursorColor: Colors.red,
             decoration: InputDecoration(
               counterText: "",
               hintText: hint,
@@ -570,7 +570,7 @@ class _StarlineJodiBidScreenState extends State<StarlineJodiBidScreen> {
           FilteringTextInputFormatter.digitsOnly,
           LengthLimitingTextInputFormatter(4),
         ],
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         decoration: InputDecoration(
           counterText: "",
           hintText: hint,
@@ -669,7 +669,7 @@ class _StarlineJodiBidScreenState extends State<StarlineJodiBidScreen> {
                 ? null
                 : () => _showConfirmationDialog(total),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
+              backgroundColor: Colors.red,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(6),
               ),

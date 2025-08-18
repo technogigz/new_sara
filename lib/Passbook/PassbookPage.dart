@@ -153,7 +153,7 @@ class _PassbookPageState extends State<PassbookPage> {
             Expanded(
               child: loading
                   ? const Center(
-                      child: CircularProgressIndicator(color: Colors.orange),
+                      child: CircularProgressIndicator(color: Colors.red),
                     )
                   : SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
@@ -189,7 +189,7 @@ class _PassbookPageState extends State<PassbookPage> {
 
   Widget _buildHeader() {
     return Container(
-      color: Colors.orange,
+      color: Colors.red,
       child: Row(
         children: const [
           _HeaderCell("Date", width: 130), // Changed to "Date"
@@ -265,7 +265,7 @@ class _PassbookPageState extends State<PassbookPage> {
         child: Container(
           height: 45,
           decoration: BoxDecoration(
-            color: enabled ? Colors.orange : Colors.grey,
+            color: enabled ? Colors.red : Colors.grey,
             borderRadius: BorderRadius.circular(6),
           ),
           child: Center(

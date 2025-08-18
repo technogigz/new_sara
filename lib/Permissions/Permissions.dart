@@ -159,13 +159,13 @@ class _PermissionScreenState extends State<PermissionScreen> {
       margin: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
-        leading: Icon(icon, size: 40, color: Colors.orange),
+        leading: Icon(icon, size: 40, color: Colors.red),
         title: Text(
           title,
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,
-            color: Colors.orange,
+            color: Colors.red,
           ),
         ),
         subtitle: Text(description),
@@ -391,13 +391,13 @@ class _PermissionScreenState extends State<PermissionScreen> {
 //       margin: const EdgeInsets.symmetric(vertical: 8),
 //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
 //       child: ListTile(
-//         leading: Icon(icon, size: 40, color: Colors.orange),
+//         leading: Icon(icon, size: 40, color: Colors.red),
 //         title: Text(
 //           title,
 //           style: const TextStyle(
 //             fontWeight: FontWeight.bold,
 //             fontSize: 18,
-//             color: Colors.orange,
+//             color: Colors.red,
 //           ),
 //         ),
 //         subtitle: Text(description),

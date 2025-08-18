@@ -351,9 +351,7 @@ class _JackpotJodiOptionsScreenState extends State<JackpotJodiOptionsScreen> {
       ),
       body: SafeArea(
         child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: Colors.amber),
-              )
+            ? const Center(child: CircularProgressIndicator(color: Colors.red))
             : _options.isEmpty
             ? Center(
                 child: FutureBuilder<String>(
@@ -531,6 +529,7 @@ class _JackpotJodiOptionsScreenState extends State<JackpotJodiOptionsScreen> {
                 item.image,
                 width: 40,
                 height: 40,
+                color: Colors.red,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
                   log('Image load error: ${item.image} | $error');
@@ -980,7 +979,7 @@ class _JackpotJodiOptionsScreenState extends State<JackpotJodiOptionsScreen> {
 //       body: SafeArea(
 //         child: isLoading
 //             ? const Center(
-//                 child: CircularProgressIndicator(color: Colors.amber),
+//                 child: CircularProgressIndicator(color: Colors.red),
 //               )
 //             : options.isEmpty
 //             ? Center(

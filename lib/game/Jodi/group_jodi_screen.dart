@@ -400,7 +400,7 @@ class _GroupJodiScreenState extends State<GroupJodiScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _isSubmitting
                                 ? Colors.grey
-                                : Colors.orange,
+                                : Colors.red,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -597,7 +597,7 @@ class _GroupJodiScreenState extends State<GroupJodiScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _isSubmitting
                                 ? Colors.grey
-                                : Colors.orange,
+                                : Colors.red,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 24,
                               vertical: 12,
@@ -693,7 +693,7 @@ class _GroupJodiScreenState extends State<GroupJodiScreen> {
                 suffixIcon: Container(
                   margin: const EdgeInsets.all(8),
                   decoration: const BoxDecoration(
-                    color: Colors.orange,
+                    color: Colors.red,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(

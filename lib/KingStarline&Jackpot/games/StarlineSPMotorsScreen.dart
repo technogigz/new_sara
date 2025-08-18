@@ -546,7 +546,7 @@ class _StarlineSPMotorsScreenState extends State<StarlineSPMotorsScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _isApiCalling
                                 ? Colors.grey
-                                : Colors.orange,
+                                : Colors.red,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(6),
                             ),
@@ -710,7 +710,7 @@ class _StarlineSPMotorsScreenState extends State<StarlineSPMotorsScreen> {
       height: 35,
       child: TextFormField(
         controller: bidController,
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         keyboardType: TextInputType.number,
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: [
@@ -737,7 +737,7 @@ class _StarlineSPMotorsScreenState extends State<StarlineSPMotorsScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.orange, width: 2),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
           ),
         ),
       ),
@@ -754,7 +754,7 @@ class _StarlineSPMotorsScreenState extends State<StarlineSPMotorsScreen> {
       height: 35,
       child: TextFormField(
         controller: controller,
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         keyboardType: TextInputType.number,
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: inputFormatters,
@@ -778,7 +778,7 @@ class _StarlineSPMotorsScreenState extends State<StarlineSPMotorsScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.orange, width: 2),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
           ),
         ),
       ),
@@ -852,7 +852,7 @@ class _StarlineSPMotorsScreenState extends State<StarlineSPMotorsScreen> {
               backgroundColor:
                   (_isApiCalling || totalPointsForSelectedType == 0)
                   ? Colors.grey
-                  : Colors.orange,
+                  : Colors.red,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

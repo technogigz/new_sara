@@ -537,7 +537,7 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
                                             _clearMessage();
                                           });
                                         },
-                                  activeColor: Colors.orange,
+                                  activeColor: Colors.red,
                                 ),
                                 Text(
                                   'SP',
@@ -563,7 +563,7 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
                                             _clearMessage();
                                           });
                                         },
-                                  activeColor: Colors.orange,
+                                  activeColor: Colors.red,
                                 ),
                                 Text(
                                   'DP',
@@ -589,7 +589,7 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
                                             _clearMessage();
                                           });
                                         },
-                                  activeColor: Colors.orange,
+                                  activeColor: Colors.red,
                                 ),
                                 Text(
                                   'TP',
@@ -612,7 +612,7 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
                             width: 150,
                             height: 40,
                             child: TextField(
-                              cursorColor: Colors.orange,
+                              cursorColor: Colors.red,
                               controller: _pannaController,
                               keyboardType: TextInputType.number,
                               inputFormatters: [
@@ -643,7 +643,7 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
                                     Radius.circular(20),
                                   ),
                                   borderSide: BorderSide(
-                                    color: Colors.orange,
+                                    color: Colors.red,
                                     width: 2,
                                   ),
                                 ),
@@ -666,7 +666,7 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
                             width: 150,
                             height: 40,
                             child: TextField(
-                              cursorColor: Colors.orange,
+                              cursorColor: Colors.red,
                               controller: _pointsController,
                               keyboardType: TextInputType.number,
                               inputFormatters: [
@@ -695,7 +695,7 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
                                     Radius.circular(20),
                                   ),
                                   borderSide: BorderSide(
-                                    color: Colors.orange,
+                                    color: Colors.red,
                                     width: 2,
                                   ),
                                 ),
@@ -717,7 +717,7 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: _isApiCalling
                                   ? Colors.grey
-                                  : Colors.orange,
+                                  : Colors.red,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(6),
                               ),
@@ -913,7 +913,7 @@ class _StarlineSpDpTpScreenState extends State<StarlineSpDpTpScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: (_isApiCalling || _bids.isEmpty)
                   ? Colors.grey
-                  : Colors.orange,
+                  : Colors.red,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

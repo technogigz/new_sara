@@ -104,7 +104,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CircularProgressIndicator(color: Colors.amber),
+            const CircularProgressIndicator(color: Colors.red),
             const SizedBox(height: 20),
             const Text(
               'Redirecting to WhatsApp...',

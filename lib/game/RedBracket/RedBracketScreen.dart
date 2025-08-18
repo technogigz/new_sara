@@ -487,9 +487,7 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
                         child: ElevatedButton(
                           onPressed: _isBusy ? null : _addBid,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _isBusy
-                                ? Colors.grey
-                                : Colors.orange,
+                            backgroundColor: _isBusy ? Colors.grey : Colors.red,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(6),
                             ),
@@ -606,7 +604,7 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
           value: type,
           groupValue: _bracketType,
           onChanged: (v) => setState(() => _bracketType = v!),
-          activeColor: Colors.orange,
+          activeColor: Colors.red,
         ),
         Text(label, style: GoogleFonts.poppins()),
       ],
@@ -631,7 +629,7 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
           borderSide: BorderSide(color: Colors.black),
         ),
         focusedBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: Colors.orange, width: 2),
+          borderSide: BorderSide(color: Colors.red, width: 2),
         ),
         contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       ),
@@ -723,7 +721,7 @@ class _RedBracketBoardScreenState extends State<RedBracketBoardScreen> {
           ElevatedButton(
             onPressed: canSubmit ? _openConfirmDialog : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: canSubmit ? Colors.orange : Colors.grey,
+              backgroundColor: canSubmit ? Colors.red : Colors.grey,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

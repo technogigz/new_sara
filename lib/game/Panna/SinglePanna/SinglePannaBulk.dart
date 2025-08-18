@@ -422,7 +422,7 @@ class _SinglePannaBulkBoardScreenState
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.orange, width: 2),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
           ),
         ),
         items: types
@@ -461,7 +461,7 @@ class _SinglePannaBulkBoardScreenState
             height: 60,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: _isApiCalling ? Colors.grey : Colors.orange,
+              color: _isApiCalling ? Colors.grey : Colors.red,
               borderRadius: BorderRadius.circular(8),
               boxShadow: _isApiCalling
                   ? []
@@ -607,7 +607,7 @@ class _SinglePannaBulkBoardScreenState
                 ? null
                 : _showConfirmationDialogAndSubmitBids,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _isApiCalling ? Colors.grey : Colors.orange,
+              backgroundColor: _isApiCalling ? Colors.grey : Colors.red,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -725,7 +725,7 @@ class _SinglePannaBulkBoardScreenState
                             height: 40,
                             child: TextFormField(
                               controller: _pointsController,
-                              cursorColor: Colors.orange,
+                              cursorColor: Colors.red,
                               keyboardType: TextInputType.number,
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly,
@@ -757,7 +757,7 @@ class _SinglePannaBulkBoardScreenState
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(30),
                                   borderSide: const BorderSide(
-                                    color: Colors.orange,
+                                    color: Colors.red,
                                     width: 2,
                                   ),
                                 ),
@@ -769,9 +769,7 @@ class _SinglePannaBulkBoardScreenState
                       const SizedBox(height: 30),
                       Center(
                         child: _isApiCalling
-                            ? const CircularProgressIndicator(
-                                color: Colors.orange,
-                              )
+                            ? const CircularProgressIndicator(color: Colors.red)
                             : _buildNumberPad(),
                       ),
                     ],
@@ -1294,7 +1292,7 @@ class _SinglePannaBulkBoardScreenState
 //           ),
 //           focusedBorder: OutlineInputBorder(
 //             borderRadius: BorderRadius.circular(30),
-//             borderSide: const BorderSide(color: Colors.orange, width: 2),
+//             borderSide: const BorderSide(color: Colors.red, width: 2),
 //           ),
 //         ),
 //         items: gameTypes.map((type) {
@@ -1417,7 +1415,7 @@ class _SinglePannaBulkBoardScreenState
 //                 height: 60,
 //                 alignment: Alignment.center,
 //                 decoration: BoxDecoration(
-//                   color: _isApiCalling ? Colors.grey : Colors.orange,
+//                   color: _isApiCalling ? Colors.grey : Colors.red,
 //                   borderRadius: BorderRadius.circular(8),
 //                   boxShadow: _isApiCalling
 //                       ? []
@@ -1563,7 +1561,7 @@ class _SinglePannaBulkBoardScreenState
 //                 ? null
 //                 : _showConfirmationDialogAndSubmitBids,
 //             style: ElevatedButton.styleFrom(
-//               backgroundColor: _isApiCalling ? Colors.grey : Colors.orange,
+//               backgroundColor: _isApiCalling ? Colors.grey : Colors.red,
 //               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
 //               shape: RoundedRectangleBorder(
 //                 borderRadius: BorderRadius.circular(8),
@@ -1674,7 +1672,7 @@ class _SinglePannaBulkBoardScreenState
 //                             height: 40,
 //                             child: TextFormField(
 //                               controller: _pointsController,
-//                               cursorColor: Colors.orange,
+//                               cursorColor: Colors.red,
 //                               keyboardType: TextInputType.number,
 //                               inputFormatters: [
 //                                 FilteringTextInputFormatter.digitsOnly,
@@ -1706,7 +1704,7 @@ class _SinglePannaBulkBoardScreenState
 //                                 focusedBorder: OutlineInputBorder(
 //                                   borderRadius: BorderRadius.circular(30),
 //                                   borderSide: const BorderSide(
-//                                     color: Colors.orange,
+//                                     color: Colors.red,
 //                                     width: 2,
 //                                   ),
 //                                 ),
@@ -1719,7 +1717,7 @@ class _SinglePannaBulkBoardScreenState
 //                       Center(
 //                         child: _isApiCalling
 //                             ? const CircularProgressIndicator(
-//                                 color: Colors.orange,
+//                                 color: Colors.red,
 //                               )
 //                             : _buildNumberPad(),
 //                       ),

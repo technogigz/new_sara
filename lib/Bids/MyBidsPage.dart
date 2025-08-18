@@ -45,7 +45,7 @@ class BidScreen extends StatelessWidget {
             margin: const EdgeInsets.symmetric(vertical: 6),
             elevation: 0,
             child: ListTile(
-              leading: Icon(item.icon, color: Colors.orange, size: 36),
+              leading: Icon(item.icon, color: Colors.red, size: 36),
               title: Text(
                 item.title,
                 style: TextStyle(
@@ -60,7 +60,7 @@ class BidScreen extends StatelessWidget {
                 child: Icon(
                   Icons.arrow_forward_ios,
                   size: 16,
-                  color: Colors.orange,
+                  color: Colors.red,
                 ),
               ),
               onTap: () {

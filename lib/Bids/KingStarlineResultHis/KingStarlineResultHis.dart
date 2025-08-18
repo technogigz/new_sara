@@ -85,13 +85,13 @@ class _KingStarlineResultScreenState extends State<KingStarlineResultScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: Colors.orange, // Header color
+              primary: Colors.red, // Header color
               onPrimary: Colors.white, // Header text color
               onSurface: Colors.black, // Body text color
             ),
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
-                foregroundColor: Colors.orange, // Button text color
+                foregroundColor: Colors.red, // Button text color
               ),
             ),
           ),
@@ -145,7 +145,7 @@ class _KingStarlineResultScreenState extends State<KingStarlineResultScreen> {
         ],
       ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.orange))
+          ? const Center(child: CircularProgressIndicator(color: Colors.red))
           : Column(
               children: [
                 Padding(

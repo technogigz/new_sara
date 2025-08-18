@@ -128,7 +128,7 @@ class _GameRateScreenState extends State<GameRateScreen> {
             padding: const EdgeInsets.all(16),
             child: gameRates == null
                 ? const Center(
-                    child: CircularProgressIndicator(color: Colors.orange),
+                    child: CircularProgressIndicator(color: Colors.red),
                   )
                 : SingleChildScrollView(
                     child: Column(

@@ -154,7 +154,7 @@ class _SetNewPinScreenState extends State<SetNewPinScreen> {
               const SizedBox(height: 30),
               Row(
                 children: [
-                  Container(width: 10, height: 50, color: Colors.amber),
+                  Container(width: 10, height: 50, color: Colors.red),
                   const SizedBox(width: 8),
                   Text(
                     'SET NEW\nPIN',
@@ -178,7 +178,7 @@ class _SetNewPinScreenState extends State<SetNewPinScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: TextField(
-                  cursorColor: Colors.amber,
+                  cursorColor: Colors.red,
                   controller: otpController,
                   decoration: const InputDecoration(
                     border: InputBorder.none,
@@ -199,7 +199,7 @@ class _SetNewPinScreenState extends State<SetNewPinScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: TextField(
-                  cursorColor: Colors.amber,
+                  cursorColor: Colors.red,
                   controller: pinController,
                   obscureText: true,
                   decoration: const InputDecoration(
@@ -216,7 +216,7 @@ class _SetNewPinScreenState extends State<SetNewPinScreen> {
                 height: 50,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.amber,
+                    backgroundColor: Colors.red,
                     elevation: 4,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(4),

@@ -502,7 +502,7 @@ class _SinglePanaScreenState extends State<SinglePanaScreen> {
                           return TextFormField(
                             controller: textCtrl,
                             focusNode: focusNode,
-                            cursorColor: Colors.orange,
+                            cursorColor: Colors.red,
                             keyboardType: TextInputType.number,
                             inputFormatters: [
                               FilteringTextInputFormatter.digitsOnly,
@@ -545,7 +545,7 @@ class _SinglePanaScreenState extends State<SinglePanaScreen> {
                       width: 150,
                       child: TextFormField(
                         controller: _amountCtrl,
-                        cursorColor: Colors.orange,
+                        cursorColor: Colors.red,
                         keyboardType: TextInputType.number,
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
@@ -566,7 +566,7 @@ class _SinglePanaScreenState extends State<SinglePanaScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _isApiCalling
                               ? Colors.grey
-                              : Colors.orange,
+                              : Colors.red,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(6),
                           ),
@@ -719,7 +719,7 @@ class _SinglePanaScreenState extends State<SinglePanaScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: _isApiCalling
                                     ? Colors.grey
-                                    : Colors.orange,
+                                    : Colors.red,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -787,7 +787,7 @@ class _SinglePanaScreenState extends State<SinglePanaScreen> {
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(30),
-      borderSide: const BorderSide(color: Colors.orange, width: 2),
+      borderSide: const BorderSide(color: Colors.red, width: 2),
     ),
   );
 
@@ -803,7 +803,7 @@ class _SinglePanaScreenState extends State<SinglePanaScreen> {
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(30),
-      borderSide: const BorderSide(color: Colors.orange, width: 2),
+      borderSide: const BorderSide(color: Colors.red, width: 2),
     ),
   );
 
@@ -1303,7 +1303,7 @@ class _SinglePanaScreenState extends State<SinglePanaScreen> {
 //           ),
 //           focusedBorder: OutlineInputBorder(
 //             borderRadius: BorderRadius.circular(30),
-//             borderSide: const BorderSide(color: Colors.orange, width: 2),
+//             borderSide: const BorderSide(color: Colors.red, width: 2),
 //           ),
 //         ),
 //         items: types
@@ -1334,7 +1334,7 @@ class _SinglePanaScreenState extends State<SinglePanaScreen> {
 //           return TextFormField(
 //             controller: textCtrl,
 //             focusNode: focusNode,
-//             cursorColor: Colors.orange,
+//             cursorColor: Colors.red,
 //             keyboardType: TextInputType.number,
 //             decoration: InputDecoration(
 //               hintText: 'Bid Pana',
@@ -1354,7 +1354,7 @@ class _SinglePanaScreenState extends State<SinglePanaScreen> {
 //               ),
 //               focusedBorder: OutlineInputBorder(
 //                 borderRadius: BorderRadius.circular(30),
-//                 borderSide: const BorderSide(color: Colors.orange, width: 2),
+//                 borderSide: const BorderSide(color: Colors.red, width: 2),
 //               ),
 //             ),
 //             style: GoogleFonts.poppins(fontSize: 14),
@@ -1399,7 +1399,7 @@ class _SinglePanaScreenState extends State<SinglePanaScreen> {
 //       width: 150,
 //       child: TextFormField(
 //         controller: amountController,
-//         cursorColor: Colors.orange,
+//         cursorColor: Colors.red,
 //         keyboardType: TextInputType.number,
 //         decoration: InputDecoration(
 //           hintText: 'Enter Amount',
@@ -1419,7 +1419,7 @@ class _SinglePanaScreenState extends State<SinglePanaScreen> {
 //           ),
 //           focusedBorder: OutlineInputBorder(
 //             borderRadius: BorderRadius.circular(30),
-//             borderSide: const BorderSide(color: Colors.orange, width: 2),
+//             borderSide: const BorderSide(color: Colors.red, width: 2),
 //           ),
 //         ),
 //         style: GoogleFonts.poppins(fontSize: 14),
@@ -1527,7 +1527,7 @@ class _SinglePanaScreenState extends State<SinglePanaScreen> {
 //                       child: ElevatedButton(
 //                         onPressed: _addBid,
 //                         style: ElevatedButton.styleFrom(
-//                           backgroundColor: Colors.orange,
+//                           backgroundColor: Colors.red,
 //                           shape: RoundedRectangleBorder(
 //                             borderRadius: BorderRadius.circular(6),
 //                           ),
@@ -1678,7 +1678,7 @@ class _SinglePanaScreenState extends State<SinglePanaScreen> {
 //                             child: ElevatedButton(
 //                               onPressed: _showBidConfirmationDialog,
 //                               style: ElevatedButton.styleFrom(
-//                                 backgroundColor: Colors.orange,
+//                                 backgroundColor: Colors.red,
 //                                 shape: RoundedRectangleBorder(
 //                                   borderRadius: BorderRadius.circular(8),
 //                                 ),

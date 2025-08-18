@@ -387,7 +387,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
   Widget _digitBox(String hint, TextEditingController c) {
     return TextField(
       controller: c,
-      cursorColor: Colors.orange,
+      cursorColor: Colors.red,
       keyboardType: TextInputType.number,
       textAlign: TextAlign.center,
       inputFormatters: [
@@ -409,7 +409,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Colors.orange, width: 2),
+          borderSide: const BorderSide(color: Colors.red, width: 2),
         ),
       ),
       onTap: _clearMsg,
@@ -550,7 +550,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                   value: _session,
                                   icon: const Icon(
                                     Icons.keyboard_arrow_down,
-                                    color: Colors.orange,
+                                    color: Colors.red,
                                   ),
                                   onChanged: _isApiCalling
                                       ? null
@@ -588,7 +588,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                             }
                                           });
                                         },
-                                  activeColor: Colors.orange,
+                                  activeColor: Colors.red,
                                   checkColor: Colors.white,
                                 ),
                                 Text(
@@ -614,7 +614,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                             }
                                           });
                                         },
-                                  activeColor: Colors.orange,
+                                  activeColor: Colors.red,
                                   checkColor: Colors.white,
                                 ),
                                 Text(
@@ -640,7 +640,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                             }
                                           });
                                         },
-                                  activeColor: Colors.orange,
+                                  activeColor: Colors.red,
                                   checkColor: Colors.white,
                                 ),
                                 Text(
@@ -687,7 +687,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                             height: 40,
                             child: TextField(
                               controller: _pointsController,
-                              cursorColor: Colors.orange,
+                              cursorColor: Colors.red,
                               keyboardType: TextInputType.number,
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly,
@@ -717,7 +717,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(20),
                                   borderSide: const BorderSide(
-                                    color: Colors.orange,
+                                    color: Colors.red,
                                     width: 2,
                                   ),
                                 ),
@@ -737,7 +737,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                           child: ElevatedButton(
                             onPressed: _isApiCalling ? null : _onAdd,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.orange,
+                              backgroundColor: Colors.red,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -955,7 +955,7 @@ class _ChoiceSpDpTpBoardScreenState extends State<ChoiceSpDpTpBoardScreen> {
                             onPressed: canSubmit ? _confirm : null,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: canSubmit
-                                  ? Colors.orange
+                                  ? Colors.red
                                   : Colors.grey,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 24,

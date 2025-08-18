@@ -10,7 +10,7 @@ class AppNameBold extends StatelessWidget {
         alignment: Alignment.centerLeft,
         children: [
           // Orange circle behind "S"
-          const CircleAvatar(radius: 48, backgroundColor: Colors.orange),
+          const CircleAvatar(radius: 48, backgroundColor: Colors.red),
 
           // "Sara777" text with overline above "ara"
           Padding(
@@ -41,7 +41,7 @@ class AppNameBold extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 48,
                         fontWeight: FontWeight.w600,
-                        color: Colors.orange,
+                        color: Colors.red,
                       ),
                     ),
                   ],

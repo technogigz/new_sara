@@ -589,7 +589,7 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
                         height: 45,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
+                            backgroundColor: Colors.red,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(6),
                             ),
@@ -793,7 +793,7 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
       height: 35,
       child: TextFormField(
         controller: digitController,
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         keyboardType: TextInputType.number,
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: [
@@ -823,7 +823,7 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.orange, width: 2),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
           ),
         ),
       ),
@@ -840,7 +840,7 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
       height: 35,
       child: TextFormField(
         controller: c,
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         keyboardType: TextInputType.number,
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: fmts,
@@ -863,7 +863,7 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.orange, width: 2),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
           ),
         ),
       ),
@@ -931,7 +931,7 @@ class _DoublePanaBetScreenState extends State<DoublePanaBetScreen> {
           ElevatedButton(
             onPressed: canSubmitAny ? _showConfirmationDialog : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: canSubmitAny ? Colors.orange : Colors.grey,
+              backgroundColor: canSubmitAny ? Colors.red : Colors.grey,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

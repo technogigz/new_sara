@@ -291,7 +291,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
       ),
       body: SafeArea(
         child: RefreshIndicator(
-          color: Colors.amber,
+          color: Colors.red,
           onRefresh: () async {
             log('Refreshing game menu data...', name: 'GameMenuScreen.Refresh');
             setState(() {
@@ -308,7 +308,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(
-                  child: CircularProgressIndicator(color: Colors.amber),
+                  child: CircularProgressIndicator(color: Colors.red),
                 );
               } else if (snapshot.hasError) {
                 return Center(
@@ -674,6 +674,7 @@ class _GameMenuScreenState extends State<GameMenuScreen> {
                                 ), // Padding inside the white circle for the image
                                 child: Image.network(
                                   item.image,
+                                  color: Colors.red,
                                   fit: BoxFit
                                       .contain, // Ensure the entire image is visible within the padded circle
                                   errorBuilder: (context, error, stackTrace) =>

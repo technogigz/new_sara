@@ -58,7 +58,7 @@ class _SubmitIdeaScreenState extends State<SubmitIdeaScreen> {
             SizedBox(height: 20),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange[700],
+                backgroundColor: Colors.red[700],
                 padding: EdgeInsets.symmetric(horizontal: 50, vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(6),
@@ -77,7 +77,7 @@ class _SubmitIdeaScreenState extends State<SubmitIdeaScreen> {
                   letterSpacing: 1,
                 ),
               ),
-            )
+            ),
           ],
         ),
       ),

@@ -481,7 +481,7 @@ class _TwoDigitPanelScreenState extends State<TwoDigitPanelScreen> {
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(30),
                                   borderSide: const BorderSide(
-                                    color: Colors.orange,
+                                    color: Colors.red,
                                     width: 2,
                                   ),
                                 ),
@@ -520,7 +520,7 @@ class _TwoDigitPanelScreenState extends State<TwoDigitPanelScreen> {
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(30),
                                   borderSide: const BorderSide(
-                                    color: Colors.orange,
+                                    color: Colors.red,
                                     width: 2,
                                   ),
                                 ),
@@ -533,7 +533,7 @@ class _TwoDigitPanelScreenState extends State<TwoDigitPanelScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: isAnyApiCalling
                                   ? Colors.grey
-                                  : Colors.orange,
+                                  : Colors.red,
                               minimumSize: const Size(80, 45),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -624,7 +624,7 @@ class _TwoDigitPanelScreenState extends State<TwoDigitPanelScreen> {
                                       IconButton(
                                         icon: const Icon(
                                           Icons.delete_outline,
-                                          color: Colors.orange,
+                                          color: Colors.red,
                                         ),
                                         onPressed: isAnyApiCalling
                                             ? null
@@ -685,7 +685,7 @@ class _TwoDigitPanelScreenState extends State<TwoDigitPanelScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: isAnyApiCalling
                                 ? Colors.grey
-                                : Colors.orange,
+                                : Colors.red,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 32,
                               vertical: 12,

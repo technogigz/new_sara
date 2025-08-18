@@ -303,7 +303,7 @@ class _LoginWithMpinScreenState extends State<LoginWithMpinScreen> {
                   controller: mpinController,
                   obscureText: true,
                   keyboardType: TextInputType.number,
-                  cursorColor: Colors.orange,
+                  cursorColor: Colors.red,
                   decoration: InputDecoration(
                     hintText: "Login with mPIN",
                     filled: true,
@@ -326,7 +326,7 @@ class _LoginWithMpinScreenState extends State<LoginWithMpinScreen> {
                   height: 50,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF9B233),
+                      backgroundColor: Colors.red,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(6),
                       ),

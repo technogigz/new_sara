@@ -546,7 +546,7 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _isApiCalling || _biddingClosed
                                 ? Colors.grey
-                                : Colors.orange,
+                                : Colors.red,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(6),
                             ),
@@ -715,7 +715,7 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
       height: 35,
       child: TextFormField(
         controller: digitController,
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         keyboardType: TextInputType.number,
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: [
@@ -746,7 +746,7 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.orange, width: 2),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
           ),
         ),
       ),
@@ -763,7 +763,7 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
       height: 35,
       child: TextFormField(
         controller: controller,
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         keyboardType: TextInputType.number,
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: inputFormatters,
@@ -787,7 +787,7 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.orange, width: 2),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
           ),
         ),
       ),
@@ -824,7 +824,7 @@ class _StarlineTPMotorsScreenState extends State<StarlineTPMotorsScreen> {
               backgroundColor:
                   (_isApiCalling || totalPoints == 0 || _biddingClosed)
                   ? Colors.grey
-                  : Colors.orange,
+                  : Colors.red,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

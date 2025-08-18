@@ -464,7 +464,7 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
                         height: 45,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
+                            backgroundColor: Colors.red,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(6),
                             ),
@@ -641,7 +641,7 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
                               : null,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: canSubmitAny
-                                ? Colors.orange
+                                ? Colors.red
                                 : Colors.grey,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 24,
@@ -761,7 +761,7 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
       height: 35,
       child: TextFormField(
         controller: bidController,
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         keyboardType: TextInputType.number,
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: [
@@ -788,7 +788,7 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.orange, width: 2),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
           ),
         ),
       ),
@@ -801,7 +801,7 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
       height: 35,
       child: TextFormField(
         controller: c,
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         keyboardType: TextInputType.number,
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: [
@@ -828,7 +828,7 @@ class _SPMotorsBetScreenState extends State<SPMotorsBetScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.orange, width: 2),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
           ),
         ),
       ),

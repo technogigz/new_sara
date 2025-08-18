@@ -13,9 +13,7 @@ void closeBidDialogue({
     barrierDismissible: false,
     builder: (_) {
       return AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         contentPadding: EdgeInsets.zero,
         content: Container(
           width: double.maxFinite,
@@ -49,10 +47,7 @@ void closeBidDialogue({
               // Game name
               Text(
                 gameName.toUpperCase(),
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18,
-                ),
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
               ),
               SizedBox(height: 16),
 
@@ -70,7 +65,7 @@ void closeBidDialogue({
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
+                    backgroundColor: Colors.red,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -86,7 +81,7 @@ void closeBidDialogue({
                     ),
                   ),
                 ),
-              )
+              ),
             ],
           ),
         ),
@@ -101,16 +96,10 @@ Widget _buildTimeRow(String label, String time) {
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          "$label :",
-          style: TextStyle(color: Colors.grey[700]),
-        ),
+        Text("$label :", style: TextStyle(color: Colors.grey[700])),
         Text(
           time.isNotEmpty ? time : "--:--",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
         ),
       ],
     ),

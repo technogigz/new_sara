@@ -26,7 +26,7 @@ void showAccountRecoveryDialog(BuildContext context, String mobile) {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: const BoxDecoration(
-                color: Color(0xFFF9B233),
+                color: Colors.red,
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(16),
                   topRight: Radius.circular(16),
@@ -48,11 +48,11 @@ void showAccountRecoveryDialog(BuildContext context, String mobile) {
                 child: isLoading
                     ? const Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),
-                        child: CircularProgressIndicator(color: Colors.amber),
+                        child: CircularProgressIndicator(color: Colors.red),
                       )
                     : ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.amber,
+                          backgroundColor: Colors.red,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 24,
                             vertical: 12,

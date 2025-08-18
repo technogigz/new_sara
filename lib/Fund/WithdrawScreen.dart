@@ -123,11 +123,11 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
       fillColor: Colors.white,
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.orange),
+        borderSide: const BorderSide(color: Colors.red),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.orange, width: 2),
+        borderSide: const BorderSide(color: Colors.red, width: 2),
       ),
     );
   }
@@ -177,7 +177,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
           builder: (context, snapshot) =>
               Text(snapshot.data ?? "Manual approve by Admin"),
         ),
-        activeColor: Colors.orange,
+        activeColor: Colors.red,
       ),
     );
   }
@@ -193,7 +193,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
       builder: (context, snapshot) {
         return TextField(
           controller: controller,
-          cursorColor: Colors.orange,
+          cursorColor: Colors.red,
           keyboardType: keyboardType,
           decoration: _buildInputDecoration(snapshot.data ?? hint),
         );
@@ -507,13 +507,13 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                         children: [
                           Image.asset(
                             "assets/images/ic_wallet.png",
-                            color: Colors.orange,
+                            color: Colors.red,
                             height: 50,
                             width: 50,
                             errorBuilder: (context, error, stackTrace) {
                               return const Icon(
                                 Icons.account_balance_wallet,
-                                color: Colors.orange,
+                                color: Colors.red,
                                 size: 50,
                               );
                             },
@@ -527,7 +527,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                                 style: GoogleFonts.poppins(
                                   fontSize: 24,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.orange,
+                                  color: Colors.red,
                                 ),
                               ),
                               FutureBuilder<String>(
@@ -582,7 +582,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                   return ElevatedButton(
                     onPressed: _performWithdrawal, // Direct call
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
+                      backgroundColor: Colors.red,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),

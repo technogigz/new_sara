@@ -562,7 +562,7 @@ class _AddFundScreenState extends State<AddFundScreen>
   // ---------- UI ----------
   @override
   Widget build(BuildContext context) {
-    final orange = const Color(0xFFFF9800); // screenshot-like orange
+    final orange = Colors.red; // screenshot-like orange
     return Scaffold(
       backgroundColor: const Color(0xFFF2F2F2),
       extendBody: true,
@@ -677,7 +677,7 @@ class _BalanceCard extends StatelessWidget {
                 Image.asset(
                   'assets/images/ic_wallet.png',
                   height: 60,
-                  color: Colors.orange,
+                  color: Colors.red,
                 ),
                 const SizedBox(width: 14),
                 Column(
@@ -716,7 +716,7 @@ class _BalanceCard extends StatelessWidget {
                         width: 28,
                         height: 28,
                         decoration: BoxDecoration(
-                          color: orange,
+                          color: Colors.orange,
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),

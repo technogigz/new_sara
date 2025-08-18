@@ -655,9 +655,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     child: Container(
                       padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                        color: Colors.orange,
+                        color: Colors.red,
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.orange, width: 2),
+                        border: Border.all(color: Colors.red, width: 2),
                         boxShadow: const [
                           BoxShadow(
                             color: Colors.black26,
@@ -668,7 +668,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(5.0),
-                        child: Image.asset("assets/images/ic_home_nav.png"),
+                        child: Icon(Icons.home, color: Colors.black, size: 30),
                       ),
                     ),
                   ),
@@ -690,7 +690,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (!visible) return const SizedBox.shrink();
 
     final isSelected = _selectedIndex == index;
-    final color = isSelected ? Colors.orange : Colors.black;
+    final color = isSelected ? Colors.red : Colors.black;
 
     return GestureDetector(
       onTap: () {

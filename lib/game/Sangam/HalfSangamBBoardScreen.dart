@@ -528,7 +528,7 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _isApiCalling
                                 ? Colors.grey
-                                : Colors.orange,
+                                : Colors.red,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(6),
                             ),
@@ -701,7 +701,7 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
           width: 150,
           height: 40,
           child: TextField(
-            cursorColor: Colors.orange,
+            cursorColor: Colors.red,
             controller: c,
             keyboardType: TextInputType.number,
             inputFormatters: [
@@ -724,7 +724,7 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
               ),
               focusedBorder: const OutlineInputBorder(
                 borderRadius: BorderRadius.all(Radius.circular(20)),
-                borderSide: BorderSide(color: Colors.orange, width: 2),
+                borderSide: BorderSide(color: Colors.red, width: 2),
               ),
             ),
           ),
@@ -780,11 +780,11 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
                   ),
                   focusedBorder: const OutlineInputBorder(
                     borderRadius: BorderRadius.all(Radius.circular(20)),
-                    borderSide: BorderSide(color: Colors.orange, width: 2),
+                    borderSide: BorderSide(color: Colors.red, width: 2),
                   ),
                   suffixIcon: const Icon(
                     Icons.arrow_forward,
-                    color: Colors.orange,
+                    color: Colors.red,
                     size: 20,
                   ),
                 ),
@@ -860,7 +860,7 @@ class _HalfSangamBBoardScreenState extends State<HalfSangamBBoardScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: (_isApiCalling || _bids.isEmpty)
                   ? Colors.grey
-                  : Colors.orange,
+                  : Colors.red,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

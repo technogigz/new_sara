@@ -516,7 +516,7 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: isBusy
                                     ? Colors.grey
-                                    : Colors.orange,
+                                    : Colors.red,
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 12,
                                 ),
@@ -641,7 +641,7 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
         border: Border.all(color: Colors.grey[300]!),
       ),
       child: TextField(
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         controller: c,
         keyboardType: TextInputType.number,
         inputFormatters: [
@@ -671,7 +671,7 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
         border: Border.all(color: Colors.grey[300]!),
       ),
       child: TextField(
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         controller: c,
         keyboardType: TextInputType.number,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -788,7 +788,7 @@ class _DigitBasedBoardScreenState extends State<DigitBasedBoardScreen> {
           ElevatedButton(
             onPressed: canSubmit ? _openConfirmDialog : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: canSubmit ? Colors.orange : Colors.grey,
+              backgroundColor: canSubmit ? Colors.red : Colors.grey,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

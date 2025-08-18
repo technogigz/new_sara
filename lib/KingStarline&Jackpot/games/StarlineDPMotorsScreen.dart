@@ -533,7 +533,7 @@ class _StarlineDPMotorsScreenState extends State<StarlineDPMotorsScreen> {
                         height: 45,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
+                            backgroundColor: Colors.red,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(6),
                             ),
@@ -697,7 +697,7 @@ class _StarlineDPMotorsScreenState extends State<StarlineDPMotorsScreen> {
       height: 35,
       child: TextFormField(
         controller: bidController,
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         keyboardType: TextInputType.number,
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: [
@@ -724,7 +724,7 @@ class _StarlineDPMotorsScreenState extends State<StarlineDPMotorsScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.orange, width: 2),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
           ),
         ),
       ),
@@ -741,7 +741,7 @@ class _StarlineDPMotorsScreenState extends State<StarlineDPMotorsScreen> {
       height: 35,
       child: TextFormField(
         controller: controller,
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         keyboardType: TextInputType.number,
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: inputFormatters,
@@ -765,7 +765,7 @@ class _StarlineDPMotorsScreenState extends State<StarlineDPMotorsScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.orange, width: 2),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
           ),
         ),
       ),
@@ -803,7 +803,7 @@ class _StarlineDPMotorsScreenState extends State<StarlineDPMotorsScreen> {
               backgroundColor:
                   (_isApiCalling || totalPointsForSelectedType == 0)
                   ? Colors.grey
-                  : Colors.orange,
+                  : Colors.red,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

@@ -321,7 +321,7 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
                         _buildInputField(
                           controller: digitController,
                           hint: "Enter Jodi",
-                          borderColor: Colors.orange,
+                          borderColor: Colors.red,
                           selected: 'digit',
                         ),
                       ),
@@ -330,7 +330,7 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
                         _buildInputField(
                           controller: amountController,
                           hint: "Enter Amount",
-                          borderColor: Colors.orange,
+                          borderColor: Colors.red,
                           selected: 'amount',
                         ),
                       ),
@@ -342,7 +342,7 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _isSubmitting
                                 ? Colors.grey
-                                : Colors.orange,
+                                : Colors.red,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(6),
                             ),
@@ -443,7 +443,7 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
             focusNode: focusNode,
             keyboardType: TextInputType.number,
             maxLength: 2,
-            cursorColor: Colors.orange,
+            cursorColor: Colors.red,
             decoration: InputDecoration(
               counterText: "",
               hintText: hint,
@@ -495,7 +495,7 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
         controller: controller,
         keyboardType: TextInputType.number,
         maxLength: 4,
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         decoration: InputDecoration(
           counterText: "",
           hintText: hint,
@@ -604,7 +604,7 @@ class _JodiBidScreenState extends State<JodiBidScreen> {
                     ? null
                     : () => _showConfirmationDialog(total),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
+                  backgroundColor: Colors.red,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(6),
                   ),

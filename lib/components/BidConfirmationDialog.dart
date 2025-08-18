@@ -59,7 +59,7 @@ class BidConfirmationDialog extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(vertical: 12.0),
                       decoration: BoxDecoration(
-                        color: Colors.orange,
+                        color: Colors.red,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -135,7 +135,7 @@ class BidConfirmationDialog extends StatelessWidget {
                               onConfirm();
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.orange,
+                              backgroundColor: Colors.red,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),

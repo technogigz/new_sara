@@ -148,7 +148,7 @@ class _WithdrawalHistoryPageState extends State<WithdrawalHistoryPage> {
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(
-                child: CircularProgressIndicator(color: Colors.orange),
+                child: CircularProgressIndicator(color: Colors.red),
               );
             } else if (snapshot.hasError) {
               return Center(
@@ -208,7 +208,7 @@ class _WithdrawalHistoryPageState extends State<WithdrawalHistoryPage> {
                                       ? Colors.green
                                       : item.statusText.toLowerCase() ==
                                             'pending'
-                                      ? Colors.orange
+                                      ? Colors.red
                                       : Colors.red,
                                 ),
                                 const SizedBox(width: 4),
@@ -221,7 +221,7 @@ class _WithdrawalHistoryPageState extends State<WithdrawalHistoryPage> {
                                         ? Colors.green
                                         : item.statusText.toLowerCase() ==
                                               'pending'
-                                        ? Colors.orange
+                                        ? Colors.red
                                         : Colors.red,
                                   ),
                                 ),

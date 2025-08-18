@@ -49,7 +49,7 @@ class VideoScreen extends StatelessWidget {
         .toList();
 
     return Scaffold(
-      backgroundColor:Colors.grey.shade300,
+      backgroundColor: Colors.grey.shade300,
       appBar: AppBar(
         backgroundColor: Colors.grey.shade300,
         elevation: 0,
@@ -83,7 +83,7 @@ class VideoScreen extends StatelessWidget {
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.orange,
+                                color: Colors.red,
                               ),
                             ),
                           ),

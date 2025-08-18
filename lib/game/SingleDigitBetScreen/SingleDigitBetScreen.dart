@@ -455,7 +455,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _isApiCalling
                                 ? Colors.grey
-                                : Colors.orange,
+                                : Colors.red,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(6),
                             ),
@@ -672,7 +672,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
           height: 35,
           child: TextFormField(
             controller: digitController,
-            cursorColor: Colors.orange,
+            cursorColor: Colors.red,
             keyboardType: TextInputType.number,
             style: GoogleFonts.poppins(fontSize: 14),
             inputFormatters: [
@@ -699,7 +699,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(30),
-                borderSide: const BorderSide(color: Colors.orange, width: 2),
+                borderSide: const BorderSide(color: Colors.red, width: 2),
               ),
             ),
           ),
@@ -754,7 +754,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
       height: 35,
       child: TextFormField(
         controller: controller,
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         keyboardType: TextInputType.number,
         style: GoogleFonts.poppins(fontSize: 14),
         inputFormatters: inputFormatters,
@@ -778,7 +778,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Colors.orange, width: 2),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
           ),
         ),
       ),
@@ -850,7 +850,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: (_isApiCalling || addedEntries.isEmpty)
                   ? Colors.grey
-                  : Colors.orange,
+                  : Colors.red,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -1369,7 +1369,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
 //                           style: ElevatedButton.styleFrom(
 //                             backgroundColor: _isApiCalling
 //                                 ? Colors.grey
-//                                 : Colors.orange,
+//                                 : Colors.red,
 //                             shape: RoundedRectangleBorder(
 //                               borderRadius: BorderRadius.circular(6),
 //                             ),
@@ -1586,7 +1586,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
 //           height: 35,
 //           child: TextFormField(
 //             controller: digitController,
-//             cursorColor: Colors.orange,
+//             cursorColor: Colors.red,
 //             keyboardType: TextInputType.number,
 //             style: GoogleFonts.poppins(fontSize: 14),
 //             inputFormatters: [
@@ -1613,7 +1613,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
 //               ),
 //               focusedBorder: OutlineInputBorder(
 //                 borderRadius: BorderRadius.circular(30),
-//                 borderSide: const BorderSide(color: Colors.orange, width: 2),
+//                 borderSide: const BorderSide(color: Colors.red, width: 2),
 //               ),
 //             ),
 //           ),
@@ -1668,7 +1668,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
 //       height: 35,
 //       child: TextFormField(
 //         controller: controller,
-//         cursorColor: Colors.orange,
+//         cursorColor: Colors.red,
 //         keyboardType: TextInputType.number,
 //         style: GoogleFonts.poppins(fontSize: 14),
 //         inputFormatters: inputFormatters,
@@ -1692,7 +1692,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
 //           ),
 //           focusedBorder: OutlineInputBorder(
 //             borderRadius: BorderRadius.circular(30),
-//             borderSide: const BorderSide(color: Colors.orange, width: 2),
+//             borderSide: const BorderSide(color: Colors.red, width: 2),
 //           ),
 //         ),
 //       ),
@@ -1764,7 +1764,7 @@ class _SingleDigitBetScreenState extends State<SingleDigitBetScreen> {
 //             style: ElevatedButton.styleFrom(
 //               backgroundColor: (_isApiCalling || addedEntries.isEmpty)
 //                   ? Colors.grey
-//                   : Colors.orange,
+//                   : Colors.red,
 //               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
 //               shape: RoundedRectangleBorder(
 //                 borderRadius: BorderRadius.circular(8),

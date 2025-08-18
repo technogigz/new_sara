@@ -117,7 +117,7 @@ class _DepositHistoryPageState extends State<DepositHistoryPage> {
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(
-                child: CircularProgressIndicator(color: Colors.orange),
+                child: CircularProgressIndicator(color: Colors.red),
               );
             } else if (snapshot.hasError) {
               return Center(child: Text('Error: ${snapshot.error}'));
@@ -141,7 +141,7 @@ class _DepositHistoryPageState extends State<DepositHistoryPage> {
                   statusColor = Colors.green;
                   statusIcon = Icons.check_circle;
                 } else if (item.statusText.toLowerCase() == 'pending') {
-                  statusColor = Colors.orange;
+                  statusColor = Colors.red;
                   statusIcon = Icons.access_time;
                 } else if (item.statusText.toLowerCase() == 'failed' ||
                     item.statusText.toLowerCase() == 'rejected') {

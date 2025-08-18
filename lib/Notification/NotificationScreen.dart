@@ -118,7 +118,7 @@ class _NoticeHistoryScreenState extends State<NoticeHistoryScreen> {
             Expanded(
               child: loading
                   ? const Center(
-                      child: CircularProgressIndicator(color: Colors.amber),
+                      child: CircularProgressIndicator(color: Colors.red),
                     )
                   : entries.isEmpty
                   ? Center(
@@ -344,7 +344,7 @@ class NoticeEntry {
 //             Expanded(
 //               child: loading
 //                   ? const Center(
-//                       child: CircularProgressIndicator(color: Colors.amber),
+//                       child: CircularProgressIndicator(color: Colors.red),
 //                     )
 //                   : entries.isEmpty
 //                   ? Center(

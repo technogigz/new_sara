@@ -116,13 +116,13 @@ class _KingJackpotHistoryScreenState extends State<KingJackpotHistoryScreen> {
         return Theme(
           data: ThemeData.light().copyWith(
             colorScheme: ColorScheme.light(
-              primary: Colors.orange, // Header background color
+              primary: Colors.red, // Header background color
               onPrimary: Colors.white, // Header text color
               onSurface: Colors.black, // Body text color
             ),
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
-                foregroundColor: Colors.orange, // Button text color
+                foregroundColor: Colors.red, // Button text color
               ),
             ),
           ),
@@ -184,7 +184,7 @@ class _KingJackpotHistoryScreenState extends State<KingJackpotHistoryScreen> {
             Expanded(
               child: loading
                   ? const Center(
-                      child: CircularProgressIndicator(color: Colors.orange),
+                      child: CircularProgressIndicator(color: Colors.red),
                     )
                   : entries.isEmpty
                   ? Center(
@@ -226,7 +226,7 @@ class _KingJackpotHistoryScreenState extends State<KingJackpotHistoryScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
-              color: Colors.orange, // Orange background for header
+              color: Colors.red, // Orange background for header
               borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
             ),
             child: Row(
@@ -347,7 +347,7 @@ class _KingJackpotHistoryScreenState extends State<KingJackpotHistoryScreen> {
         child: Container(
           height: 45,
           decoration: BoxDecoration(
-            color: enabled ? Colors.orange : Colors.grey,
+            color: enabled ? Colors.red : Colors.grey,
             borderRadius: BorderRadius.circular(6),
           ),
           child: Center(

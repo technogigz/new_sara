@@ -474,7 +474,7 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
                                 value: _selectedLataDayType,
                                 icon: const Icon(
                                   Icons.keyboard_arrow_down,
-                                  color: Colors.orange,
+                                  color: Colors.red,
                                 ),
                                 onChanged: (v) => setState(() {
                                   _selectedLataDayType = v;
@@ -502,7 +502,7 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
                                   _clearMessage();
                                 });
                               },
-                              activeColor: Colors.orange,
+                              activeColor: Colors.red,
                               contentPadding: EdgeInsets.zero,
                             ),
                           ),
@@ -517,7 +517,7 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
                                   _clearMessage();
                                 });
                               },
-                              activeColor: Colors.orange,
+                              activeColor: Colors.red,
                               contentPadding: EdgeInsets.zero,
                             ),
                           ),
@@ -556,7 +556,7 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: _isApiCalling
                                     ? Colors.grey
-                                    : Colors.orange,
+                                    : Colors.red,
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 12,
                                 ),
@@ -692,7 +692,7 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
         border: Border.all(color: Colors.grey[300]!),
       ),
       child: TextField(
-        cursorColor: Colors.orange,
+        cursorColor: Colors.red,
         controller: controller,
         keyboardType: TextInputType.number,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -800,7 +800,7 @@ class _OddEvenBoardScreenState extends State<OddEvenBoardScreen> {
           ElevatedButton(
             onPressed: canSubmit ? _showConfirmationDialog : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: canSubmit ? Colors.orange : Colors.grey,
+              backgroundColor: canSubmit ? Colors.red : Colors.grey,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
